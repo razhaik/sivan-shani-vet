@@ -1,0 +1,56 @@
+{
+  "name": "ClientArchive",
+  "description": "A creator-owned archive marker that hides a derived CRM customer row while preserving its appointment and inquiry history",
+  "properties": {
+    "client_key": {
+      "type": "string",
+      "description": "Stable derived customer row key, such as client:phone:+972... or lead:phone:+972..."
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Customer name captured when the row was archived"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Customer phone snapshot captured when the row was archived"
+    },
+    "email": {
+      "type": "string",
+      "description": "Customer email snapshot captured when the row was archived"
+    },
+    "archived_at": {
+      "type": "string",
+      "description": "ISO timestamp when the derived customer row was archived"
+    },
+    "source_status": {
+      "type": "string",
+      "description": "Source row status when archived, such as active, new, or lead"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

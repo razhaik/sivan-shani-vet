@@ -1,0 +1,200 @@
+{
+  "name": "ClinicSettings",
+  "description": "Global settings for the veterinary clinic dashboard",
+  "properties": {
+    "auto_confirm_appointments": {
+      "type": "boolean",
+      "description": "Whether new appointments are auto-confirmed and synced to calendar"
+    },
+    "min_hours_before_booking": {
+      "type": "integer",
+      "description": "מספר שעות מינימלי מראש לקביעת תור"
+    },
+    "weekly_availability": {
+      "type": "array",
+      "description": "זמינות שבועית כללית של המרפאה, המשמשת כבסיס לכל סוגי התורים ונפרדת מהגבלות AppointmentWindow לפי שירות",
+      "items": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "integer",
+            "description": "יום בשבוע, ראשון 0 עד שבת 6"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "האם המרפאה זמינה ביום הזה"
+          },
+          "periods": {
+            "type": "array",
+            "description": "טווחי שעות הפעילות של היום בפורמט HH:mm",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "description": "שעת התחלה בפורמט HH:mm"
+                },
+                "end": {
+                  "type": "string",
+                  "description": "שעת סיום בפורמט HH:mm"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "booking_note_vaccine": {
+      "type": "string",
+      "description": "הודעה שתוצג ללקוחות שבוחרים תור חיסון וטיפולים שגרתיים"
+    },
+    "booking_note_general": {
+      "type": "string",
+      "description": "הודעה שתוצג ללקוחות שבוחרים תור בדיקה כללית / לקוח חדש"
+    },
+    "booking_note_surgery": {
+      "type": "string",
+      "description": "הודעה שתוצג ללקוחות שבוחרים תור עיקור / סירוס / פרוצדורה אחרת"
+    },
+    "booking_note_dental": {
+      "type": "string",
+      "description": "הודעה שתוצג ללקוחות שבוחרים תור ניקוי שיניים בהרדמה"
+    },
+    "enable_email_reminders": {
+      "type": "boolean",
+      "description": "האם הרובוט שולח תזכורות במייל ללקוחות"
+    },
+    "reminder_day_before_hours": {
+      "type": "integer",
+      "description": "כמה שעות לפני התור נשלחת תזכורת 'יום לפני' (ברירת מחדל 24)"
+    },
+    "reminder_hour_before_hours": {
+      "type": "integer",
+      "description": "כמה שעות לפני התור נשלחת תזכורת 'שעה לפני' (ברירת מחדל 1)"
+    },
+    "reminder_day_before_subject": {
+      "type": "string",
+      "description": "נושא המייל לתזכורת יום לפני"
+    },
+    "reminder_day_before_title": {
+      "type": "string",
+      "description": "כותרת גדולה בתוך המייל לתזכורת יום לפני"
+    },
+    "reminder_day_before_subtitle": {
+      "type": "string",
+      "description": "שורת משנה/הסבר במייל לתזכורת יום לפני"
+    },
+    "reminder_day_before_status_label": {
+      "type": "string",
+      "description": "טקסט התגית הצבעונית (סטטוס) לתזכורת יום לפני"
+    },
+    "reminder_hour_before_subject": {
+      "type": "string",
+      "description": "נושא המייל לתזכורת שעה לפני"
+    },
+    "reminder_hour_before_title": {
+      "type": "string",
+      "description": "כותרת גדולה בתוך המייל לתזכורת שעה לפני"
+    },
+    "reminder_hour_before_subtitle": {
+      "type": "string",
+      "description": "שורת משנה/הסבר במייל לתזכורת שעה לפני"
+    },
+    "reminder_hour_before_status_label": {
+      "type": "string",
+      "description": "טקסט התגית הצבעונית (סטטוס) לתזכורת שעה לפני"
+    },
+    "enable_sms_reminders": {
+      "type": "boolean",
+      "description": "האם הרובוט שולח תזכורות SMS ללקוחות"
+    },
+    "reminder_sms_day_before_template": {
+      "type": "string",
+      "description": "תבנית ה-SMS ליום לפני התור (ניתן להשתמש במשתנים: {CLIENT_NAME}, {PET_NAME}, {DATE}, {TIME})"
+    },
+    "reminder_sms_hour_before_template": {
+      "type": "string",
+      "description": "תבנית ה-SMS לשעה לפני התור (אותם משתנים)"
+    },
+    "customer_email_template_selections": {
+      "type": "object",
+      "description": "בחירת התבנית הקיימת לכל סוג אימייל שנשלח ללקוחות, עם ברירת מחדל בטוחה לתבנית הנוכחית",
+      "properties": {
+        "booking_request": {
+          "type": "string",
+          "description": "תבנית עבור קבלת בקשת תור"
+        },
+        "appointment_approved": {
+          "type": "string",
+          "description": "תבנית עבור אישור תור"
+        },
+        "appointment_updated": {
+          "type": "string",
+          "description": "תבנית עבור עדכון פרטי תור"
+        },
+        "appointment_cancelled": {
+          "type": "string",
+          "description": "תבנית עבור ביטול תור או דחיית בקשה"
+        },
+        "appointment_reminder_day": {
+          "type": "string",
+          "description": "תבנית עבור תזכורת ראשונה במייל"
+        },
+        "appointment_reminder_hour": {
+          "type": "string",
+          "description": "תבנית עבור תזכורת שנייה במייל"
+        },
+        "client_cancellation": {
+          "type": "string",
+          "description": "תבנית עבור אישור ביטול על ידי הלקוח"
+        },
+        "reschedule_rejected": {
+          "type": "string",
+          "description": "תבנית עבור דחיית בקשת שינוי מועד"
+        }
+      }
+    },
+    "self_service_appointment_management_enabled": {
+      "type": "boolean",
+      "description": "האם לקוחות יכולים לנהל את התור שלהם דרך קישור מאובטח במייל"
+    },
+    "self_service_cancellation_min_hours": {
+      "type": "integer",
+      "description": "מספר השעות המינימלי מראש שבהן ניתן לבטל תור באופן עצמאי; 0 ללא הגבלה"
+    },
+    "self_service_reschedule_min_hours": {
+      "type": "integer",
+      "description": "מספר השעות המינימלי מראש להגשת בקשת שינוי מועד; 0 ללא הגבלה, אך מועד שכבר עבר תמיד אינו תקין"
+    },
+    "self_service_cancellation_cutoff_message": {
+      "type": "string",
+      "description": "הודעה שמוצגת ללקוח לאחר שחלף חלון הזמן לביטול עצמאי"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

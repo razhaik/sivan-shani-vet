@@ -1,0 +1,173 @@
+{
+  "name": "BusinessClient",
+  "description": "A customer record created independently from appointments, including imported CRM details",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "שם הלקוח המלא, לשמירת תאימות לאחור"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "השם הפרטי של הלקוח, כפי שיובא או נערך בתיק הפרטי"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "שם המשפחה של הלקוח, כפי שיובא או נערך בתיק הפרטי"
+    },
+    "national_id": {
+      "type": "string",
+      "description": "מספר תעודת הזהות של הלקוח, מידע פרטי לצוות ה-CRM"
+    },
+    "phone": {
+      "type": "string",
+      "description": "מספר הטלפון הראשי, לשמירת תאימות לאחור"
+    },
+    "mobile_phone": {
+      "type": "string",
+      "description": "מספר הטלפון הסלולרי של הלקוח"
+    },
+    "home_phone": {
+      "type": "string",
+      "description": "מספר הטלפון בבית של הלקוח"
+    },
+    "email": {
+      "type": "string",
+      "description": "כתובת האימייל של הלקוח"
+    },
+    "address": {
+      "type": "string",
+      "description": "כתובת המגורים של הלקוח"
+    },
+    "city": {
+      "type": "string",
+      "description": "העיר של הלקוח"
+    },
+    "postal_code": {
+      "type": "string",
+      "description": "המיקוד של הלקוח"
+    },
+    "pet_name": {
+      "type": "string",
+      "description": "שם חיית המחמד הראשית, לשמירה על תאימות לאחור"
+    },
+    "pet_species": {
+      "type": "string",
+      "description": "סוג חיית המחמד הראשית: dog, cat או other"
+    },
+    "pet_details": {
+      "type": "array",
+      "description": "פרופילים נפרדים לכל חיית מחמד, כולל מזהה יציב, פרטי זיהוי ופרטים רפואיים פנימיים",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pet_id": {
+            "type": "string",
+            "description": "מזהה יציב של חיית המחמד, לשמירת הקישור ליומן גם לאחר שינוי שם"
+          },
+          "name": {
+            "type": "string",
+            "description": "שם חיית המחמד"
+          },
+          "species": {
+            "type": "string",
+            "description": "סוג חיית המחמד: dog, cat או other"
+          },
+          "breed": {
+            "type": "string",
+            "description": "גזע חיית המחמד, אם ידוע"
+          },
+          "birth_date": {
+            "type": "string",
+            "description": "תאריך הלידה של חיית המחמד בפורמט YYYY-MM-DD, אם ידוע"
+          },
+          "weight_kg": {
+            "type": "number",
+            "description": "משקל חיית המחמד בקילוגרמים"
+          },
+          "allergies": {
+            "type": "string",
+            "description": "אלרגיות ידועות של חיית המחמד"
+          },
+          "medical_notes": {
+            "type": "string",
+            "description": "הערות רפואיות פנימיות לצוות המרפאה"
+          }
+        }
+      }
+    },
+    "additional_fields": {
+      "type": "array",
+      "description": "שדות מקור נוספים שיובאו מהגיליון ולא מופו לשדה תקני. כל פריט שומר את הכותרת המקורית, מפתח מנורמל והערך הלא-ריק.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "מפתח יציב ומנורמל של כותרת העמודה"
+          },
+          "label": {
+            "type": "string",
+            "description": "כותרת העמודה המקורית שהוצגה בקובץ"
+          },
+          "value": {
+            "type": "string",
+            "description": "הערך הלא-ריק שנשמר מהגיליון"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "הערות שהגיעו עם הלקוח"
+    },
+    "sms_consent": {
+      "type": "boolean",
+      "description": "האם נשמרה הסכמה מפורשת ל-SMS"
+    },
+    "sms_consent_language": {
+      "type": "string",
+      "description": "נוסח ההסכמה המדויק שנשמר עם הייבוא"
+    },
+    "import_source": {
+      "type": "string",
+      "description": "מקור הייבוא, כולל שמות הקבצים אם קיימים"
+    },
+    "linked_client_key": {
+      "type": "string",
+      "description": "מפתח הלקוח הראשי שאליו הרשומה אוחדה, אם נבחר איחוד"
+    },
+    "linked_client_keys": {
+      "type": "array",
+      "description": "כל מפתחות הלקוחות שנשמרו במהלך איחוד הרשומות",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

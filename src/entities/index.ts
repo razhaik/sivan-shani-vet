@@ -1,0 +1,22 @@
+import { superdevClient } from "@/lib/superdev/client";
+
+export const User = superdevClient.auth;
+export const ContactInquiry = superdevClient.entity("ContactInquiry");
+export const Appointment = superdevClient.entity("Appointment");
+export const AppointmentRescheduleRequest = superdevClient.entity("AppointmentRescheduleRequest");
+export const AppointmentNote = superdevClient.entity("AppointmentNote");
+export const ClinicSettings = superdevClient.entity("ClinicSettings");
+export const AppointmentWindow = superdevClient.entity("AppointmentWindow");
+export const AppointmentBlock = superdevClient.entity("AppointmentBlock");
+export const BusinessClient = superdevClient.entity("BusinessClient");
+export const PetMedicalRecord = superdevClient.entity("PetMedicalRecord");
+export const ClientArchive = superdevClient.entity("ClientArchive");
+export const MarketingCampaign = superdevClient.entity("MarketingCampaign");
+export const MarketingBroadcastDraft = superdevClient.entity("MarketingBroadcastDraft");
+export const MarketingSendLog = superdevClient.entity("MarketingSendLog");
+export const MarketingRecipientStatus = superdevClient.entity("MarketingRecipientStatus");
+export const DashboardLayoutPreference = superdevClient.entity("DashboardLayoutPreference");
+export const ClientListPreference = superdevClient.entity("ClientListPreference");
+export const ClientReminder = superdevClient.entity("ClientReminder");
+export const ClinicService = superdevClient.entity("ClinicService");
+export const ClinicNotificationSettings = superdevClient.entity("ClinicNotificationSettings");

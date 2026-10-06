@@ -1,0 +1,50 @@
+{
+  "name": "ClientListPreference",
+  "description": "A personal display and sorting preference for the signed-in CRM customer list",
+  "properties": {
+    "visible_columns": {
+      "type": "array",
+      "description": "The customer-list columns shown to this CRM user",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rows_per_page": {
+      "type": "number",
+      "description": "The number of customer rows shown per page",
+      "minimum": 20,
+      "maximum": 100
+    },
+    "sort_key": {
+      "type": "string",
+      "description": "The customer-list sort column selected by this CRM user",
+      "enum": [
+        "name",
+        "lastActivity",
+        "appointments"
+      ]
+    },
+    "sort_direction": {
+      "type": "string",
+      "description": "The customer-list sort direction selected by this CRM user",
+      "enum": [
+        "asc",
+        "desc"
+      ]
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

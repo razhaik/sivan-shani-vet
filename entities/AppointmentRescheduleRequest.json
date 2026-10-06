@@ -1,0 +1,140 @@
+{
+  "name": "AppointmentRescheduleRequest",
+  "description": "Protected request record for the future customer appointment rescheduling workflow",
+  "properties": {
+    "appointment_id": {
+      "type": "string",
+      "description": "מזהה התור המקורי שאליו מתייחסת בקשת שינוי המועד"
+    },
+    "old_appointment_date": {
+      "type": "string",
+      "description": "תאריך התור המקורי כפי שנשמר בעת הגשת הבקשה; תמונת מצב שאינה משתנה"
+    },
+    "old_start_time": {
+      "type": "string",
+      "description": "שעת תחילת התור המקורי כפי שנשמרה בעת הגשת הבקשה; תמונת מצב שאינה משתנה"
+    },
+    "old_end_time": {
+      "type": "string",
+      "description": "שעת סיום התור המקורי כפי שנשמרה בעת הגשת הבקשה; תמונת מצב שאינה משתנה"
+    },
+    "proposed_appointment_date": {
+      "type": "string",
+      "description": "התאריך שהלקוח הציע למועד החדש"
+    },
+    "proposed_start_time": {
+      "type": "string",
+      "description": "שעת תחילת המועד החדש שהלקוח הציע"
+    },
+    "proposed_end_time": {
+      "type": "string",
+      "description": "שעת סיום המועד החדש שהלקוח הציע"
+    },
+    "service_identifier": {
+      "type": "string",
+      "description": "מזהה השירות או סוג השירות כפי שנשמר לצורך בדיקת זמינות המועד החדש"
+    },
+    "service_duration_minutes": {
+      "type": "integer",
+      "description": "משך השירות בדקות כפי שנשמר בעת הגשת הבקשה"
+    },
+    "status": {
+      "type": "string",
+      "description": "מחזור חיי הבקשה: pending, processing, approved, rejected, invalidated או recovery-required"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "מפתח יציב לזיהוי הגשה חוזרת של אותה בקשה ולמניעת יצירת בקשות כפולות"
+    },
+    "inbox_handled_at": {
+      "type": "string",
+      "description": "חותמת זמן שבה מנהל המרפאה סימן את הבקשה כנקראה או טופלה בתיבת ה-CRM"
+    },
+    "inbox_archived_at": {
+      "type": "string",
+      "description": "תאריך ושעת העברת בקשת שינוי המועד לארכיון בתיבת הדואר (ISO). שדה ריק מציין שהבקשה אינה בארכיון."
+    },
+    "inbox_deleted_at": {
+      "type": "string",
+      "description": "תאריך ושעת העברת בקשת שינוי המועד לאשפה בתיבת הדואר (ISO). שדה ריק מציין שהבקשה אינה באשפה."
+    },
+    "processing_started_at": {
+      "type": "string",
+      "description": "חותמת הזמן שבה התחיל עיבוד החלטת מנהל עבור הבקשה"
+    },
+    "processing_attempts": {
+      "type": "integer",
+      "description": "מספר ניסיונות עיבוד ההחלטה והשלכותיה"
+    },
+    "decision_at": {
+      "type": "string",
+      "description": "חותמת הזמן שבה התקבלה החלטת המנהל או סומנה הבקשה כלא תקפה"
+    },
+    "decision_by_user_id": {
+      "type": "string",
+      "description": "מזהה משתמש ה-CRM שקיבל או תיעד את ההחלטה"
+    },
+    "decision_note": {
+      "type": "string",
+      "description": "הערה או הסבר פנימי המצורף להחלטת המנהל"
+    },
+    "customer_notification_sent_at": {
+      "type": "string",
+      "description": "חותמת הזמן שבה נשלחה הודעת התוצאה ללקוח"
+    },
+    "manager_notification_sent_at": {
+      "type": "string",
+      "description": "חותמת הזמן שבה נשלחה הודעת התוצאה או התקלה למנהל"
+    },
+    "customer_notification_error": {
+      "type": "string",
+      "description": "פרטי שגיאה בשליחת הודעת התוצאה ללקוח, אם נכשלה"
+    },
+    "manager_notification_error": {
+      "type": "string",
+      "description": "פרטי שגיאה בשליחת הודעה למנהל, אם נכשלה"
+    },
+    "recovery_required_at": {
+      "type": "string",
+      "description": "חותמת הזמן שבה הבקשה הועברה לטיפול התאוששות ידני"
+    },
+    "recovery_detail": {
+      "type": "string",
+      "description": "פרטים הדרושים לטיפול ידני בבקשה שנמצאת במצב recovery-required"
+    },
+    "last_error": {
+      "type": "string",
+      "description": "השגיאה האחרונה שנרשמה במהלך עיבוד הבקשה או שליחת ההתראות"
+    },
+    "last_error_at": {
+      "type": "string",
+      "description": "חותמת הזמן של השגיאה האחרונה"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

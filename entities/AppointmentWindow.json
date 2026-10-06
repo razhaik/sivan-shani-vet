@@ -1,0 +1,48 @@
+{
+  "name": "AppointmentWindow",
+  "description": "Allowed time windows for specific appointment types by weekday",
+  "properties": {
+    "appointment_type_id": {
+      "type": "string",
+      "description": "ID of the appointment type (e.g., vaccine, general, surgery, dental)"
+    },
+    "weekday": {
+      "type": "integer",
+      "description": "Weekday index (0=Sunday, 6=Saturday)"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time in HH:mm format"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "End time in HH:mm format"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "ContactInquiry",
+  "description": "פניית לקוח מהטופס באתר",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "שם מלא של הפונה"
+    },
+    "phone": {
+      "type": "string",
+      "description": "טלפון ליצירת קשר"
+    },
+    "email": {
+      "type": "string",
+      "description": "אימייל ליצירת קשר (לא חובה)"
+    },
+    "message": {
+      "type": "string",
+      "description": "תיאור הפנייה / איך אפשר לעזור"
+    },
+    "inbox_handled_at": {
+      "type": "string",
+      "description": "תאריך ושעת הטיפול בפנייה בתיבת הדואר (ISO). שדה ריק מציין שהפנייה עדיין לא טופלה."
+    },
+    "inbox_archived_at": {
+      "type": "string",
+      "description": "תאריך ושעת העברת הפנייה לארכיון בתיבת הדואר (ISO). שדה ריק מציין שהפנייה אינה בארכיון."
+    },
+    "inbox_deleted_at": {
+      "type": "string",
+      "description": "תאריך ושעת העברת הפנייה לאשפה בתיבת הדואר (ISO). שדה ריק מציין שהפנייה אינה באשפה."
+    },
+    "browser_push_notified_at": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת הפנייה על ידי OneSignal להתראת הדפדפן (ISO). שדה ריק מציין שעדיין לא נשלחה התראה."
+    },
+    "owner_new_inquiry_notified_at": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת ההתראה המשולבת לבעלים על ליד או הודעה חדשה (ISO)."
+    }
+  },
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

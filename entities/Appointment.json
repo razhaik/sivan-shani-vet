@@ -1,0 +1,140 @@
+{
+  "name": "Appointment",
+  "description": "An appointment for the veterinary clinic",
+  "properties": {
+    "appointment_type": {
+      "type": "string",
+      "description": "סוג התור (למשל: חיסון, בדיקה כללית)"
+    },
+    "duration_minutes": {
+      "type": "integer",
+      "description": "משך התור בדקות"
+    },
+    "date": {
+      "type": "string",
+      "description": "תאריך התור (YYYY-MM-DD)"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "שעת התחלה (HH:mm)"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "שעת סיום (HH:mm)"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "שם הלקוח"
+    },
+    "phone": {
+      "type": "string",
+      "description": "מספר טלפון של הלקוח"
+    },
+    "email": {
+      "type": "string",
+      "description": "אימייל של הלקוח (לאישור וביטול תורים)"
+    },
+    "pet_name": {
+      "type": "string",
+      "description": "שם חיית המחמד"
+    },
+    "pet_species": {
+      "type": "string",
+      "description": "סוג חיית המחמד: dog לכלב, cat לחתול, other לסוג אחר. ערך ריק או חסר מציין לא ידוע."
+    },
+    "notes": {
+      "type": "string",
+      "description": "הערות נוספות"
+    },
+    "status": {
+      "type": "string",
+      "description": "סטטוס התור (למשל: requested, confirmed, cancelled)"
+    },
+    "sms_consent": {
+      "type": "boolean",
+      "description": "האם הלקוח נתן הסכמה מפורשת לקבלת הודעות SMS מהמרפאה"
+    },
+    "sms_consent_language": {
+      "type": "string",
+      "description": "הנוסח המדויק שהוצג ללקוח בעת מתן הסכמה לקבלת SMS"
+    },
+    "google_event_id": {
+      "type": "string",
+      "description": "ID of the Google Calendar event"
+    },
+    "cancel_token": {
+      "type": "string",
+      "description": "טוקן ייחודי לביטול תור דרך קישור במייל"
+    },
+    "cancelled_by": {
+      "type": "string",
+      "description": "מי ביטל את התור (client/admin)"
+    },
+    "client_cancellation_email_sent_at": {
+      "type": "string",
+      "description": "תאריך ושעת שליחת אישור ביטול ללקוח שביטל דרך קישור ניהול התור"
+    },
+    "day_before_reminder_sent_at": {
+      "type": "string",
+      "description": "תאריך/שעת שליחת תזכורת יום לפני (ISO)"
+    },
+    "hour_before_reminder_sent_at": {
+      "type": "string",
+      "description": "תאריך/שעת שליחת תזכורת שעה לפני (ISO)"
+    },
+    "inbox_handled_at": {
+      "type": "string",
+      "description": "תאריך ושעת הטיפול בבקשת התור בתיבת הדואר (ISO). שדה ריק מציין שבקשת התור עדיין לא טופלה."
+    },
+    "inbox_archived_at": {
+      "type": "string",
+      "description": "תאריך ושעת העברת בקשת התור לארכיון בתיבת הדואר (ISO). שדה ריק מציין שהבקשה אינה בארכיון."
+    },
+    "inbox_deleted_at": {
+      "type": "string",
+      "description": "תאריך ושעת העברת בקשת התור לאשפה בתיבת הדואר (ISO). שדה ריק מציין שהבקשה אינה באשפה."
+    },
+    "browser_push_notified_at": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת התור על ידי OneSignal להתראת הדפדפן (ISO). שדה ריק מציין שעדיין לא נשלחה התראה."
+    },
+    "owner_new_appointment_notified_at": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת התראת הבעלים על תור חדש (ISO). שדה ריק מציין שההתראה עדיין לא סומנה כטופלה."
+    },
+    "owner_appointment_changed_notified_at": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת התראת הבעלים על ביטול או שינוי שבוצע על ידי הלקוח (ISO)."
+    },
+    "owner_appointment_no_show_notified_at": {
+      "type": "string",
+      "description": "תאריך ושעת קבלת התראת הבעלים על אי-הגעה לתור (ISO)."
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

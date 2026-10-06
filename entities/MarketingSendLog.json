@@ -1,0 +1,98 @@
+{
+  "name": "MarketingSendLog",
+  "description": "רשומת שליחה שיווקית אמיתית שנוצרה לאחר מסירה מתועדת של אימייל או SMS",
+  "properties": {
+    "campaign_name": {
+      "type": "string",
+      "description": "שם הקמפיין או ההודעה כפי שנשמר בעת השליחה"
+    },
+    "campaign_type": {
+      "type": "string",
+      "description": "סוג המקור: automatic או broadcast"
+    },
+    "source_id": {
+      "type": "string",
+      "description": "מזהה ההגדרה או הטיוטה שממנה נוצרה השליחה, אם קיים"
+    },
+    "channel": {
+      "type": "string",
+      "description": "ערוץ השליחה: email או sms"
+    },
+    "email_subject": {
+      "type": "string",
+      "description": "נושא האימייל שנשלח, אם נשמר"
+    },
+    "message_preview": {
+      "type": "string",
+      "description": "תצוגה מקדימה או גוף מקוצר של ההודעה, אם נשמר"
+    },
+    "audience_label": {
+      "type": "string",
+      "description": "תיאור הקהל שנשלח אליו, אם נשמר"
+    },
+    "sent_at": {
+      "type": "string",
+      "description": "מועד השליחה בפועל בפורמט תאריך"
+    },
+    "status": {
+      "type": "string",
+      "description": "מצב הריצה: completed, partial או failed"
+    },
+    "recipient_count": {
+      "type": "integer",
+      "description": "מספר הנמענים שנכללו בניסיון השליחה, כולל נמענים שדולגו"
+    },
+    "delivered_count": {
+      "type": "integer",
+      "description": "מספר הודעות שהתקבלו באישור מספק השליחה"
+    },
+    "failed_count": {
+      "type": "integer",
+      "description": "מספר הנמענים שהשליחה אליהם נכשלה"
+    },
+    "skipped_count": {
+      "type": "integer",
+      "description": "מספר הנמענים שדולגו בגלל הסכמה, טלפון, כפילות או רשומה חסרה"
+    },
+    "opened_count": {
+      "type": "integer",
+      "description": "מספר פתיחות שנמדדו, אם קיימות במקור השליחה"
+    },
+    "clicked_count": {
+      "type": "integer",
+      "description": "מספר הקלקות שנמדדו, אם קיימות במקור השליחה"
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "administrator"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "administrator"
+          }
+        }
+      ]
+    }
+  }
+}

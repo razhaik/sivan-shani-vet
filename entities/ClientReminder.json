@@ -1,0 +1,64 @@
+{
+  "name": "ClientReminder",
+  "description": "תזכורת מעקב פנימית ופרטית המחוברת לתיק לקוח אחד במערכת הלקוחות",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "מזהה יציב של שורת הלקוח ב-CRM שאליה התזכורת הפנימית שייכת"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "צילום מצב של שם הלקוח לצורך הצגת התזכורת"
+    },
+    "title": {
+      "type": "string",
+      "description": "כותרת קצרה ונדרשת לתזכורת המעקב הפנימית של צוות המרפאה"
+    },
+    "notes": {
+      "type": "string",
+      "description": "הערה פנימית אופציונלית לצוות המרפאה לגבי המעקב"
+    },
+    "due_at": {
+      "type": "string",
+      "description": "חותמת זמן ISO נדרשת למועד התזכורת הפנימית"
+    },
+    "status": {
+      "type": "string",
+      "description": "סטטוס התזכורת: open או completed"
+    },
+    "completed_at": {
+      "type": "string",
+      "description": "חותמת זמן ISO שנשמרת כאשר התזכורת מסומנת כבוצעה, או ערך ריק כל עוד היא פתוחה"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "שם התצוגה של איש צוות המרפאה שיצר את התזכורת"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

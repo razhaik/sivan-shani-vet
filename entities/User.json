@@ -1,0 +1,10 @@
+{
+  "name": "User",
+  "description": "Additional profile fields for the authenticated user",
+  "properties": {
+    "profile_image_url": {
+      "type": "string",
+      "description": "Stored profile image URL for the signed-in user"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "AppointmentNote",
+  "description": "A private internal note attached to a clinic appointment",
+  "properties": {
+    "appointment_id": {
+      "type": "string",
+      "description": "The Appointment record id this note belongs to"
+    },
+    "body": {
+      "type": "string",
+      "description": "Private note text for the clinic team"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Display name of the clinic administrator who wrote the note"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

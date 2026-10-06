@@ -1,0 +1,70 @@
+{
+  "name": "MarketingRecipientStatus",
+  "description": "סטטוס אמיתי של נמען בשליחה שיווקית מתועדת",
+  "properties": {
+    "send_log_id": {
+      "type": "string",
+      "description": "מזהה רשומת השליחה שאליה שייך הסטטוס"
+    },
+    "recipient_label": {
+      "type": "string",
+      "description": "שם או תווית של הנמען, אם נשמרו"
+    },
+    "destination_masked": {
+      "type": "string",
+      "description": "יעד השליחה כשהוא מוסווה, למשל כתובת אימייל או מספר טלפון חלקי"
+    },
+    "channel": {
+      "type": "string",
+      "description": "ערוץ הסטטוס: email או sms"
+    },
+    "status": {
+      "type": "string",
+      "description": "סטטוס הנמען כפי שנמסר ממקור השליחה"
+    },
+    "sent_at": {
+      "type": "string",
+      "description": "מועד ניסיון השליחה לנמען, אם נשמר"
+    },
+    "delivered_at": {
+      "type": "string",
+      "description": "מועד המסירה לנמען, אם נשמר"
+    },
+    "failure_reason": {
+      "type": "string",
+      "description": "סיבת כישלון, אם נמסרה ממקור השליחה"
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "administrator"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "administrator"
+          }
+        }
+      ]
+    }
+  }
+}

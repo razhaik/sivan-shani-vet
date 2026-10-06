@@ -1,0 +1,22 @@
+# ד״ר סיון שני – מרפאה וטרינרית
+
+This website belongs to Dr. Sivan Shani, a professional veterinary clinic in Israel providing comprehensive medical care for pets. 
+
+## Core Services
+- Routine vaccinations and health treatments.
+- General medical examinations for new and returning pets.
+- Surgical procedures including spaying, neutering, and specialized operations.
+- Professional dental cleaning under anesthesia.
+- Comprehensive medical consultations and pet health management.
+
+## User Capabilities
+- Book appointments online via the scheduling system.
+- Manage and cancel appointments using secure tokens.
+- View clinic services, team information, and FAQs.
+- Access contact information and directions to the clinic.
+
+## Technical Context
+The site is a React-based web application with an integrated appointment management system, dashboard for clinic staff, and automated email/SMS notification capabilities for pet owners.
+
+## Contact
+- Website: https://sivanshanivet.com

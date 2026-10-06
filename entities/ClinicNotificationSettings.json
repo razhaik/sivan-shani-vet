@@ -1,0 +1,89 @@
+{
+  "name": "ClinicNotificationSettings",
+  "description": "Owner-scoped notification preferences for immediate clinic activity alerts",
+  "properties": {
+    "email_recipients": {
+      "type": "array",
+      "description": "Email recipients for owner alerts. Values must be valid email addresses.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sms_recipients": {
+      "type": "array",
+      "description": "SMS recipients for owner alerts. Values must be E.164 phone numbers.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "new_appointment_enabled": {
+      "type": "boolean",
+      "description": "Whether an immediate alert is enabled when a new appointment is created"
+    },
+    "new_appointment_channels": {
+      "type": "array",
+      "description": "Channels for new appointment alerts. Allowed values: email, sms, push.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "new_inquiry_enabled": {
+      "type": "boolean",
+      "description": "Whether an immediate combined lead and inbox alert is enabled for a new ContactInquiry"
+    },
+    "new_inquiry_channels": {
+      "type": "array",
+      "description": "Channels for combined lead and inbox alerts. Allowed values: email, sms, push.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "appointment_changed_enabled": {
+      "type": "boolean",
+      "description": "Whether an immediate alert is enabled after a client cancellation or supported client change"
+    },
+    "appointment_changed_channels": {
+      "type": "array",
+      "description": "Channels for client cancellation or change alerts. Allowed values: email, sms, push.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "appointment_no_show_enabled": {
+      "type": "boolean",
+      "description": "Whether an immediate alert is enabled when staff records an appointment no-show"
+    },
+    "appointment_no_show_channels": {
+      "type": "array",
+      "description": "Channels for appointment no-show alerts. Allowed values: email, sms, push.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "appointment_reschedule_requested_enabled": {
+      "type": "boolean",
+      "description": "Whether an immediate alert is enabled when a customer submits an appointment reschedule request"
+    },
+    "appointment_reschedule_requested_channels": {
+      "type": "array",
+      "description": "Channels for appointment reschedule request alerts. Allowed values: email, sms, push.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

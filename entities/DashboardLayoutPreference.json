@@ -1,0 +1,48 @@
+{
+  "name": "DashboardLayoutPreference",
+  "description": "A personal ordering and sizing preference for the Hebrew CRM dashboard widgets",
+  "properties": {
+    "widget_order": {
+      "type": "array",
+      "description": "The ordered list of CRM dashboard widget ids",
+      "items": {
+        "type": "string"
+      }
+    },
+    "widget_layout": {
+      "type": "array",
+      "description": "Normalized CRM dashboard widget dimensions in abstract grid units",
+      "items": {
+        "type": "object",
+        "properties": {
+          "widget_id": {
+            "type": "string",
+            "description": "The stable CRM dashboard widget id"
+          },
+          "column_span": {
+            "type": "number",
+            "description": "The widget width on the 12-column desktop grid"
+          },
+          "row_span": {
+            "type": "number",
+            "description": "The widget height in bounded abstract grid rows"
+          }
+        }
+      }
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

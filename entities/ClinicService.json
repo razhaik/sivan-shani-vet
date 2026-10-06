@@ -1,0 +1,93 @@
+{
+  "name": "ClinicService",
+  "description": "Shared catalog of veterinary clinic services managed in CRM settings and shown in public customer booking",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "שם השירות כפי שיוצג לצוות וללקוחות"
+    },
+    "duration_minutes": {
+      "type": "integer",
+      "description": "משך השירות בדקות"
+    },
+    "meeting_type": {
+      "type": "string",
+      "description": "סוג הפגישה, למשל פגישה אישית"
+    },
+    "description": {
+      "type": "string",
+      "description": "הנחיות והסבר שיוצגו לצד השירות"
+    },
+    "is_paid": {
+      "type": "boolean",
+      "description": "האם השירות מסומן כשירות בתשלום"
+    },
+    "payment_notes": {
+      "type": "string",
+      "description": "פרטי אמצעי תשלום או הערת תשלום ללא סכום"
+    },
+    "sort_order": {
+      "type": "integer",
+      "description": "סדר הצגת השירותים בקטלוג"
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "האם השירות פעיל וזמין להצגה"
+    },
+    "weekly_availability": {
+      "type": "array",
+      "description": "זמינות שבועית ייחודית לשירות. בהיעדר לוח שמור, השירות יורש את שעות המרפאה הכלליות.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "integer",
+            "description": "יום בשבוע, ראשון 0 עד שבת 6"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "האם השירות זמין ביום הזה"
+          },
+          "periods": {
+            "type": "array",
+            "description": "טווחי השעות שבהם השירות זמין, בפורמט HH:mm",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "description": "שעת התחלה בפורמט HH:mm"
+                },
+                "end": {
+                  "type": "string",
+                  "description": "שעת סיום בפורמט HH:mm"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {},
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

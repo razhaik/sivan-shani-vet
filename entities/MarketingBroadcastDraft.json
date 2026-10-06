@@ -1,0 +1,95 @@
+{
+  "name": "MarketingBroadcastDraft",
+  "description": "טיוטת הודעה שיווקית חד-פעמית פרטית למודול השיווק של ה-CRM",
+  "properties": {
+    "broadcast_name": {
+      "type": "string",
+      "description": "שם הטיוטה שהצוות נותן להודעה"
+    },
+    "broadcast_type": {
+      "type": "string",
+      "description": "סוג הרשומה. בשלב זה הערך הוא broadcast בלבד"
+    },
+    "status": {
+      "type": "string",
+      "description": "מצב הטיוטה: draft או ready"
+    },
+    "channel": {
+      "type": "string",
+      "description": "ערוץ ההודעה: email או sms"
+    },
+    "email_subject": {
+      "type": "string",
+      "description": "נושא ההודעה כאשר הערוץ הוא אימייל"
+    },
+    "message_body": {
+      "type": "string",
+      "description": "תוכן ההודעה, כולל משתני התאמה אישית בטוחים"
+    },
+    "audience_key": {
+      "type": "string",
+      "description": "מפתח קהל יעד מתוך פלחי ה-CRM המאושרים"
+    },
+    "audience_label": {
+      "type": "string",
+      "description": "התווית המוצגת של קהל היעד"
+    },
+    "selected_client_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "מזהי ClientRow של לקוחות שנבחרו. המזהים נפתרים מול רשומות ה-CRM בעת השליחה, בלי לשמור העתק של פרטי הלקוח."
+    },
+    "cta_key": {
+      "type": "string",
+      "description": "מפתח הפעולה האופציונלית מתוך פעולות המרפאה"
+    },
+    "cta_label": {
+      "type": "string",
+      "description": "הטקסט המוצג של הפעולה"
+    },
+    "cta_url": {
+      "type": "string",
+      "description": "כתובת הפעולה שנבחרה"
+    },
+    "sms_consent_acknowledged": {
+      "type": "boolean",
+      "description": "אישור הצוות שהודעת SMS תופנה רק לאנשי קשר עם הסכמה מתועדת"
+    },
+    "last_sent_at": {
+      "type": "string",
+      "description": "מועד ניסיון השליחה האחרון, אם בוצע ניסיון"
+    },
+    "last_send_status": {
+      "type": "string",
+      "description": "מצב ניסיון השליחה האחרון: completed, partial או failed"
+    },
+    "last_sent_count": {
+      "type": "integer",
+      "description": "מספר הודעות SMS שנשלחו בהצלחה בניסיון האחרון"
+    },
+    "last_skipped_count": {
+      "type": "integer",
+      "description": "מספר נמענים שדולגו בניסיון האחרון בגלל הסכמה, טלפון או כפילות"
+    },
+    "last_failed_count": {
+      "type": "integer",
+      "description": "מספר נמענים שניסיון השליחה אליהם נכשל בניסיון האחרון"
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

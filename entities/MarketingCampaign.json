@@ -1,0 +1,98 @@
+{
+  "name": "MarketingCampaign",
+  "description": "הגדרת קמפיין אוטומטי פרטית למודול השיווק של ה-CRM",
+  "properties": {
+    "campaign_name": {
+      "type": "string",
+      "description": "שם ההגדרה שהצוות נותן לקמפיין"
+    },
+    "campaign_type": {
+      "type": "string",
+      "description": "סוג הקמפיין. בשלב זה הערך הוא automatic בלבד"
+    },
+    "status": {
+      "type": "string",
+      "description": "מצב ההגדרה: draft, active או paused"
+    },
+    "channel": {
+      "type": "string",
+      "description": "ערוץ השיווק: email או sms"
+    },
+    "template_key": {
+      "type": "string",
+      "description": "מפתח תבנית הפתיחה שנבחרה, אם ישנה"
+    },
+    "trigger_type": {
+      "type": "string",
+      "description": "אירוע המפעיל את ההגדרה"
+    },
+    "trigger_value": {
+      "type": "integer",
+      "description": "ערך מספרי לטריגר, למשל מספר ימי חוסר פעילות"
+    },
+    "timing_relation": {
+      "type": "string",
+      "description": "יחס הזמן לטריגר: same_day, before או after"
+    },
+    "timing_unit": {
+      "type": "string",
+      "description": "יחידת התזמון: hours או days"
+    },
+    "timing_value": {
+      "type": "integer",
+      "description": "כמות היחידות ביחס לטריגר"
+    },
+    "email_subject": {
+      "type": "string",
+      "description": "נושא ההודעה כאשר הערוץ הוא אימייל"
+    },
+    "message_body": {
+      "type": "string",
+      "description": "תוכן ההודעה הסטטי והניתן לעריכה"
+    },
+    "audience_description": {
+      "type": "string",
+      "description": "תיאור הקהל שאליו ההגדרה מיועדת"
+    },
+    "sms_consent_acknowledged": {
+      "type": "boolean",
+      "description": "אישור מנהל שהשליחה העתידית תוגבל לאנשי קשר עם הסכמת SMS מתועדת"
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "האם ההגדרה מסומנת כמופעלת עבור טריגרים עתידיים"
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "administrator"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "administrator"
+          }
+        }
+      ]
+    }
+  }
+}

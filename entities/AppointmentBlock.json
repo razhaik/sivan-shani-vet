@@ -1,0 +1,48 @@
+{
+  "name": "AppointmentBlock",
+  "description": "One-off closed time windows for a specific calendar date",
+  "properties": {
+    "date": {
+      "type": "string",
+      "description": "Calendar date in YYYY-MM-DD format using Asia/Jerusalem"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time in HH:mm format"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "End time in HH:mm format on the same date"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional internal reason for closing the time window"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}

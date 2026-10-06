@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /dashboard-desktop
+
+Sitemap: https://sivanshanivet.com/sitemap.xml

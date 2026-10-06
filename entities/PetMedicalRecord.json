@@ -1,0 +1,64 @@
+{
+  "name": "PetMedicalRecord",
+  "description": "A private internal medical journal entry for one pet in a CRM client profile",
+  "properties": {
+    "client_key": {
+      "type": "string",
+      "description": "Stable CRM profile row key that owns this internal journal entry"
+    },
+    "pet_id": {
+      "type": "string",
+      "description": "Stable pet identifier used to keep the entry attached after a pet is renamed"
+    },
+    "pet_name": {
+      "type": "string",
+      "description": "Pet name snapshot saved with the entry for historical display"
+    },
+    "record_type": {
+      "type": "string",
+      "description": "Journal entry type: visit, vaccination, treatment, medication, test, or other"
+    },
+    "record_date": {
+      "type": "string",
+      "description": "Local clinic date for the entry in YYYY-MM-DD format"
+    },
+    "title": {
+      "type": "string",
+      "description": "Short required title for the internal medical journal entry"
+    },
+    "details": {
+      "type": "string",
+      "description": "Optional internal clinical detail written by clinic staff"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Display name of the signed-in clinic staff member who created the entry"
+    }
+  },
+  "rls": {
+    "create": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "role": "administrator" } },
+        { "user_condition": { "role": "user" } }
+      ]
+    }
+  }
+}
