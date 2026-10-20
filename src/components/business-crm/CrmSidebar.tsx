@@ -28,6 +28,7 @@ export type CrmActiveKey =
   | "calendar"
   | "settings"
   | "clients"
+  | "sales"
   | "marketing"
   | "marketing-automatic"
   | "marketing-broadcasts"
@@ -58,7 +59,7 @@ const navItems: NavItem[] = [
   { key: "inbox", label: "תיבת דואר", icon: Mail, view: { kind: "inbox" } },
   { key: "calendar", label: "יומן", icon: CalendarDays, view: { kind: "calendar" } },
   { key: "clients", label: "לקוחות", icon: Users, view: { kind: "clients" } },
-  { label: "מכירות", icon: ReceiptText },
+  { key: "sales", label: "מכירות ונתונים", icon: ReceiptText, view: { kind: "sales" } },
   { label: "קבצים", icon: FileText },
   { key: "marketing", label: "שיווק", icon: Megaphone, view: { kind: "marketing", subview: "automatic" }, expandable: true },
   { label: "לכידת לידים", icon: Globe2 },

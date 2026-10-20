@@ -5,6 +5,7 @@ import BusinessCrmClientDetails from "@/pages/BusinessCrmClientDetails";
 import BusinessCrmMarketing from "@/pages/BusinessCrmMarketing";
 import BusinessCrmCalendar from "@/components/business-crm/BusinessCrmCalendar";
 import BusinessCrmSettings from "@/components/business-crm/BusinessCrmSettings";
+import BusinessCrmSales from "@/components/business-crm/BusinessCrmSales";
 import { useCrmContext } from "@/components/business-crm/CrmContext";
 
 export default function BusinessCrmContent() {
@@ -14,6 +15,7 @@ export default function BusinessCrmContent() {
   if (view.kind === "client-details") return <BusinessCrmClientDetails key={view.clientId} clientId={view.clientId} />;
   if (view.kind === "marketing") return <BusinessCrmMarketing key={view.subview} view={view.subview} />;
   if (view.kind === "calendar") return <BusinessCrmCalendar key="calendar" />;
+  if (view.kind === "sales") return <BusinessCrmSales key="sales" />;
   if (view.kind === "settings") return <BusinessCrmSettings key={`settings-${view.section ?? "overview"}`} initialSection={view.section} />;
   return <BusinessCrmDashboard key="overview" />;
 }

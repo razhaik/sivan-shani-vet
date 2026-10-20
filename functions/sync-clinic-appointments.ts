@@ -8,8 +8,17 @@ import {
 const DB_SCAN_LIMIT = 5000;
 const PAGE_SIZE = 100;
 const PARALLEL_SYNC_LIMIT = 4;
+const MAX_REVIEW_ITEMS_PER_PAGE = 50;
 
 type AppointmentRecord = Record<string, any>;
+type CalendarReviewItem = {
+  appointment_id: string;
+  date: string;
+  start_time: string;
+  service: string;
+  pet_name: string;
+  client_name: string;
+};
 type SyncCounts = {
   scanned: number;
   linked_existing: number;
@@ -17,6 +26,10 @@ type SyncCounts = {
   failed: number;
   needs_review: number;
   skipped: number;
+};
+type AppointmentOutcome = {
+  kind: keyof Omit<SyncCounts, "scanned">;
+  reviewItem?: CalendarReviewItem;
 };
 
 function json(body: unknown, status = 200) {
@@ -50,17 +63,30 @@ function emptyCounts(): SyncCounts {
   return { scanned: 0, linked_existing: 0, created: 0, failed: 0, needs_review: 0, skipped: 0 };
 }
 
-async function processAppointment(runtime: Awaited<ReturnType<typeof createCalendarRuntime>>, appointment: AppointmentRecord): Promise<keyof Omit<SyncCounts, "scanned">> {
+function reviewItemForAppointment(appointment: AppointmentRecord): CalendarReviewItem {
+  return {
+    appointment_id: text(appointment.id).slice(0, 200),
+    date: text(appointment.date).slice(0, 10),
+    start_time: text(appointment.start_time).slice(0, 5),
+    service: text(appointment.appointment_type).slice(0, 160),
+    pet_name: text(appointment.pet_name).slice(0, 160),
+    client_name: text(appointment.client_name).slice(0, 160),
+  };
+}
+
+async function processAppointment(runtime: Awaited<ReturnType<typeof createCalendarRuntime>>, appointment: AppointmentRecord): Promise<AppointmentOutcome> {
   const id = text(appointment.id);
   try {
     const result = await syncAppointmentCalendar(runtime, id, { backfill: true });
-    if (result.kind === "created") return "created";
-    if (result.kind === "linked_existing") return "linked_existing";
-    return "skipped";
+    if (result.kind === "created") return { kind: "created" };
+    if (result.kind === "linked_existing") return { kind: "linked_existing" };
+    return { kind: "skipped" };
   } catch (error) {
-    if (error instanceof CalendarReviewRequired) return "needs_review";
+    if (error instanceof CalendarReviewRequired) {
+      return { kind: "needs_review", reviewItem: reviewItemForAppointment(appointment) };
+    }
     console.error("A confirmed appointment could not be synced to Google Calendar.");
-    return "failed";
+    return { kind: "failed" };
   }
 }
 
@@ -116,7 +142,11 @@ Deno.serve(async (req) => {
     const outcomes = await mapConcurrent(page, PARALLEL_SYNC_LIMIT, (record) => processAppointment(runtime, record));
     const counts = emptyCounts();
     counts.scanned = page.length;
-    outcomes.forEach((outcome) => { counts[outcome] += 1; });
+    outcomes.forEach((outcome) => { counts[outcome.kind] += 1; });
+    const reviewItems = outcomes
+      .flatMap((outcome) => outcome.kind === "needs_review" && outcome.reviewItem ? [outcome.reviewItem] : [])
+      .slice(0, MAX_REVIEW_ITEMS_PER_PAGE);
+    const reviewItemsOmitted = Math.max(0, counts.needs_review - reviewItems.length);
 
     const hasMore = missing.length > page.length;
     const nextCursor = hasMore && page.length > 0 ? text(page[page.length - 1].id) : "";
@@ -124,6 +154,8 @@ Deno.serve(async (req) => {
     return json({
       success: true,
       ...counts,
+      review_items: reviewItems,
+      review_items_omitted: reviewItemsOmitted,
       has_more: hasMore,
       next_cursor: nextCursor,
       inventory_limit_reached: inventoryLimitReached,

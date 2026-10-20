@@ -12,6 +12,7 @@ export type CrmView =
   | { kind: "client-details"; clientId: string }
   | { kind: "marketing"; subview: MarketingView }
   | { kind: "calendar" }
+  | { kind: "sales" }
   | { kind: "settings"; section?: CrmSettingsSection };
 
 export function crmViewIdentity(view: CrmView): string {

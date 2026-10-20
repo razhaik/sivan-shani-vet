@@ -5,6 +5,7 @@ import {
   BellRing,
   CheckCircle2,
   Clock3,
+  ExternalLink,
   Info,
   Mail,
   MessageSquare,
@@ -62,6 +63,7 @@ interface BusinessCrmRemindersSettingsProps {
 
 const DEFAULT_DAY_HOURS = 24;
 const DEFAULT_HOUR_HOURS = 1;
+const LIVE_CRM_SETTINGS_URL = `${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}/settings`;
 const DEFAULT_DAY_TEMPLATE = `שלום {CLIENT_NAME}, תזכורת לתור עבור {PET_NAME} בתאריך {DATE} בשעה {TIME} במרפאת ${VETERINARY_CLINIC_PROFILE.shortName}.`;
 const DEFAULT_HOUR_TEMPLATE = `שלום {CLIENT_NAME}, תזכורת לתור עבור {PET_NAME} בעוד שעה, בתאריך {DATE} בשעה {TIME} במרפאת ${VETERINARY_CLINIC_PROFILE.shortName}.`;
 const SUPPORTED_PLACEHOLDERS = ["{TIME}", "{DATE}", "{PET_NAME}", "{CLIENT_NAME}"] as const;
@@ -188,11 +190,12 @@ export default function BusinessCrmRemindersSettings({
   const browserPushStatusLabel: Record<BrowserPushStatus, string> = {
     loading: "בודקות זמינות",
     ready: "מוכן להפעלה",
-    subscribed: "פעיל",
+    subscribed: "פעיל בדפדפן הזה",
     unsupported: "לא זמין בדפדפן הזה",
     denied: "ההרשאה חסומה",
-    unconfigured: "עדיין לא הוגדר",
-    error: "נדרשת בדיקה נוספת",
+    unconfigured: "חסרה הגדרת אפליקציה",
+    "origin-mismatch": "נדרש האתר החי",
+    error: "החיבור לא הושלם",
   };
   const browserPushStatusTone: Record<BrowserPushStatus, StatusTone> = {
     loading: "neutral",
@@ -200,18 +203,21 @@ export default function BusinessCrmRemindersSettings({
     subscribed: "success",
     unsupported: "neutral",
     denied: "danger",
-    unconfigured: "neutral",
+    unconfigured: "warning",
+    "origin-mismatch": "warning",
     error: "warning",
   };
   const browserPushStatusMessage: Record<BrowserPushStatus, string> = {
-    loading: "טוענות את שירות ההתראות. לא תופיע בקשת הרשאה בלי לחיצה שלך.",
-    ready: "הפעילי את ההתראות כדי לקבל עדכונים על תורים ופניות חדשות גם כשהלשונית סגורה.",
-    subscribed: "התראות הצוות פעילות בדפדפן הזה. תורים ופניות חדשות יוכלו להופיע גם כשהאתר סגור.",
+    loading: "טוענות את שירות ההתראות. בקשת הרשאה תופיע רק אחרי לחיצה שלך על מתג ההפעלה.",
+    ready: "שירות ההתראות מוכן. הפעילי את המתג כדי לבקש הרשאה מהדפדפן; הבדיקה עצמה לא מציגה בקשת הרשאה.",
+    subscribed: "OneSignal מזהה הרשמה פעילה בדפדפן הזה, והרשאת הדפדפן מאושרת. תורים ופניות חדשות יוכלו להופיע גם כשהאתר סגור.",
     unsupported: "הדפדפן או מצב הגלישה הנוכחי אינם תומכים בהתראות Web Push.",
-    denied: "ההרשאה נחסמה בדפדפן. אפשר לשנות אותה בהגדרות האתר ואז לבדוק שוב.",
-    unconfigured: "התראות הדפדפן עדיין לא הוגדרו במערכת. אפשר להפעיל אותן אחרי שההגדרה תושלם.",
-    error: "לא הצלחנו לחבר את שירות ההתראות. בדקי את החיבור ונסי שוב.",
+    denied: "הרשאת ההתראות חסומה בדפדפן. שני אותה בהגדרות האתר ואז לחצי על „בדקי שוב”.",
+    unconfigured: "לא נמצא מזהה אפליקציית OneSignal בהגדרת האתר. צריך להוסיף אותו לפני שאפשר לבדוק או להפעיל התראות.",
+    "origin-mismatch": "התראות הצוות מוגדרות לאתר המרפאה הפעיל. פתחי את מערכת הניהול באתר החי כדי לבדוק או להפעיל אותן שם.",
+    error: "שירות ההתראות לא נטען או לא אותחל. אפשר לבדוק שוב; בקשת הרשאה לא תופיע בזמן הבדיקה.",
   };
+  const canUseBrowserPushToggle = browserPushStatus === "ready" || browserPushStatus === "subscribed";
 
   const clearFeedback = () => setFeedback(null);
 
@@ -245,20 +251,52 @@ export default function BusinessCrmRemindersSettings({
     }
   };
 
-  const handleBrowserPushRequest = async () => {
-    if (isRequestingBrowserPush || browserPushStatus === "subscribed" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured") return;
+  const handleBrowserPushStatusRetry = async () => {
+    if (isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "subscribed" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured" || browserPushStatus === "origin-mismatch") return;
 
     setIsRequestingBrowserPush(true);
     setBrowserPushStatus("loading");
+    clearFeedback();
+    try {
+      const nextStatus = await getBrowserPushStatus();
+      setBrowserPushStatus(nextStatus);
+      if (nextStatus === "ready") {
+        setFeedback({ kind: "success", message: "שירות ההתראות זמין. המתג יבקש הרשאה רק כשתבחרי להפעיל אותו." });
+      } else if (nextStatus === "denied") {
+        setFeedback({ kind: "error", message: "ההרשאה עדיין חסומה. שני אותה בהגדרות האתר ואז לחצי על „בדקי שוב”." });
+      } else if (nextStatus === "error") {
+        setFeedback({ kind: "error", message: "שירות ההתראות עדיין לא התחבר. בדקי את החיבור ונסי שוב." });
+      } else {
+        setFeedback(null);
+      }
+    } catch (error) {
+      console.error("Could not retry browser notification status for CRM staff:", error);
+      setBrowserPushStatus("error");
+      setFeedback({ kind: "error", message: "לא הצלחנו לבדוק את שירות ההתראות. נסי שוב." });
+    } finally {
+      setIsRequestingBrowserPush(false);
+    }
+  };
+
+  const handleBrowserPushRequest = async () => {
+    if (isRequestingBrowserPush || browserPushStatus !== "ready") return;
+
+    setIsRequestingBrowserPush(true);
+    setBrowserPushStatus("loading");
+    clearFeedback();
     try {
       const nextStatus = await requestBrowserPushPermission();
       setBrowserPushStatus(nextStatus);
-      if (nextStatus === "unconfigured") {
-        setFeedback(null);
+      if (nextStatus === "subscribed") {
+        setFeedback({ kind: "success", message: "התראות הצוות הופעלו בדפדפן הזה." });
+      } else if (nextStatus === "denied") {
+        setFeedback({ kind: "error", message: "ההרשאה נחסמה בדפדפן. אפשר לשנות אותה בהגדרות האתר." });
+      } else if (nextStatus === "ready") {
+        setFeedback({ kind: "error", message: "ההרשאה לא הופעלה. אפשר לנסות שוב דרך המתג." });
+      } else if (nextStatus === "error") {
+        setFeedback({ kind: "error", message: "לא הצלחנו לחבר את ההתראות. נסי שוב." });
       } else {
-        setFeedback(nextStatus === "subscribed"
-          ? { kind: "success", message: "התראות הצוות הופעלו בדפדפן הזה." }
-          : { kind: "error", message: "ההרשאה לא הופעלה. בדקי את סטטוס הדפדפן ונסי שוב." });
+        setFeedback(null);
       }
     } catch (error) {
       console.error("Could not enable browser notifications for CRM staff:", error);
@@ -270,8 +308,8 @@ export default function BusinessCrmRemindersSettings({
   };
 
   const handleBrowserPushToggle = (checked: boolean) => {
-    if (browserPushStatus === "unconfigured") return;
     if (checked) {
+      if (browserPushStatus !== "ready") return;
       void handleBrowserPushRequest();
       return;
     }
@@ -476,7 +514,7 @@ export default function BusinessCrmRemindersSettings({
               <Switch
                 checked={browserPushStatus === "subscribed"}
                 onCheckedChange={handleBrowserPushToggle}
-                disabled={isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured"}
+                disabled={isRequestingBrowserPush || !canUseBrowserPushToggle}
                 aria-label="הפעלת התראות צוות בדפדפן"
               />
             </div>
@@ -491,21 +529,33 @@ export default function BusinessCrmRemindersSettings({
               <p>באייפון ובאייפד יש להוסיף את האתר למסך הבית דרך Safari, ב־iOS או iPadOS 16.4 ומעלה, ואז להפעיל כאן את ההתראות.</p>
             </div>
           </div>
-          <div className="flex min-h-[58px] items-center justify-between gap-3 py-2.5">
+          <div className="flex min-h-[58px] flex-col gap-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2 text-xs font-semibold leading-5 text-[#738790]">
               <BellRing className="h-4 w-4 shrink-0 text-[#2F8794]" aria-hidden="true" />
               <span>ההרשאה נשמרת בדפדפן הזה בלבד.</span>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleBrowserPushRequest()}
-              disabled={isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "subscribed" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured"}
-              className="min-h-9 shrink-0 rounded-xl border-[#C9DDE3] bg-white px-3 text-xs font-extrabold text-[#1D6472] hover:bg-[#EAF6F7] hover:text-[#102E47]"
-            >
-              {browserPushStatus === "loading" ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-              {browserPushStatus === "subscribed" ? "התראות פעילות" : browserPushStatus === "unsupported" ? "לא נתמך" : browserPushStatus === "unconfigured" ? "ממתינים להגדרה" : "נסי שוב"}
-            </Button>
+            {browserPushStatus === "origin-mismatch" ? (
+              <a
+                href={LIVE_CRM_SETTINGS_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-9 w-fit shrink-0 items-center gap-2 rounded-xl border border-[#C9DDE3] bg-white px-3 text-xs font-extrabold text-[#1D6472] transition hover:bg-[#EAF6F7] hover:text-[#102E47] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F90A1] focus-visible:ring-offset-2"
+              >
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                פתחי את ה־CRM באתר המרפאה
+              </a>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleBrowserPushStatusRetry()}
+                disabled={isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "subscribed" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured"}
+                className="min-h-9 shrink-0 rounded-xl border-[#C9DDE3] bg-white px-3 text-xs font-extrabold text-[#1D6472] hover:bg-[#EAF6F7] hover:text-[#102E47]"
+              >
+                {browserPushStatus === "loading" ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+                {browserPushStatus === "subscribed" ? "התראות פעילות" : browserPushStatus === "unsupported" ? "לא נתמך" : browserPushStatus === "unconfigured" ? "חסרה הגדרה" : browserPushStatus === "ready" ? "בדיקת מצב" : browserPushStatus === "denied" ? "בדקי שוב" : browserPushStatus === "loading" ? "בודקות..." : "נסי שוב"}
+              </Button>
+            )}
           </div>
         </SettingsGroup>
 

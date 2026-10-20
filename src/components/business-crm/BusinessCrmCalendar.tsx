@@ -21,7 +21,7 @@ import { BusinessCrmCalendarToolbar, type CalendarServiceItem } from "@/componen
 import { BusinessCrmCalendarSidePanel } from "@/components/business-crm/BusinessCrmCalendarSidePanel";
 import { BusinessCrmCalendarBlockDialog, type CalendarBlockDraft } from "@/components/business-crm/BusinessCrmCalendarBlockDialog";
 import { BusinessCrmCalendarSlotActionDialog } from "@/components/business-crm/BusinessCrmCalendarSlotActionDialog";
-import { CalendarAppointmentSyncPanel, CalendarEventDetails, CalendarQuickBooking, type CalendarBackfillUiState, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type CalendarSyncCounts, type CalendarSyncFeedback, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
+import { CalendarAppointmentSyncPanel, CalendarEventDetails, CalendarQuickBooking, CALENDAR_REVIEW_LIST_LIMIT, type CalendarBackfillUiState, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type CalendarReviewItem, type CalendarSyncCounts, type CalendarSyncFeedback, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
 import type { CalendarBlockDisplay } from "@/components/business-crm/BusinessCrmCalendarGrid";
 import type { AppointmentEditorMode } from "@/components/business-crm/BusinessCrmCalendarAppointmentEditor";
 
@@ -47,9 +47,13 @@ const normalizedCalendarValue = (value: unknown) => text(value);
 
 const EMPTY_CALENDAR_SYNC_COUNTS: CalendarSyncCounts = { scanned: 0, linked_existing: 0, created: 0, failed: 0, needs_review: 0, skipped: 0 };
 const MAX_CALENDAR_SYNC_PAGES = 55;
+const MAX_CALENDAR_REVIEW_ITEMS = CALENDAR_REVIEW_LIST_LIMIT;
+const MAX_CALENDAR_REVIEW_ITEMS_PER_PAGE = 50;
 
 type CalendarSyncPageResult = {
   counts: CalendarSyncCounts;
+  reviewItems: CalendarReviewItem[];
+  reviewItemsOmitted: number;
   hasMore: boolean;
   nextCursor: string;
   complete: boolean;
@@ -71,6 +75,39 @@ function unwrapCalendarSyncPayload(value: unknown): Record<string, unknown> | nu
   return null;
 }
 
+function reviewField(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const normalized = String(value).trim();
+  return normalized.length <= maxLength ? normalized : null;
+}
+
+function validReviewDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function normalizeCalendarReviewItem(value: unknown): CalendarReviewItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const appointmentId = reviewField(record.appointment_id, 200);
+  const date = reviewField(record.date, 10);
+  const startTime = reviewField(record.start_time, 5);
+  const service = reviewField(record.service, 160);
+  const petName = reviewField(record.pet_name, 160);
+  const clientName = reviewField(record.client_name, 160);
+  if (!appointmentId || !date || !validReviewDate(date) || !startTime || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(startTime)) return null;
+  if (service === null || petName === null || clientName === null) return null;
+  return { appointmentId, date, startTime, service, petName, clientName };
+}
+
 function parseCalendarSyncPage(value: unknown): CalendarSyncPageResult {
   const payload = unwrapCalendarSyncPayload(value);
   if (!payload || payload.success !== true || payload.error) throw new Error("בקשת הסנכרון לא החזירה תוצאה תקינה.");
@@ -82,18 +119,49 @@ function parseCalendarSyncPage(value: unknown): CalendarSyncPageResult {
     if (!Number.isInteger(result) || result < 0) throw new Error("תוצאת הסנכרון אינה כוללת סיכום תקין.");
     return result;
   };
+  const counts: CalendarSyncCounts = {
+    scanned: count("scanned"),
+    linked_existing: count("linked_existing"),
+    created: count("created"),
+    failed: count("failed"),
+    needs_review: count("needs_review"),
+    skipped: count("skipped"),
+  };
   const nextCursor = typeof payload.next_cursor === "string" ? payload.next_cursor.trim() : "";
   if (payload.has_more && !nextCursor) throw new Error("הסנכרון לא החזיר נקודת המשך תקינה.");
+
+  let reviewItems: CalendarReviewItem[] = [];
+  let reviewItemsOmitted = counts.needs_review;
+  const rawReviewItems = payload.review_items;
+  const hasReportedOmitted = Object.prototype.hasOwnProperty.call(payload, "review_items_omitted");
+  const reportedOmitted = payload.review_items_omitted;
+  const reportedOmittedIsValid = typeof reportedOmitted === "number" && Number.isInteger(reportedOmitted) && reportedOmitted >= 0;
+  const malformedReportedOmitted = hasReportedOmitted && !reportedOmittedIsValid;
+
+  if (Array.isArray(rawReviewItems) && rawReviewItems.length <= MAX_CALENDAR_REVIEW_ITEMS_PER_PAGE && !malformedReportedOmitted) {
+    const uniqueItems = new Map<string, CalendarReviewItem>();
+    rawReviewItems.forEach((rawItem) => {
+      const item = normalizeCalendarReviewItem(rawItem);
+      if (item && !uniqueItems.has(item.appointmentId)) uniqueItems.set(item.appointmentId, item);
+    });
+    const candidates = [...uniqueItems.values()];
+    const expectedOmitted = Math.max(0, counts.needs_review - candidates.length);
+    const reportExceedsUnlistedItems = reportedOmittedIsValid && Number(reportedOmitted) > expectedOmitted;
+    const responseIsInconsistent = rawReviewItems.length > counts.needs_review || reportExceedsUnlistedItems;
+    if (responseIsInconsistent) {
+      reviewItemsOmitted = counts.needs_review;
+    } else {
+      reviewItems = candidates;
+      reviewItemsOmitted = Math.min(counts.needs_review, Math.max(expectedOmitted, reportedOmittedIsValid ? Number(reportedOmitted) : 0));
+    }
+  }
+
+  const hasMore = payload.has_more;
   return {
-    counts: {
-      scanned: count("scanned"),
-      linked_existing: count("linked_existing"),
-      created: count("created"),
-      failed: count("failed"),
-      needs_review: count("needs_review"),
-      skipped: count("skipped"),
-    },
-    hasMore: payload.has_more,
+    counts,
+    reviewItems,
+    reviewItemsOmitted,
+    hasMore,
     nextCursor,
     complete: payload.complete,
     inventoryLimitReached: payload.inventory_limit_reached,
@@ -349,9 +417,10 @@ export default function BusinessCrmCalendar() {
   const [notesRetryable, setNotesRetryable] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
-  const [calendarBackfillState, setCalendarBackfillState] = useState<CalendarBackfillUiState>({ phase: "idle", counts: EMPTY_CALENDAR_SYNC_COUNTS, page: 0, complete: false, inventoryLimitReached: false, retryable: false, tone: "info", message: "" });
+  const [calendarBackfillState, setCalendarBackfillState] = useState<CalendarBackfillUiState>({ phase: "idle", counts: EMPTY_CALENDAR_SYNC_COUNTS, reviewItems: [], reviewItemsOmitted: 0, page: 0, complete: false, inventoryLimitReached: false, retryable: false, tone: "info", message: "" });
   const [calendarSyncFeedback, setCalendarSyncFeedback] = useState<CalendarSyncFeedback | null>(null);
   const calendarBackfillCursorRef = useRef("");
+  const calendarBackfillReviewIdsRef = useRef<Set<string>>(new Set());
   const calendarBackfillLockRef = useRef(false);
   const calendarBackfillOutcomesMayBeUnknownRef = useRef(false);
   const calendarRetryLockRef = useRef(false);
@@ -771,17 +840,35 @@ export default function BusinessCrmCalendar() {
     const resumeInterruptedRun = calendarBackfillState.phase === "interrupted" && calendarBackfillState.retryable;
     let cursor = resumeInterruptedRun ? calendarBackfillCursorRef.current : "";
     let counts: CalendarSyncCounts = resumeInterruptedRun ? { ...calendarBackfillState.counts } : { ...EMPTY_CALENDAR_SYNC_COUNTS };
+    let reviewItems: CalendarReviewItem[] = resumeInterruptedRun ? [...calendarBackfillState.reviewItems] : [];
+    let reviewItemsOmitted = resumeInterruptedRun ? calendarBackfillState.reviewItemsOmitted : 0;
     let page = resumeInterruptedRun ? calendarBackfillState.page : 0;
     let inventoryLimitReached = resumeInterruptedRun && calendarBackfillState.inventoryLimitReached;
     let completed = false;
-    if (!resumeInterruptedRun) calendarBackfillCursorRef.current = "";
-    setCalendarBackfillState({ phase: "running", counts, page, complete: false, inventoryLimitReached, retryable: false, tone: "info", message: "בודקת תורים מאושרים חסרי קישור ל-Google Calendar..." });
+    if (!resumeInterruptedRun) {
+      calendarBackfillCursorRef.current = "";
+      calendarBackfillReviewIdsRef.current = new Set();
+    } else if (calendarBackfillReviewIdsRef.current.size === 0) {
+      calendarBackfillReviewIdsRef.current = new Set(reviewItems.map((item) => item.appointmentId).filter(Boolean));
+    }
+    setCalendarBackfillState({ phase: "running", counts, reviewItems, reviewItemsOmitted, page, complete: false, inventoryLimitReached, retryable: false, tone: "info", message: "בודקת תורים מאושרים חסרי קישור ל-Google Calendar..." });
 
     try {
       while (page < MAX_CALENDAR_SYNC_PAGES) {
         const response = await syncClinicAppointments({ after_id: cursor });
         const result = parseCalendarSyncPage(response);
         counts = addCalendarSyncCounts(counts, result.counts);
+        const nextReviewItems = [...reviewItems];
+        let nextReviewItemsOmitted = reviewItemsOmitted + result.reviewItemsOmitted;
+        result.reviewItems.forEach((item) => {
+          const appointmentId = item.appointmentId.trim();
+          if (!appointmentId || calendarBackfillReviewIdsRef.current.has(appointmentId)) return;
+          calendarBackfillReviewIdsRef.current.add(appointmentId);
+          if (nextReviewItems.length < MAX_CALENDAR_REVIEW_ITEMS) nextReviewItems.push(item);
+          else nextReviewItemsOmitted += 1;
+        });
+        reviewItems = nextReviewItems;
+        reviewItemsOmitted = nextReviewItemsOmitted;
         page += 1;
         inventoryLimitReached = inventoryLimitReached || result.inventoryLimitReached;
 
@@ -789,7 +876,7 @@ export default function BusinessCrmCalendar() {
           if (cursor && result.nextCursor.localeCompare(cursor) <= 0) throw new Error("נקודת ההמשך לא התקדמה.");
           cursor = result.nextCursor;
           calendarBackfillCursorRef.current = cursor;
-          setCalendarBackfillState({ phase: "running", counts, page, complete: false, inventoryLimitReached, retryable: false, tone: "info", message: `נבדקו ${counts.scanned} תורים ללא קישור. הסנכרון ממשיך לעמוד הבא.` });
+          setCalendarBackfillState({ phase: "running", counts, reviewItems, reviewItemsOmitted, page, complete: false, inventoryLimitReached, retryable: false, tone: "info", message: `נבדקו ${counts.scanned} תורים ללא קישור. הסנכרון ממשיך לעמוד הבא.` });
           continue;
         }
 
@@ -811,6 +898,8 @@ export default function BusinessCrmCalendar() {
         setCalendarBackfillState({
           phase: isComplete ? "complete" : "interrupted",
           counts,
+          reviewItems,
+          reviewItemsOmitted,
           page,
           complete: isComplete,
           inventoryLimitReached,
@@ -823,7 +912,7 @@ export default function BusinessCrmCalendar() {
       }
 
       if (!completed) {
-        setCalendarBackfillState({ phase: "interrupted", counts, page, complete: false, inventoryLimitReached, retryable: true, tone: "warning", message: "הסריקה נעצרה לפני השלמת כל העמודים. אפשר להריץ שוב, והפעולה ממשיכה מנקודת ההמשך האחרונה." });
+        setCalendarBackfillState({ phase: "interrupted", counts, reviewItems, reviewItemsOmitted, page, complete: false, inventoryLimitReached, retryable: true, tone: "warning", message: "הסריקה נעצרה לפני השלמת כל העמודים. אפשר להריץ שוב, והפעולה ממשיכה מנקודת ההמשך האחרונה." });
       }
     } catch (error) {
       console.error("Clinic appointment Google Calendar backfill was interrupted:", error);
@@ -831,6 +920,8 @@ export default function BusinessCrmCalendar() {
       setCalendarBackfillState({
         phase: "interrupted",
         counts,
+        reviewItems,
+        reviewItemsOmitted,
         page,
         complete: false,
         inventoryLimitReached,

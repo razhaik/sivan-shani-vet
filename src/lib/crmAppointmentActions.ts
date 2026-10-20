@@ -1,6 +1,6 @@
 import { format, isValid, parse } from "date-fns";
 import { he } from "date-fns/locale";
-import { ClinicSettings } from "@/entities";
+import { Appointment, ClinicSettings } from "@/entities";
 import { createCalendarEvent, sendSms } from "@/functions";
 import { sendEmail } from "@/integrations/core";
 import {

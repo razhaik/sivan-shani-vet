@@ -198,6 +198,7 @@ function activeKeyForView(view: CrmView): CrmActiveKey {
   if (view.kind === "calendar") return "calendar";
   if (view.kind === "settings") return "settings";
   if (view.kind === "marketing") return `marketing-${view.subview}`;
+  if (view.kind === "sales") return "sales";
   return "overview";
 }
 

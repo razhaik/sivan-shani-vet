@@ -16,9 +16,20 @@ export type CalendarDetailMode = "view" | AppointmentEditorMode;
 export interface CalendarDetailFeedback { tone: "success" | "error" | "info" | "warning"; message: string; }
 export interface CalendarPrivateNote { id?: string; appointment_id?: string; body?: string; author_name?: string; created_at?: string; }
 export interface CalendarSyncCounts { scanned: number; linked_existing: number; created: number; failed: number; needs_review: number; skipped: number; }
+export const CALENDAR_REVIEW_LIST_LIMIT = 100;
+export interface CalendarReviewItem {
+  appointmentId: string;
+  date: string;
+  startTime: string;
+  service: string;
+  petName: string;
+  clientName: string;
+}
 export interface CalendarBackfillUiState {
   phase: "idle" | "running" | "complete" | "interrupted";
   counts: CalendarSyncCounts;
+  reviewItems: CalendarReviewItem[];
+  reviewItemsOmitted: number;
   page: number;
   complete: boolean;
   inventoryLimitReached: boolean;
@@ -39,11 +50,22 @@ interface CalendarAppointmentSyncPanelProps {
   onRetrySingle: (appointmentId: string) => void;
 }
 
+function calendarReviewDateLabel(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return isValid(date) ? format(date, "EEEE, d בMMMM yyyy", { locale: he }) : value;
+}
+
 export function CalendarAppointmentSyncPanel({ canManage, state, syncFeedback, onRunBackfill, onRetrySingle }: CalendarAppointmentSyncPanelProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   if (!canManage) return null;
   const running = state.phase === "running";
   const hasSummary = state.phase !== "idle";
+  const reviewItems = Array.isArray(state.reviewItems) ? state.reviewItems : [];
+  const reviewItemsOmitted = Number.isInteger(state.reviewItemsOmitted) && state.reviewItemsOmitted >= 0
+    ? state.reviewItemsOmitted
+    : Math.max(0, state.counts.needs_review - reviewItems.length);
   const toneClasses = state.tone === "success"
     ? "border-emerald-200 bg-emerald-50 text-emerald-900"
     : state.tone === "warning"
@@ -104,6 +126,34 @@ export function CalendarAppointmentSyncPanel({ canManage, state, syncFeedback, o
             <p className="mt-0.5 text-[9px] font-extrabold leading-4 text-slate-500">{label}</p>
           </div>)}
         </div>
+        {(state.counts.needs_review > 0 || reviewItems.length > 0 || reviewItemsOmitted > 0) && <section aria-labelledby="calendar-google-review-title" className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-amber-950 sm:p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#80620B] shadow-sm"><CalendarDays className="h-4 w-4" /></span>
+            <div className="min-w-0">
+              <h3 id="calendar-google-review-title" className="text-sm font-black text-[#1A1A3E]">פגישות שממתינות לבדיקה ידנית</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-amber-950">לפני הרצה חוזרת, בדקו ב-Google Calendar את האירועים בתאריך ובשעה של כל פגישה והשוו ביניהם. התאמות עמומות נשארות ללא שינוי עד שתבררו איזה אירוע שייך לפגישה.</p>
+            </div>
+          </div>
+          {reviewItemsOmitted > 0
+            ? <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-xs font-extrabold leading-5 text-amber-950">הרשימה חלקית. היא מציגה עד {CALENDAR_REVIEW_LIST_LIMIT} פגישות; עוד {reviewItemsOmitted} מקרים שממתינים לבדיקה לא מופיעים כאן. בדקו גם את הספירה הכוללת של המקרים הדורשים בדיקה.</p>
+            : <p role="status" className="mt-3 rounded-lg border border-amber-100 bg-white/80 px-3 py-2 text-[11px] font-bold leading-5 text-slate-600">כל {reviewItems.length} הפגישות שדורשות בדיקה מופיעות כאן. הרשימה מוגבלת לעד {CALENDAR_REVIEW_LIST_LIMIT} פגישות.</p>}
+          {reviewItems.length > 0 && <ol aria-label="פגישות לבדיקה ב-Google Calendar" className="mt-3 max-h-80 list-none space-y-2 overflow-y-auto overscroll-contain pl-1">
+            {reviewItems.map((item, index) => <li key={item.appointmentId} className="rounded-xl border border-amber-100 bg-white p-3 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#FFF7D6] text-[11px] font-black tabular-nums text-[#80620B]">{index + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-xs font-black leading-5 text-[#1A1A3E]">חיית מחמד: {item.petName || "לא צוין"}<span className="px-1.5 text-amber-500">·</span>לקוח: {item.clientName || "לא צוין"}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold leading-5 text-slate-600">
+                    <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#5267A8]" />{calendarReviewDateLabel(item.date)}</span>
+                    <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 text-[#5267A8]" /><span dir="ltr">{item.startTime}</span></span>
+                  </div>
+                  <p className="mt-1 text-[11px] font-bold leading-5 text-slate-600">שירות: {item.service || "לא צוין"}</p>
+                  <p className="mt-1 break-all text-[10px] font-semibold text-slate-400">מזהה פגישה: <span dir="ltr" className="font-mono text-slate-500">{item.appointmentId}</span></p>
+                </div>
+              </div>
+            </li>)}
+          </ol>}
+        </section>}
       </div>}
     </section>
 
