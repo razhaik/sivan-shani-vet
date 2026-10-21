@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Appointment, AppointmentBlock, AppointmentNote, AppointmentWindow, ClinicService, ClinicSettings } from "@/entities";
 import { contacts } from "@/integrations/core";
-import { getCalendarBusy, getCalendarEvents, publicAppointmentBooking, syncClinicAppointments } from "@/functions";
+import { getCalendarBusy, getCalendarEvents, publicAppointmentBooking } from "@/functions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { APPOINTMENT_TYPES } from "@/pages/AppointmentBooking";
 import { normalizeClientPhone } from "@/lib/clientAggregation";
@@ -13,7 +13,8 @@ import { getAvailableManagerSlots, getManagerBookingWarnings, type CalendarBusyI
 import { getClinicHours, isValidTime } from "@/lib/clinicAvailability";
 import { notifyBrowserPush, notifyBusinessNotification } from "@/lib/onesignalPush";
 import { approveAppointmentRequest, rejectAppointmentRequest } from "@/lib/crmAppointmentDecision";
-import { appointmentSnapshotFromRecord, cancelConfirmedAppointment, retryCalendarAppointmentRemoval, retryCalendarAppointmentSync, syncCalendarOnlyAppointment, syncUpdatedAppointment, type SideEffectOutcome } from "@/lib/crmAppointmentActions";
+import { appointmentSnapshotFromRecord, cancelConfirmedAppointment, syncCalendarOnlyAppointment, syncUpdatedAppointment, type SideEffectOutcome } from "@/lib/crmAppointmentActions";
+import { calendarOutcomeFeedback, runCalendarAppointmentRetry, useCalendarSyncFeedback } from "@/lib/calendarAppointmentSyncRetry";
 import { appointmentStatusTone, createAppointmentEditDraft, dateFromKey, dateKey, GOOGLE_CALENDAR_SERVICE_ID, hasRemoteSupport, isActiveAppointment, isInMonth, isPastCalendarMoment, isToday, minutesToClock, monthGridDates, navigationDate, recordSearchText, serviceIdForRecord, text, timeToMinutes, type AppointmentEditDraft, type CalendarMode, visibleDates } from "@/lib/crmCalendar";
 import { useCrmContext, type CrmRecord } from "@/components/business-crm/CrmContext";
 import { BusinessCrmCalendarGrid } from "@/components/business-crm/BusinessCrmCalendarGrid";
@@ -21,7 +22,9 @@ import { BusinessCrmCalendarToolbar, type CalendarServiceItem } from "@/componen
 import { BusinessCrmCalendarSidePanel } from "@/components/business-crm/BusinessCrmCalendarSidePanel";
 import { BusinessCrmCalendarBlockDialog, type CalendarBlockDraft } from "@/components/business-crm/BusinessCrmCalendarBlockDialog";
 import { BusinessCrmCalendarSlotActionDialog } from "@/components/business-crm/BusinessCrmCalendarSlotActionDialog";
-import { CalendarAppointmentSyncPanel, CalendarEventDetails, CalendarQuickBooking, CALENDAR_REVIEW_LIST_LIMIT, type CalendarBackfillUiState, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type CalendarReviewItem, type CalendarSyncCounts, type CalendarSyncFeedback, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
+import { CalendarEventDetails, CalendarQuickBooking, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
+import CalendarAppointmentSyncSection from "@/components/business-crm/CalendarAppointmentSyncSection";
+import CrmMobileSkeleton from "@/components/business-crm/CrmMobileSkeleton";
 import type { CalendarBlockDisplay } from "@/components/business-crm/BusinessCrmCalendarGrid";
 import type { AppointmentEditorMode } from "@/components/business-crm/BusinessCrmCalendarAppointmentEditor";
 
@@ -44,165 +47,6 @@ const cancelToken = () => globalThis.crypto?.randomUUID?.() || `${Math.random().
 const recordIdentity = (record: CrmRecord) => String(record.id || `${record.date}|${record.start_time}|${record.client_name}|${record.pet_name}`);
 const validEmail = (value: string) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const normalizedCalendarValue = (value: unknown) => text(value);
-
-const EMPTY_CALENDAR_SYNC_COUNTS: CalendarSyncCounts = { scanned: 0, linked_existing: 0, created: 0, failed: 0, needs_review: 0, skipped: 0 };
-const MAX_CALENDAR_SYNC_PAGES = 55;
-const MAX_CALENDAR_REVIEW_ITEMS = CALENDAR_REVIEW_LIST_LIMIT;
-const MAX_CALENDAR_REVIEW_ITEMS_PER_PAGE = 50;
-
-type CalendarSyncPageResult = {
-  counts: CalendarSyncCounts;
-  reviewItems: CalendarReviewItem[];
-  reviewItemsOmitted: number;
-  hasMore: boolean;
-  nextCursor: string;
-  complete: boolean;
-  inventoryLimitReached: boolean;
-};
-
-function unwrapCalendarSyncPayload(value: unknown): Record<string, unknown> | null {
-  let current = value;
-  for (let depth = 0; depth < 8; depth += 1) {
-    if (typeof current === "string") {
-      try { current = JSON.parse(current); continue; } catch { return null; }
-    }
-    if (!current || typeof current !== "object" || Array.isArray(current)) return null;
-    const record = current as Record<string, unknown>;
-    if (Object.prototype.hasOwnProperty.call(record, "data")) { current = record.data; continue; }
-    if (Object.prototype.hasOwnProperty.call(record, "body")) { current = record.body; continue; }
-    return record;
-  }
-  return null;
-}
-
-function reviewField(value: unknown, maxLength: number): string | null {
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  const normalized = String(value).trim();
-  return normalized.length <= maxLength ? normalized : null;
-}
-
-function validReviewDate(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return false;
-  const date = new Date(0);
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
-function normalizeCalendarReviewItem(value: unknown): CalendarReviewItem | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const appointmentId = reviewField(record.appointment_id, 200);
-  const date = reviewField(record.date, 10);
-  const startTime = reviewField(record.start_time, 5);
-  const service = reviewField(record.service, 160);
-  const petName = reviewField(record.pet_name, 160);
-  const clientName = reviewField(record.client_name, 160);
-  if (!appointmentId || !date || !validReviewDate(date) || !startTime || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(startTime)) return null;
-  if (service === null || petName === null || clientName === null) return null;
-  return { appointmentId, date, startTime, service, petName, clientName };
-}
-
-function parseCalendarSyncPage(value: unknown): CalendarSyncPageResult {
-  const payload = unwrapCalendarSyncPayload(value);
-  if (!payload || payload.success !== true || payload.error) throw new Error("בקשת הסנכרון לא החזירה תוצאה תקינה.");
-  if (typeof payload.has_more !== "boolean" || typeof payload.complete !== "boolean" || typeof payload.inventory_limit_reached !== "boolean") {
-    throw new Error("תוצאת הסנכרון אינה שלמה.");
-  }
-  const count = (field: keyof CalendarSyncCounts) => {
-    const result = Number(payload[field]);
-    if (!Number.isInteger(result) || result < 0) throw new Error("תוצאת הסנכרון אינה כוללת סיכום תקין.");
-    return result;
-  };
-  const counts: CalendarSyncCounts = {
-    scanned: count("scanned"),
-    linked_existing: count("linked_existing"),
-    created: count("created"),
-    failed: count("failed"),
-    needs_review: count("needs_review"),
-    skipped: count("skipped"),
-  };
-  const nextCursor = typeof payload.next_cursor === "string" ? payload.next_cursor.trim() : "";
-  if (payload.has_more && !nextCursor) throw new Error("הסנכרון לא החזיר נקודת המשך תקינה.");
-
-  let reviewItems: CalendarReviewItem[] = [];
-  let reviewItemsOmitted = counts.needs_review;
-  const rawReviewItems = payload.review_items;
-  const hasReportedOmitted = Object.prototype.hasOwnProperty.call(payload, "review_items_omitted");
-  const reportedOmitted = payload.review_items_omitted;
-  const reportedOmittedIsValid = typeof reportedOmitted === "number" && Number.isInteger(reportedOmitted) && reportedOmitted >= 0;
-  const malformedReportedOmitted = hasReportedOmitted && !reportedOmittedIsValid;
-
-  if (Array.isArray(rawReviewItems) && rawReviewItems.length <= MAX_CALENDAR_REVIEW_ITEMS_PER_PAGE && !malformedReportedOmitted) {
-    const uniqueItems = new Map<string, CalendarReviewItem>();
-    rawReviewItems.forEach((rawItem) => {
-      const item = normalizeCalendarReviewItem(rawItem);
-      if (item && !uniqueItems.has(item.appointmentId)) uniqueItems.set(item.appointmentId, item);
-    });
-    const candidates = [...uniqueItems.values()];
-    const expectedOmitted = Math.max(0, counts.needs_review - candidates.length);
-    const reportExceedsUnlistedItems = reportedOmittedIsValid && Number(reportedOmitted) > expectedOmitted;
-    const responseIsInconsistent = rawReviewItems.length > counts.needs_review || reportExceedsUnlistedItems;
-    if (responseIsInconsistent) {
-      reviewItemsOmitted = counts.needs_review;
-    } else {
-      reviewItems = candidates;
-      reviewItemsOmitted = Math.min(counts.needs_review, Math.max(expectedOmitted, reportedOmittedIsValid ? Number(reportedOmitted) : 0));
-    }
-  }
-
-  const hasMore = payload.has_more;
-  return {
-    counts,
-    reviewItems,
-    reviewItemsOmitted,
-    hasMore,
-    nextCursor,
-    complete: payload.complete,
-    inventoryLimitReached: payload.inventory_limit_reached,
-  };
-}
-
-function addCalendarSyncCounts(total: CalendarSyncCounts, page: CalendarSyncCounts): CalendarSyncCounts {
-  return {
-    scanned: total.scanned + page.scanned,
-    linked_existing: total.linked_existing + page.linked_existing,
-    created: total.created + page.created,
-    failed: total.failed + page.failed,
-    needs_review: total.needs_review + page.needs_review,
-    skipped: total.skipped + page.skipped,
-  };
-}
-
-function calendarOutcomeFeedback(appointmentId: string, outcome: SideEffectOutcome, action: "sync" | "remove"): CalendarSyncFeedback {
-  const id = normalizedCalendarValue(appointmentId);
-  if (outcome.status === "failed") {
-    const retryText = id ? "אפשר לנסות שוב." : "לא נמצא מזהה שמאפשר ניסיון חוזר מהיומן.";
-    const message = action === "remove"
-      ? `התור בוטל ב-Buildy, אך לא הצלחנו להסיר את האירוע מ-Google Calendar. ${retryText}`
-      : `הפגישה נשמרה ב-Buildy, אך לא הצלחנו לסנכרן אותה ל-Google Calendar. ${retryText}`;
-    return { tone: "warning", message, ...(id ? { retryAppointmentId: id, retryAction: action } : {}) };
-  }
-  if (outcome.status === "skipped") {
-    return {
-      tone: "info",
-      message: action === "remove"
-        ? "התור בוטל ב-Buildy. לא נמצא אירוע Google שמקושר אליו, ולכן לא הוסר אירוע."
-        : `לא בוצע שינוי ביומן Google. ${outcome.detail}.`,
-    };
-  }
-  return {
-    tone: "success",
-    message: action === "remove"
-      ? `התור בוטל ב-Buildy. ${outcome.detail}.`
-      : `הפגישה נשמרה ב-Buildy. ${outcome.detail}.`,
-  };
-}
 
 type PrivateNoteLoadFailure = {
   message: string;
@@ -383,9 +227,10 @@ function CalendarState({ loading, onRetry }: { loading?: boolean; onRetry?: () =
 export default function BusinessCrmCalendar() {
   const { user, userLabel, appointments, inquiries, businessClients, search, isDataLoading, dataError, refreshData, openView, setSearch } = useCrmContext();
   const isMobile = useIsMobile();
+  const isMobileCalendar = isMobile || (typeof window !== "undefined" && window.innerWidth < 768);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [monthDate, setMonthDate] = useState(() => new Date());
-  const [mode, setMode] = useState<CalendarMode>("week");
+  const [mode, setMode] = useState<CalendarMode>(() => typeof window !== "undefined" && window.innerWidth < 768 ? "day" : "week");
   const [now, setNow] = useState(() => new Date());
   const [sidePanelOpen, setSidePanelOpen] = useState(() => typeof window === "undefined" || window.innerWidth >= 768);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
@@ -417,13 +262,7 @@ export default function BusinessCrmCalendar() {
   const [notesRetryable, setNotesRetryable] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
-  const [calendarBackfillState, setCalendarBackfillState] = useState<CalendarBackfillUiState>({ phase: "idle", counts: EMPTY_CALENDAR_SYNC_COUNTS, reviewItems: [], reviewItemsOmitted: 0, page: 0, complete: false, inventoryLimitReached: false, retryable: false, tone: "info", message: "" });
-  const [calendarSyncFeedback, setCalendarSyncFeedback] = useState<CalendarSyncFeedback | null>(null);
-  const calendarBackfillCursorRef = useRef("");
-  const calendarBackfillReviewIdsRef = useRef<Set<string>>(new Set());
-  const calendarBackfillLockRef = useRef(false);
-  const calendarBackfillOutcomesMayBeUnknownRef = useRef(false);
-  const calendarRetryLockRef = useRef(false);
+  const [calendarSyncFeedback, setCalendarSyncFeedback] = useCalendarSyncFeedback();
   const noteRequestRef = useRef(0);
   const canManageClinicCalendar = ["administrator", "user"].includes(String(user?.role || "").toLowerCase());
   const canManagePrivateNotes = ["administrator", "user"].includes(String(user?.role || "").toLowerCase());
@@ -570,6 +409,10 @@ export default function BusinessCrmCalendar() {
   const allAppointments = useMemo(
     () => allAppointmentRecords.filter((record) => !["cancelled", "canceled"].includes(text(record.status).toLowerCase())),
     [allAppointmentRecords],
+  );
+  const unsyncedConfirmedCount = useMemo(
+    () => allAppointments.filter((record) => text(record.status).toLowerCase() === "confirmed" && !text(record.google_event_id)).length,
+    [allAppointments],
   );
   const googleEventsForDisplay = useMemo(() => {
     const source = Array.isArray(googleEvents) ? googleEvents : [];
@@ -834,123 +677,12 @@ export default function BusinessCrmCalendar() {
     if (outcome.status !== "failed") refreshGoogleCalendarViews();
     return { record: syncedRecord, outcome };
   };
-  const runCalendarBackfill = async () => {
-    if (!canManageClinicCalendar || calendarBackfillLockRef.current) return;
-    calendarBackfillLockRef.current = true;
-    const resumeInterruptedRun = calendarBackfillState.phase === "interrupted" && calendarBackfillState.retryable;
-    let cursor = resumeInterruptedRun ? calendarBackfillCursorRef.current : "";
-    let counts: CalendarSyncCounts = resumeInterruptedRun ? { ...calendarBackfillState.counts } : { ...EMPTY_CALENDAR_SYNC_COUNTS };
-    let reviewItems: CalendarReviewItem[] = resumeInterruptedRun ? [...calendarBackfillState.reviewItems] : [];
-    let reviewItemsOmitted = resumeInterruptedRun ? calendarBackfillState.reviewItemsOmitted : 0;
-    let page = resumeInterruptedRun ? calendarBackfillState.page : 0;
-    let inventoryLimitReached = resumeInterruptedRun && calendarBackfillState.inventoryLimitReached;
-    let completed = false;
-    if (!resumeInterruptedRun) {
-      calendarBackfillCursorRef.current = "";
-      calendarBackfillReviewIdsRef.current = new Set();
-    } else if (calendarBackfillReviewIdsRef.current.size === 0) {
-      calendarBackfillReviewIdsRef.current = new Set(reviewItems.map((item) => item.appointmentId).filter(Boolean));
-    }
-    setCalendarBackfillState({ phase: "running", counts, reviewItems, reviewItemsOmitted, page, complete: false, inventoryLimitReached, retryable: false, tone: "info", message: "בודקת תורים מאושרים חסרי קישור ל-Google Calendar..." });
-
-    try {
-      while (page < MAX_CALENDAR_SYNC_PAGES) {
-        const response = await syncClinicAppointments({ after_id: cursor });
-        const result = parseCalendarSyncPage(response);
-        counts = addCalendarSyncCounts(counts, result.counts);
-        const nextReviewItems = [...reviewItems];
-        let nextReviewItemsOmitted = reviewItemsOmitted + result.reviewItemsOmitted;
-        result.reviewItems.forEach((item) => {
-          const appointmentId = item.appointmentId.trim();
-          if (!appointmentId || calendarBackfillReviewIdsRef.current.has(appointmentId)) return;
-          calendarBackfillReviewIdsRef.current.add(appointmentId);
-          if (nextReviewItems.length < MAX_CALENDAR_REVIEW_ITEMS) nextReviewItems.push(item);
-          else nextReviewItemsOmitted += 1;
-        });
-        reviewItems = nextReviewItems;
-        reviewItemsOmitted = nextReviewItemsOmitted;
-        page += 1;
-        inventoryLimitReached = inventoryLimitReached || result.inventoryLimitReached;
-
-        if (result.hasMore) {
-          if (cursor && result.nextCursor.localeCompare(cursor) <= 0) throw new Error("נקודת ההמשך לא התקדמה.");
-          cursor = result.nextCursor;
-          calendarBackfillCursorRef.current = cursor;
-          setCalendarBackfillState({ phase: "running", counts, reviewItems, reviewItemsOmitted, page, complete: false, inventoryLimitReached, retryable: false, tone: "info", message: `נבדקו ${counts.scanned} תורים ללא קישור. הסנכרון ממשיך לעמוד הבא.` });
-          continue;
-        }
-
-        const isComplete = result.complete && !inventoryLimitReached;
-        const hasReviewItems = counts.failed > 0 || counts.needs_review > 0;
-        const tone = inventoryLimitReached || !isComplete || hasReviewItems ? "warning" : "success";
-        const uncertaintyNote = calendarBackfillOutcomesMayBeUnknownRef.current
-          ? " ניתוק קודם עלול לגרום לכך שחלק מהפעולות שהושלמו לא ייכללו במספרים."
-          : "";
-        const message = inventoryLimitReached
-          ? "הסריקה הגיעה למגבלת הרשומות ואינה מכסה את כל התורים. לא בוצעו שינויים מחוץ לטווח שנבדק."
-          : !isComplete
-            ? "הסריקה הסתיימה בלי אישור שכל הרשומות נבדקו. אפשר להריץ שוב בבטחה."
-            : counts.scanned === 0
-              ? "לא נמצאו תורים מאושרים נוספים ללא קישור ל-Google Calendar."
-              : hasReviewItems
-                ? "הסריקה הסתיימה. אירועים מתאימים קושרו, ומקרים שנכשלו או נמצאו עמומים נשארו לבדיקה."
-                : "הסריקה הושלמה. תורים מאושרים חוברו ליומן בלי להעתיק בקשות ממתינות, ביטולים או הערות צוות.";
-        setCalendarBackfillState({
-          phase: isComplete ? "complete" : "interrupted",
-          counts,
-          reviewItems,
-          reviewItemsOmitted,
-          page,
-          complete: isComplete,
-          inventoryLimitReached,
-          retryable: !inventoryLimitReached && (!isComplete || counts.failed > 0),
-          tone,
-          message: `${message}${uncertaintyNote}`,
-        });
-        completed = true;
-        break;
-      }
-
-      if (!completed) {
-        setCalendarBackfillState({ phase: "interrupted", counts, reviewItems, reviewItemsOmitted, page, complete: false, inventoryLimitReached, retryable: true, tone: "warning", message: "הסריקה נעצרה לפני השלמת כל העמודים. אפשר להריץ שוב, והפעולה ממשיכה מנקודת ההמשך האחרונה." });
-      }
-    } catch (error) {
-      console.error("Clinic appointment Google Calendar backfill was interrupted:", error);
-      calendarBackfillOutcomesMayBeUnknownRef.current = true;
-      setCalendarBackfillState({
-        phase: "interrupted",
-        counts,
-        reviewItems,
-        reviewItemsOmitted,
-        page,
-        complete: false,
-        inventoryLimitReached,
-        retryable: true,
-        tone: "error",
-        message: "החיבור נקטע לפני שהתקבלו כל התוצאות. ייתכן שחלק מהפעולות הושלמו בלי להיספר; אפשר לנסות שוב, והסנכרון מונע יצירת כפילויות.",
-      });
-    } finally {
-      calendarBackfillLockRef.current = false;
-      refreshCrmAndGoogleCalendar();
-    }
-  };
   const retrySingleCalendarAction = async (appointmentId: string, actionOverride?: "sync" | "remove") => {
     const id = text(appointmentId);
-    if (!id || calendarRetryLockRef.current) return;
-    const action = actionOverride || (calendarSyncFeedback?.retryAppointmentId === id ? calendarSyncFeedback.retryAction || "sync" : "sync");
-    calendarRetryLockRef.current = true;
-    setCalendarSyncFeedback((current) => current?.retryAppointmentId === id
-      ? { ...current, retryAction: action, busyAppointmentId: id }
-      : { tone: "info", message: action === "remove" ? "בודקת אם נשאר אירוע שמקושר לתור שבוטל..." : "מנסה לסנכרן את הפגישה עם Google Calendar...", retryAppointmentId: id, retryAction: action, busyAppointmentId: id });
-    let outcome: SideEffectOutcome;
-    try {
-      outcome = action === "remove"
-        ? await retryCalendarAppointmentRemoval(id)
-        : await retryCalendarAppointmentSync(id);
-    } catch (error) {
-      console.error("Google Calendar retry failed:", error);
-      outcome = { status: "failed", detail: "לא הצלחנו להשלים את ניסיון הסנכרון ל-Google Calendar." };
-    }
+    if (!id) return;
+    const retry = await runCalendarAppointmentRetry(id, actionOverride);
+    if (!retry) return;
+    const { outcome } = retry;
     if (outcome.eventId) {
       const selectedMatches = Boolean(selectedAppointment && text(selectedAppointment.id) === id);
       const existing = selectedMatches
@@ -962,9 +694,7 @@ export default function BusinessCrmCalendar() {
         if (selectedMatches) setSelectedAppointment(updated);
       }
     }
-    setCalendarSyncFeedback(calendarOutcomeFeedback(id, outcome, action));
-    if (outcome.status !== "failed") refreshCrmAndGoogleCalendar();
-    calendarRetryLockRef.current = false;
+    refreshCrmAndGoogleCalendar();
   };
 
   const saveAppointmentDecision = async (action: "approve" | "reject") => {
@@ -1321,15 +1051,16 @@ export default function BusinessCrmCalendar() {
       : null;
   const visibleNotesRetryable = notesBelongToSelection && notesRetryable;
 
-  if (isDataLoading) return <CalendarState loading />;
+  if (isDataLoading) return <><div className="crm-mobile-loading-only"><CrmMobileSkeleton variant="calendar" label="טוען את נתוני היומן..." /></div><div className="crm-desktop-loading-only"><CalendarState loading /></div></>;
   if (dataError) return <CalendarState onRetry={() => void refreshData()} />;
   return <>
     <div dir="rtl" className="space-y-5">
-      <BusinessCrmCalendarToolbar mode={mode} selectedDate={selectedDate} isTodayView={isTodayView} canCreateBooking={canCreateBooking} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} servicePickerOpen={servicePickerOpen} sidePanelOpen={sidePanelOpen} onModeChange={setMode} onPrevious={() => moveDate(-1)} onNext={() => moveDate(1)} onToday={() => selectDate(new Date())} onRefresh={() => { void refreshData(); void calendarBlocksQuery.refetch(); }} onToggleServicePicker={() => setServicePickerOpen((open) => !open)} onToggleService={toggleService} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} onNewBooking={() => openQuickBooking(selectedDate, suggestedBookingTime)} onOpenBlock={openBlockDialog} onOpenSettings={() => openView({ kind: "settings", section: "calendar" })} />
-      <CalendarAppointmentSyncPanel canManage={canManageClinicCalendar} state={calendarBackfillState} syncFeedback={calendarSyncFeedback} onRunBackfill={() => void runCalendarBackfill()} onRetrySingle={(appointmentId) => void retrySingleCalendarAction(appointmentId)} />
+      <BusinessCrmCalendarToolbar mode={mode} selectedDate={selectedDate} isTodayView={isTodayView} canCreateBooking={canCreateBooking} unsyncedCount={unsyncedConfirmedCount} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} servicePickerOpen={servicePickerOpen} sidePanelOpen={sidePanelOpen} onModeChange={setMode} onPrevious={() => moveDate(-1)} onNext={() => moveDate(1)} onToday={() => selectDate(new Date())} onSelectDate={selectDate} onRefresh={() => { void refreshData(); void calendarBlocksQuery.refetch(); }} onToggleServicePicker={() => setServicePickerOpen((open) => !open)} onToggleService={toggleService} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} onNewBooking={() => openQuickBooking(selectedDate, suggestedBookingTime)} onOpenBlock={openBlockDialog} onOpenSettings={() => openView({ kind: "settings", section: "calendar" })} />
+      <CalendarAppointmentSyncSection className="crm-calendar-sync-in-calendar" syncFeedback={calendarSyncFeedback} onRetrySingle={(appointmentId) => void retrySingleCalendarAction(appointmentId)} onSyncSettled={refreshCrmAndGoogleCalendar} />
       {(blockFeedback || calendarBlocksQuery.error) && <div role={calendarBlocksQuery.error ? "alert" : "status"} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-xs font-bold leading-5 ${calendarBlocksQuery.error ? "border-red-100 bg-red-50 text-red-800" : "border-emerald-100 bg-emerald-50 text-emerald-800"}`}><span className="inline-flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{calendarBlocksQuery.error ? "לא הצלחנו לטעון את סגירות הזמן בטווח הזה. התורים נשארו זמינים, נסי לרענן את היומן." : blockFeedback}</span>{calendarBlocksQuery.error && <button type="button" onClick={() => void calendarBlocksQuery.refetch()} className="rounded-lg border border-current px-3 py-1.5 text-[11px] font-black">נסי שוב</button>}</div>}
-      <div className={`grid min-w-0 gap-5 ${sidePanelOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "grid-cols-1"}`} dir="ltr"><div className="min-w-0" dir="rtl"><BusinessCrmCalendarGrid mode={mode} selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} services={appointmentServiceItems} now={now} onSelectDate={selectDate} onSelectSlot={openSlotAction} onSelectAppointment={openAppointment} calendarBlocks={normalizedCalendarBlocks} /></div>{sidePanelOpen && <BusinessCrmCalendarSidePanel selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} calendarBlocks={normalizedCalendarBlocks} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} onSelectDate={selectDate} onChangeMonth={setMonthDate} onToggleService={toggleService} onDeleteBlock={(block) => { void deleteCalendarBlock(block); }} />}</div>
+      <div className={`grid min-w-0 gap-5 ${sidePanelOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "grid-cols-1"}`} dir="ltr"><div className="min-w-0" dir="rtl"><BusinessCrmCalendarGrid mode={mode} selectedDate={selectedDate} monthDate={monthDate} isMobile={isMobileCalendar} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} services={appointmentServiceItems} now={now} onSelectDate={selectDate} onSelectSlot={openSlotAction} onSelectAppointment={openAppointment} calendarBlocks={normalizedCalendarBlocks} /></div>{sidePanelOpen && <BusinessCrmCalendarSidePanel selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} calendarBlocks={normalizedCalendarBlocks} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} onSelectDate={selectDate} onChangeMonth={setMonthDate} onToggleService={toggleService} onDeleteBlock={(block) => { void deleteCalendarBlock(block); }} />}</div>
     </div>
+    <button type="button" className="crm-calendar-fab inline-flex min-h-12 items-center gap-2 rounded-full bg-[#1A1A3E] px-5 text-sm font-black text-white shadow-[0_12px_30px_rgba(26,26,62,0.25)] transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => openQuickBooking(selectedDate, suggestedBookingTime)} disabled={!canCreateBooking} title={!canCreateBooking ? "אפשר לקבוע פגישה רק היום בשעה עתידית או במועד עתידי." : undefined} aria-label="תור חדש"><Plus className="h-5 w-5" aria-hidden="true" />תור חדש</button>
     {slotAction && <BusinessCrmCalendarSlotActionDialog date={slotAction.date} time={slotAction.time} onChooseAppointment={chooseSlotAppointment} onChooseBlock={chooseSlotBlock} onClose={() => setSlotAction(null)} />}
     {blockDialogOpen && <BusinessCrmCalendarBlockDialog draft={blockDraft} feedback={blockFeedback} overlapWarning={blockOverlapWarning} saving={blockSaving} onChange={updateBlockDraft} onSubmit={() => void saveCalendarBlock()} onClose={() => { if (!blockSaving) setBlockDialogOpen(false); }} />}
     {quickBooking && <CalendarQuickBooking date={quickBooking.date} time={quickBooking.time} now={now} services={quickBookingServiceItems} managerWarnings={quickBookingWarnings} publicSuggestedTimes={publicSuggestedTimes} publicAvailabilityLoading={publicAvailabilityLoading} publicAvailabilityError={publicAvailabilityError} availabilityChecksLoading={quickBookingAvailabilityLoading} availabilityChecksError={quickBookingAvailabilityErrorMessage} customers={customerRows} customerMode={quickBooking.customerMode} customerSearch={quickBooking.customerSearch} selectedCustomerId={quickBooking.selectedCustomerId} selectedCustomer={selectedQuickCustomer} onCustomerModeChange={changeQuickCustomerMode} onCustomerSearchChange={updateQuickCustomerSearch} onSelectCustomer={selectQuickCustomer} draft={quickBooking.draft} feedback={quickBooking.feedback} saving={savingBooking} onChange={updateQuickDraft} onTimeChange={updateQuickBookingTime} onSubmit={() => void saveBooking()} onClose={() => { if (!savingBooking) setQuickBooking(null); }} />}

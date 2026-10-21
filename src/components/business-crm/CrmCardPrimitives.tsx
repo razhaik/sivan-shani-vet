@@ -4,9 +4,9 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CrmWidgetSizeMode } from "@/lib/crmDashboardLayout";
 
-export function Card({ id, title, icon: Icon, children, className, mode }: { id?: string; title: string; icon: LucideIcon; children: ReactNode; className?: string; mode: CrmWidgetSizeMode }) {
+export function Card({ id, title, icon: Icon, children, className, mode, reducedMotion = false }: { id?: string; title: string; icon: LucideIcon; children: ReactNode; className?: string; mode: CrmWidgetSizeMode; reducedMotion?: boolean }) {
   const compact = mode === "compact";
-  return <motion.section id={id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.38 }} className={cn("flex h-full min-w-0 flex-col overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_30px_-24px_rgba(26,26,62,0.65)] sm:p-5", compact ? "min-h-[180px]" : mode === "expanded" ? "min-h-[330px]" : "min-h-[240px]", className)}>
+  return <motion.section id={id} initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }} animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0.16 : 0.38 }} className={cn("flex h-full min-w-0 flex-col overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_30px_-24px_rgba(26,26,62,0.65)] sm:p-5", compact ? "min-h-[180px]" : mode === "expanded" ? "min-h-[330px]" : "min-h-[240px]", className)}>
     <div className={cn("mb-4 flex shrink-0 items-center gap-3", compact && "mb-3")}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F2D162]/[0.25] text-[#1A1A3E]"><Icon className="h-[18px] w-[18px]" /></span><h2 className="min-w-0 break-words text-base font-extrabold leading-5 text-[#1A1A3E]">{title}</h2></div>
     <div className="min-h-0 min-w-0 flex-1">{children}</div>
   </motion.section>;

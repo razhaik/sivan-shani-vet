@@ -302,20 +302,164 @@ async function sendSms(to: string, body: string, config: TwilioConfig) {
   if (!response.ok) throw new Error(`Twilio rejected the request (${response.status}${data && typeof data === "object" && "code" in data ? `, code ${(data as { code?: unknown }).code}` : ""})`);
 }
 
-async function sendPush(content: ReturnType<typeof buildContent>, apiKey: string) {
-  const response = await fetch(ONESIGNAL_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Key ${apiKey}` },
-    body: JSON.stringify({
-      app_id: ONESIGNAL_APP_ID,
-      target_channel: "push",
-      included_segments: ["Subscribed Users"],
-      headings: { en: content.titleEn, he: content.titleHe },
-      contents: { en: content.bodyEn, he: content.bodyHe },
-      web_url: content.url,
-    }),
+type OneSignalCreateResponse = {
+  id?: unknown;
+  recipients?: unknown;
+  errors?: unknown;
+  warnings?: unknown;
+};
+
+type OneSignalPushOutcome = {
+  notificationId: string;
+  recipientCount?: number;
+  warning?: string;
+};
+
+const SAFE_ONESIGNAL_ISSUE_KEYS = new Set([
+  "invalid_aliases",
+  "invalid_player_ids",
+  "invalid_external_user_ids",
+  "invalid_subscription_ids",
+  "invalid_onesignal_ids",
+]);
+
+function hasOneSignalIssues(value: unknown): boolean {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return Boolean(value && typeof value === "object" && Object.keys(value).length > 0);
+}
+
+function oneSignalIssueCategories(...values: unknown[]): string[] {
+  const categories: string[] = [];
+  for (const value of values) {
+    if (!hasOneSignalIssues(value)) continue;
+    if (Array.isArray(value)) {
+      categories.push("provider_messages");
+      continue;
+    }
+    if (value && typeof value === "object") {
+      const keys = Object.keys(value as Record<string, unknown>);
+      if (keys.length === 0) continue;
+      for (const key of keys.slice(0, 4)) {
+        categories.push(SAFE_ONESIGNAL_ISSUE_KEYS.has(key) ? key : "provider_details_redacted");
+      }
+      continue;
+    }
+    categories.push("provider_details_redacted");
+  }
+  return [...new Set(categories)].slice(0, 4);
+}
+
+function oneSignalRecipientCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
+function logOneSignalOutcome({
+  event,
+  sourceId,
+  httpStatus,
+  outcome,
+  notificationId,
+  recipientCount,
+  issueCategories,
+}: {
+  event: NotificationEvent;
+  sourceId: string;
+  httpStatus: number | null;
+  outcome: string;
+  notificationId: string | null;
+  recipientCount?: number;
+  issueCategories?: string[];
+}) {
+  console.info("[BusinessNotification] OneSignal push result", {
+    event,
+    source_id: sourceId,
+    http_status: httpStatus,
+    outcome,
+    notification_id: notificationId,
+    ...(recipientCount !== undefined ? { recipient_count: recipientCount } : {}),
+    ...(issueCategories?.length ? { issue_categories: issueCategories.slice(0, 4) } : {}),
   });
-  if (!response.ok) throw new Error(`OneSignal rejected the request (${response.status})`);
+}
+
+async function sendPush(
+  content: ReturnType<typeof buildContent>,
+  apiKey: string,
+  event: NotificationEvent,
+  sourceId: string,
+): Promise<OneSignalPushOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(ONESIGNAL_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Key ${apiKey}` },
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        target_channel: "push",
+        included_segments: ["Subscribed Users"],
+        headings: { en: content.titleEn, he: content.titleHe },
+        contents: { en: content.bodyEn, he: content.bodyHe },
+        web_url: content.url,
+      }),
+    });
+  } catch {
+    logOneSignalOutcome({ event, sourceId, httpStatus: null, outcome: "request_failed", notificationId: null, issueCategories: ["network_error"] });
+    throw new Error("OneSignal request failed.");
+  }
+
+  let rawBody: unknown = null;
+  try { rawBody = await response.json(); } catch { /* Provider responses must be parsed before acceptance. */ }
+  const payload = rawBody && typeof rawBody === "object" && !Array.isArray(rawBody)
+    ? rawBody as OneSignalCreateResponse
+    : null;
+  const recipientCount = oneSignalRecipientCount(payload?.recipients);
+  const issueCategories = oneSignalIssueCategories(payload?.errors, payload?.warnings);
+
+  if (!response.ok) {
+    logOneSignalOutcome({
+      event,
+      sourceId,
+      httpStatus: response.status,
+      outcome: "rejected",
+      notificationId: null,
+      recipientCount,
+      issueCategories: issueCategories.length ? issueCategories : ["provider_rejected"],
+    });
+    throw new Error(`OneSignal rejected the request (${response.status}).`);
+  }
+
+  if (!payload) {
+    logOneSignalOutcome({ event, sourceId, httpStatus: response.status, outcome: "invalid_response", notificationId: null, issueCategories: ["malformed_response"] });
+    throw new Error(`OneSignal returned an invalid response (${response.status}).`);
+  }
+
+  const notificationId = typeof payload.id === "string" ? payload.id.trim() : "";
+  if (!notificationId || notificationId.length > 128) {
+    logOneSignalOutcome({
+      event,
+      sourceId,
+      httpStatus: response.status,
+      outcome: "no_notification_id",
+      notificationId: null,
+      recipientCount,
+      issueCategories: issueCategories.length ? issueCategories : ["no_notification_id"],
+    });
+    throw new Error(`OneSignal returned HTTP ${response.status} without a notification ID.`);
+  }
+
+  const warning = issueCategories.length
+    ? "OneSignal created the notification and reported partial recipient warnings."
+    : undefined;
+  logOneSignalOutcome({
+    event,
+    sourceId,
+    httpStatus: response.status,
+    outcome: warning ? "created_with_warning" : "created",
+    notificationId,
+    recipientCount,
+    issueCategories,
+  });
+  return { notificationId, ...(recipientCount !== undefined ? { recipientCount } : {}), ...(warning ? { warning } : {}) };
 }
 
 async function loadSettings(): Promise<SettingsRecord | null> {
@@ -457,6 +601,7 @@ export async function dispatchBusinessNotification({
     let accepted = 0;
     let attempted = 0;
     const failures: string[] = [];
+    const warnings: string[] = [];
 
     if (routing.channels.includes("email")) {
       for (const recipient of routing.emailRecipients) {
@@ -489,8 +634,11 @@ export async function dispatchBusinessNotification({
         console.error(`[BusinessNotification] ${event} ${detail}`);
       } else {
         attempted++;
-        try { await sendPush(content, oneSignalApiKey); accepted++; }
-        catch (error) {
+        try {
+          const pushOutcome = await sendPush(content, oneSignalApiKey, event, normalizedRecordId);
+          accepted++;
+          if (pushOutcome.warning) warnings.push(`push: ${pushOutcome.warning}`);
+        } catch (error) {
           const detail = `push: ${safeError(error)}`;
           failures.push(detail);
           console.error(`[BusinessNotification] ${event} ${detail}`);
@@ -519,7 +667,12 @@ export async function dispatchBusinessNotification({
     }
 
     console.log(`[BusinessNotification] ${event} accepted through ${accepted} ${accepted === 1 ? "delivery" : "deliveries"}${attempted > accepted ? `, ${attempted - accepted} failed` : ""}`);
-    return result({ ok: true, status: "sent", ...(attempted > accepted ? { partial: true } : {}) });
+    return result({
+      ok: true,
+      status: "sent",
+      ...(attempted > accepted ? { partial: true } : {}),
+      ...(warnings.length ? { warnings } : {}),
+    });
   } catch (error) {
     console.error(`[BusinessNotification] ${event} failed:`, safeError(error));
     if (event === "appointment_reschedule_requested") await markNotificationError(event, normalizedRecordId, safeError(error));

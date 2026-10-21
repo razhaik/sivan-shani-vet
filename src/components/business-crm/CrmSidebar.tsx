@@ -22,6 +22,8 @@ import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { optimizedImageSource, optimizedImageSrcSet, restoreOriginalImage } from "@/lib/optimizedImageUrl";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
 
+export type CrmInstallAction = (trigger: HTMLButtonElement) => Promise<void>;
+
 export type CrmActiveKey =
   | "overview"
   | "inbox"
@@ -43,6 +45,7 @@ interface CrmSidebarProps {
   activeKey?: CrmActiveKey;
   inboxCount?: number;
   onOpenAppMarketplace: (trigger?: HTMLButtonElement) => void;
+  onRegisterInstallAction?: (action: CrmInstallAction | null) => void;
 }
 
 type NavItem = {
@@ -52,6 +55,7 @@ type NavItem = {
   view?: CrmView;
   targetId?: string;
   expandable?: boolean;
+  mobileHidden?: boolean;
 };
 
 const navItems: NavItem[] = [
@@ -60,29 +64,30 @@ const navItems: NavItem[] = [
   { key: "calendar", label: "יומן", icon: CalendarDays, view: { kind: "calendar" } },
   { key: "clients", label: "לקוחות", icon: Users, view: { kind: "clients" } },
   { key: "sales", label: "מכירות ונתונים", icon: ReceiptText, view: { kind: "sales" } },
-  { label: "קבצים", icon: FileText },
+  { label: "קבצים", icon: FileText, mobileHidden: true },
   { key: "marketing", label: "שיווק", icon: Megaphone, view: { kind: "marketing", subview: "automatic" }, expandable: true },
-  { label: "לכידת לידים", icon: Globe2 },
+  { label: "לכידת לידים", icon: Globe2, mobileHidden: true },
   { key: "settings", label: "הגדרות", icon: Settings, view: { kind: "settings" } },
 ];
 
 const logoImage = optimizedImageSource(VETERINARY_CLINIC_PROFILE.logoUrl, { width: 300, fallbackWidth: 180, quality: 72 });
 const logoImageSrcSet = optimizedImageSrcSet(VETERINARY_CLINIC_PROFILE.logoUrl, [180, 240, 300], { quality: 72 });
 
-type InstallDialogMode = "instructions" | "installed" | "already-installed";
+type InstallDialogMode = "instructions" | "installed" | "already-installed" | "dismissed";
+type InstallPlatform = "ios" | "android" | "desktop" | "other";
 
 type InstallDialogProps = {
   mode: InstallDialogMode;
-  isAppleMobileDevice: boolean;
+  platform: InstallPlatform;
   onClose: () => void;
   returnFocusRef: { current: HTMLButtonElement | null };
 };
 
-function InstallDialog({ mode, isAppleMobileDevice, onClose, returnFocusRef }: InstallDialogProps) {
+function InstallDialog({ mode, platform, onClose, returnFocusRef }: InstallDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const isConfirmation = mode === "installed" || mode === "already-installed";
-  const title = mode === "installed" ? "האפליקציה נוספה" : mode === "already-installed" ? "האפליקציה כבר מותקנת" : "הוספה למסך הבית";
+  const title = mode === "installed" ? "האפליקציה נוספה" : mode === "already-installed" ? "האפליקציה כבר מותקנת" : mode === "dismissed" ? "ההתקנה לא אושרה" : "הוספה למסך הבית";
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
@@ -177,13 +182,19 @@ function InstallDialog({ mode, isAppleMobileDevice, onClose, returnFocusRef }: I
           </div>
         )}
 
+        {mode === "dismissed" && (
+          <div id="crm-install-dialog-description" className="mt-6 rounded-2xl border border-amber-700/15 bg-amber-50 px-4 py-4 text-right text-sm font-bold leading-6 text-amber-950">
+            חלון ההתקנה נסגר בלי אישור. סביבת הניהול לא נוספה למסך הבית. אפשר לנסות שוב מהתפריט כשמתאים.
+          </div>
+        )}
+
         {mode === "instructions" && (
           <div id="crm-install-dialog-description" className="mt-5 text-right">
             <p className="text-sm font-semibold leading-6 text-[#1A1A3E]/[0.74]">
-              {isAppleMobileDevice ? "ב-iPhone או ב-iPad אפשר להוסיף את סביבת הניהול למסך הבית בכמה צעדים." : "אפשר להוסיף את סביבת הניהול למסך הבית דרך תפריט הדפדפן."}
+              {platform === "ios" ? "ב-iPhone וב-iPad הדפדפן לא מציג חלון התקנה אוטומטי. פתחו את תפריט השיתוף כדי להוסיף את סביבת הניהול למסך הבית." : platform === "android" ? "הדפדפן לא פתח חלון התקנה. אם אפשרות ההתקנה זמינה, היא נמצאת בתפריט הדפדפן." : platform === "desktop" ? "הדפדפן לא פתח חלון התקנה. חפשו אפשרות התקנה בשורת הכתובת או בתפריט." : "לא ניתן לפתוח חלון התקנה בדפדפן הנוכחי. בדקו בתפריט אם קיימת אפשרות להוסיף את האתר."}
             </p>
             <ol className="mt-5 space-y-3">
-              {isAppleMobileDevice ? (
+              {platform === "ios" ? (
                 <>
                   <li className="flex items-start gap-3 rounded-2xl bg-[#F2D162]/[0.25] px-3 py-3 text-sm font-bold leading-6">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-xs text-white">1</span>
@@ -202,11 +213,11 @@ function InstallDialog({ mode, isAppleMobileDevice, onClose, returnFocusRef }: I
                 <>
                   <li className="flex items-start gap-3 rounded-2xl bg-[#F2D162]/[0.25] px-3 py-3 text-sm font-bold leading-6">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-xs text-white">1</span>
-                    <span>פתחו את תפריט הדפדפן.</span>
+                    <span>{platform === "desktop" ? "חפשו סמל התקנה בשורת הכתובת או פתחו את תפריט הדפדפן." : "פתחו את תפריט הדפדפן."}</span>
                   </li>
                   <li className="flex items-start gap-3 rounded-2xl bg-[#F2D162]/[0.25] px-3 py-3 text-sm font-bold leading-6">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-xs text-white">2</span>
-                    <span>בחרו ״הוספה למסך הבית״ או ״התקנת אפליקציה״.</span>
+                    <span>{platform === "desktop" ? "בחרו ״התקנת אפליקציה״." : platform === "android" ? "בחרו ״התקנת אפליקציה״ או ״הוספה למסך הבית״." : "בדקו אם מופיעה ״התקנת אפליקציה״ או ״הוספה למסך הבית״."}</span>
                   </li>
                   <li className="flex items-start gap-3 rounded-2xl bg-[#F2D162]/[0.25] px-3 py-3 text-sm font-bold leading-6">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-xs text-white">3</span>
@@ -289,7 +300,7 @@ function SidebarPanel({ userName, onClose, onNavigate, activeKey, inboxCount, on
           const className = `group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-right text-[13px] font-bold transition ${active ? "bg-[#1A1A3E] text-white shadow-md shadow-[#1A1A3E]/[0.15]" : "text-[#1A1A3E]/[0.75] hover:bg-white/[0.45] hover:text-[#1A1A3E]"}`;
           const content = <><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-[#F2D162]" : "text-[#1A1A3E]/[0.70]"}`} aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{label}</span>{label === "תיבת דואר" && Boolean(inboxCount && inboxCount > 0) && <span className={`min-w-6 rounded-full px-1.5 py-0.5 text-center text-[10px] font-black leading-4 ${active ? "bg-[#F2D162] text-[#1A1A3E]" : "bg-white/70 text-[#1A1A3E]"}`} aria-label={`${inboxCount} הודעות בתיבת הדואר`}>{inboxCount! > 99 ? "99+" : inboxCount}</span>}{expandable && <ChevronDown className="h-4 w-4 shrink-0 opacity-60" aria-hidden="true" />}</>;
           const itemButton = view ? <button type="button" onClick={() => onNavigate(view, targetId)} aria-current={active ? "page" : undefined} className={className}>{content}</button> : <button type="button" disabled title="אפשרות זו תתחבר בהמשך" className={`${className} cursor-not-allowed opacity-70`} aria-label={`${label}, בקרוב`}>{content}</button>;
-          return <div key={label}>{itemButton}{key === "marketing" && marketingActive && <div className="mr-3 mt-1 space-y-1 border-r border-[#1A1A3E]/20 pr-3" aria-label="ניווט שיווק">{marketingLinks.map((link) => { const linkActive = link.key === activeKey; return <button key={link.key} type="button" onClick={() => onNavigate(link.view)} aria-current={linkActive ? "page" : undefined} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-right text-[11px] font-extrabold transition ${linkActive ? "bg-white/75 text-[#1A1A3E]" : "text-[#1A1A3E]/[0.65] hover:bg-white/[0.45] hover:text-[#1A1A3E]"}`}><span className={`h-1.5 w-1.5 rounded-full ${linkActive ? "bg-[#1A1A3E]" : "bg-[#1A1A3E]/[0.35]"}`} />{link.label}</button>; })}</div>}</div>;
+          return <div key={label} className={item.mobileHidden ? "crm-mobile-hidden-nav-entry" : undefined}>{itemButton}{key === "marketing" && marketingActive && <div className="mr-3 mt-1 space-y-1 border-r border-[#1A1A3E]/20 pr-3" aria-label="ניווט שיווק">{marketingLinks.map((link) => { const linkActive = link.key === activeKey; return <button key={link.key} type="button" onClick={() => onNavigate(link.view)} aria-current={linkActive ? "page" : undefined} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-right text-[11px] font-extrabold transition ${linkActive ? "bg-white/75 text-[#1A1A3E]" : "text-[#1A1A3E]/[0.65] hover:bg-white/[0.45] hover:text-[#1A1A3E]"}`}><span className={`h-1.5 w-1.5 rounded-full ${linkActive ? "bg-[#1A1A3E]" : "bg-[#1A1A3E]/[0.35]"}`} />{link.label}</button>; })}</div>}</div>;
         })}
       </nav>
 
@@ -306,54 +317,73 @@ function SidebarPanel({ userName, onClose, onNavigate, activeKey, inboxCount, on
   );
 }
 
-export function CrmSidebar({ isOpen, userName, onClose, onNavigate, onOpenAppMarketplace, activeKey = "overview", inboxCount = 0 }: CrmSidebarProps) {
-  const { isInstallAvailable, isInstalled, promptInstall, clearInstallPrompt } = usePwaInstall();
+export function CrmSidebar({ isOpen, userName, onClose, onNavigate, onOpenAppMarketplace, onRegisterInstallAction, activeKey = "overview", inboxCount = 0 }: CrmSidebarProps) {
+  const { isInstalled, promptInstall } = usePwaInstall();
   const [installDialog, setInstallDialog] = useState<InstallDialogMode | null>(null);
-  const [isAppleMobileDevice, setIsAppleMobileDevice] = useState(false);
+  const [installPlatform, setInstallPlatform] = useState<InstallPlatform>("other");
   const installTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const installAttemptRef = useRef(false);
 
   const closeInstallDialog = useCallback(() => setInstallDialog(null), []);
   const handleInstall = useCallback(async (trigger: HTMLButtonElement) => {
+    if (installAttemptRef.current) return;
+    installAttemptRef.current = true;
     installTriggerRef.current = trigger;
     onClose();
 
-    if (isInstalled) {
-      clearInstallPrompt();
-      setInstallDialog("already-installed");
-      return;
-    }
+    try {
+      if (isInstalled) {
+        setInstallDialog("already-installed");
+        return;
+      }
 
-    if (!isInstallAvailable) {
-      setIsAppleMobileDevice(isAppleMobileBrowser());
+      // Always ask the shared PWA controller directly. Availability state can
+      // lag the event by a render, while the one-use prompt is consumed safely.
+      const outcome = await promptInstall();
+      if (outcome === "accepted") {
+        setInstallDialog("installed");
+        return;
+      }
+      if (outcome === "dismissed") {
+        setInstallDialog("dismissed");
+        return;
+      }
+
+      setInstallPlatform(detectInstallPlatform());
       setInstallDialog("instructions");
-      return;
+    } finally {
+      installAttemptRef.current = false;
     }
+  }, [isInstalled, onClose, promptInstall]);
 
-    const outcome = await promptInstall();
-    if (outcome === "accepted") {
-      setInstallDialog("installed");
-      return;
-    }
+  useEffect(() => {
+    if (!onRegisterInstallAction) return;
+    onRegisterInstallAction(handleInstall);
+    return () => onRegisterInstallAction(null);
+  }, [handleInstall, onRegisterInstallAction]);
 
-    setIsAppleMobileDevice(isAppleMobileBrowser());
-    setInstallDialog("instructions");
-  }, [clearInstallPrompt, isInstallAvailable, isInstalled, onClose, promptInstall]);
+  useEffect(() => {
+    if (isInstalled && installDialog === "instructions") setInstallDialog("already-installed");
+  }, [installDialog, isInstalled]);
 
   const panelProps: SidebarPanelProps = { userName, onClose, onNavigate, onOpenAppMarketplace, activeKey, inboxCount, onInstall: handleInstall };
 
   return <>
     <aside className="fixed inset-y-0 right-0 z-40 hidden w-[248px] bg-[#F2D162] shadow-[-10px_0_35px_-28px_rgba(26,26,62,0.6)] lg:flex"><SidebarPanel {...panelProps} /></aside>
     <AnimatePresence>
-      {isOpen && <motion.div className="fixed inset-0 z-[70] lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><button type="button" aria-label="סגירת תפריט הצד" onClick={onClose} className="absolute inset-0 h-full w-full bg-[#1A1A3E]/[0.35] backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 320, damping: 30 }} className="absolute inset-y-0 right-0 w-[min(86vw,320px)] bg-[#F2D162] shadow-2xl"><SidebarPanel {...panelProps} /></motion.aside></motion.div>}
+      {isOpen && <motion.div className="crm-mobile-sidebar-drawer fixed inset-0 z-[70] lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><button type="button" aria-label="סגירת תפריט הצד" onClick={onClose} className="absolute inset-0 h-full w-full bg-[#1A1A3E]/[0.35] backdrop-blur-[2px]" /><motion.aside initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 320, damping: 30 }} className="absolute inset-y-0 right-0 w-[min(86vw,320px)] bg-[#F2D162] shadow-2xl"><SidebarPanel {...panelProps} /></motion.aside></motion.div>}
     </AnimatePresence>
-    {installDialog && <InstallDialog mode={installDialog} isAppleMobileDevice={isAppleMobileDevice} onClose={closeInstallDialog} returnFocusRef={installTriggerRef} />}
+    {installDialog && <InstallDialog mode={installDialog} platform={installPlatform} onClose={closeInstallDialog} returnFocusRef={installTriggerRef} />}
   </>;
 }
 
-function isAppleMobileBrowser() {
-  if (typeof navigator === "undefined") return false;
+function detectInstallPlatform(): InstallPlatform {
+  if (typeof navigator === "undefined") return "other";
   const userAgent = navigator.userAgent || "";
-  const isAppleMobile = /iPad|iPhone|iPod/.test(userAgent);
-  const isTouchMac = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-  return isAppleMobile || isTouchMac;
+  const isAppleMobile = /iPad|iPhone|iPod/i.test(userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isAppleMobile) return "ios";
+  if (/Android/i.test(userAgent)) return "android";
+  if (/Windows|Macintosh|Mac OS|X11|Linux/i.test(userAgent)) return "desktop";
+  return "other";
 }

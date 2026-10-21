@@ -74,6 +74,327 @@
   }
 }
 
+.crm-mobile-navigation,
+.crm-calendar-mobile-toolbar,
+.crm-calendar-fab,
+.crm-mobile-loading-only,
+.crm-dashboard-title-mobile,
+.crm-calendar-sync-settings-mobile {
+  display: none;
+}
+
+.crm-desktop-loading-only {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  #crm-root {
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  #crm-root .crm-main-content {
+    min-width: 0;
+    padding-top: 1.25rem;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 1.25rem);
+  }
+
+  #crm-root .crm-phone-hamburger,
+  #crm-root .crm-mobile-sidebar-drawer,
+  #crm-root .crm-mobile-hidden-nav-entry {
+    display: none !important;
+  }
+
+  #crm-root .crm-mobile-navigation {
+    display: block;
+    box-sizing: border-box;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid rgba(26, 26, 62, 0.1);
+    background: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+  }
+
+  #crm-root .crm-mobile-navigation-row {
+    display: grid;
+    box-sizing: border-box;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: center;
+    gap: 2px;
+    height: 64px;
+    padding: 4px 8px;
+  }
+
+  #crm-root .crm-mobile-navigation-item {
+    display: flex;
+    min-width: 0;
+    height: 56px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: #697386;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    transition: color 100ms ease, background-color 100ms ease, transform 100ms ease;
+  }
+
+  #crm-root .crm-mobile-navigation-item.is-active {
+    background: rgba(242, 209, 98, 0.28);
+    color: #1A1A3E;
+  }
+
+  #crm-root .crm-mobile-navigation-item:focus-visible {
+    outline: 2px solid rgba(26, 26, 62, 0.7);
+    outline-offset: 1px;
+  }
+
+  #crm-root .crm-mobile-more-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  #crm-root .crm-topbar-touch-target {
+    box-sizing: border-box;
+    display: inline-flex;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  #crm-root .crm-mobile-more-sheet {
+    box-sizing: border-box;
+    max-height: min(84vh, 640px);
+    overflow-y: auto;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+    overscroll-behavior: contain;
+  }
+
+  #crm-root .crm-main-content :is(input, select, textarea) {
+    font-size: 16px !important;
+  }
+
+  #crm-root .crm-mobile-loading-only {
+    display: block;
+  }
+
+  #crm-root .crm-desktop-loading-only {
+    display: none;
+  }
+
+  #crm-root .crm-dashboard-title-desktop {
+    display: none;
+  }
+
+  #crm-root .crm-dashboard-title-mobile {
+    display: flex;
+  }
+
+  #crm-root .crm-calendar-desktop-toolbar {
+    display: none;
+  }
+
+  #crm-root .crm-calendar-mobile-toolbar {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  #crm-root .crm-calendar-date-strip {
+    display: flex;
+    min-width: 0;
+    gap: 7px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 1px 5px;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  #crm-root .crm-calendar-date-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  #crm-root .crm-calendar-date-button {
+    flex: 0 0 46px;
+    min-width: 46px;
+  }
+
+  #crm-root .crm-calendar-mobile-date-toolbar {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #crm-root .crm-calendar-mobile-range {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #crm-root .crm-calendar-fab {
+    display: inline-flex;
+    position: fixed;
+    left: 16px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    z-index: 45;
+  }
+
+  #crm-root .crm-calendar-options-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  #crm-root .crm-calendar-options-sheet {
+    max-height: min(88dvh, 720px);
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  #crm-root .crm-calendar-sync-in-calendar {
+    display: none;
+  }
+
+  #crm-root .crm-calendar-sync-settings-mobile {
+    display: block;
+  }
+
+  #crm-root :is(button, a) {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #crm-root button:not(:disabled) {
+    transition-duration: 100ms;
+  }
+
+  #crm-root button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #crm-root *,
+  #crm-root *::before,
+  #crm-root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Management widget board: square cells, deliberate lift, and a brief landing cue. */
+#crm-overview .crm-dashboard-grid--board {
+  direction: rtl;
+  align-items: stretch;
+  grid-auto-flow: row;
+  gap: 12px;
+}
+
+#crm-overview .crm-dashboard-widget {
+  min-width: 0;
+  transform-origin: center;
+  will-change: transform;
+}
+
+#crm-overview .crm-dashboard-widget--editing {
+  isolation: isolate;
+}
+
+#crm-overview .crm-dashboard-widget--drag-source {
+  opacity: 0.24;
+}
+
+#crm-overview .crm-dashboard-widget--drop-target {
+  outline: 1px dashed rgba(82, 103, 168, 0.55);
+  outline-offset: -3px;
+  border-radius: 18px;
+}
+
+#crm-overview .crm-dashboard-widget--drop-flash {
+  outline: 1px solid rgba(82, 103, 168, 0.58);
+  outline-offset: 1px;
+  border-radius: 18px;
+  animation: crm-dashboard-drop-flash 900ms ease-out both;
+}
+
+#crm-overview .crm-dashboard-widget--drag-overlay {
+  transform: scale(1.025);
+  box-shadow: 0 24px 52px -18px rgba(26, 26, 62, 0.42), 0 8px 20px -12px rgba(26, 26, 62, 0.3);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease;
+}
+
+#crm-overview .crm-dashboard-drag-handle {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+#crm-overview .crm-dashboard-drag-handle:active {
+  cursor: grabbing;
+}
+
+@keyframes crm-dashboard-drop-flash {
+  0% {
+    outline-color: rgba(82, 103, 168, 0.68);
+    outline-offset: 1px;
+  }
+  100% {
+    outline-color: rgba(82, 103, 168, 0);
+    outline-offset: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #crm-overview .crm-dashboard-widget {
+    transition: opacity 120ms ease !important;
+  }
+
+  #crm-overview .crm-dashboard-widget--drag-overlay {
+    transform: none !important;
+    transition: opacity 120ms ease !important;
+  }
+
+  #crm-overview .crm-dashboard-widget--drop-flash {
+    animation: none !important;
+    outline: 1px solid rgba(82, 103, 168, 0.5);
+  }
+}
+
+#crm-overview .crm-dashboard-client-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 767px) {
+  #crm-overview .crm-dashboard-card :is([class~="text-[9px]"], [class~="text-[10px]"], [class~="text-[11px]"]) {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+
+  #crm-overview .crm-dashboard-card .truncate {
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;

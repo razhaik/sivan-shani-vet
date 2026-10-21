@@ -8,7 +8,7 @@ import {
 } from "@/lib/optimizedImageUrl";
 
 const HERO_IMAGE_URL =
-  "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/files/chat-generated-images/project-lczgvu3wjuxaqpny3stm/7ef8dc11-9254-485d-a555-2585c4035fb0.png";
+  "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/e4b08990-f579-4036-ae06-d6be2cdfc27a-file.png";
 const LOGO_IMAGE_URL =
   "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768587105801-2026-01-05-15.55.10-Nero-AI-Background-Remover.png";
 
@@ -111,20 +111,20 @@ export function VetHeroSection() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="relative"
           >
-            <div className="relative z-10 aspect-[175/128] rounded-[2.5rem] overflow-hidden bg-white/10 shadow-2xl border-8 border-white/10 sm:backdrop-blur-md">
+            <div className="relative z-10 aspect-[73/57] rounded-[2.5rem] overflow-hidden bg-white/10 shadow-2xl border-8 border-white/10 sm:backdrop-blur-md">
               <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent" />
               <img
                 src={heroImage.src}
                 srcSet={heroImageSrcSet}
                 sizes="(max-width: 1023px) calc(100vw - 2rem), 50vw"
-                alt="וטרינרית עם כלב וחתול במרפאה"
-                width={1400}
-                height={1024}
+                alt="איור של וטרינרית אפורת שיער עם כלב וחתול במרפאה"
+                width={1168}
+                height={912}
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
                 onError={(event) => restoreOriginalImage(event, heroImage.fallbackSrc)}
-                className="relative z-10 w-full h-full object-cover"
+                className="relative z-10 w-full h-full object-contain"
               />
             </div>
             {/* Decorative circle */}

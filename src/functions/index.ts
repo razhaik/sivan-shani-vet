@@ -11,3 +11,4 @@ export const sendSms = superdevClient.functions["send-sms"];
 export const sendBulkClientSms = superdevClient.functions["send-bulk-client-sms"];
 export const sendOneSignalNotification = superdevClient.functions["send-onesignal-notification"];
 export const sendBusinessNotification = superdevClient.functions["send-business-notification"];
+export const testBusinessPush = superdevClient.functions["test-business-push"];

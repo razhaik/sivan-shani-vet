@@ -1,0 +1,41 @@
+{
+  "name": "DashboardLayout",
+  "description": "A private per-user layout for the Hebrew CRM management widget board",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "The authenticated user id that owns this personal dashboard layout"
+    },
+    "items": {
+      "type": "array",
+      "description": "The ordered active CRM dashboard widgets and each widget's fixed grid size",
+      "items": {
+        "type": "object",
+        "properties": {
+          "widget_id": {
+            "type": "string",
+            "description": "Stable id of an active dashboard widget"
+          },
+          "size": {
+            "type": "string",
+            "description": "Widget size: small, wide, tall, or large"
+          }
+        }
+      }
+    }
+  },
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

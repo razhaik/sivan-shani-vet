@@ -73,7 +73,7 @@ export function VetHeader() {
     >
       <a
         href="#main-content"
-        className="absolute right-4 top-2 z-[60] -translate-y-full rounded-lg bg-white px-4 py-3 font-bold text-blue-950 shadow-lg transition-transform focus-visible:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
+        className="absolute right-4 top-2 z-[-1] -translate-y-full pointer-events-none font-bold text-blue-950 opacity-0 underline decoration-2 underline-offset-4 transition-[transform,opacity] focus-visible:pointer-events-auto focus-visible:z-[60] focus-visible:translate-y-0 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
       >
         דלגו לתוכן הראשי
       </a>
