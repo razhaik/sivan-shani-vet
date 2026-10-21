@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Appointment, AppointmentRescheduleRequest, BusinessClient, ClientArchive, ContactInquiry, User } from "@/entities";
-import { CrmSidebar, type CrmActiveKey } from "@/components/business-crm/CrmSidebar";
+import { CrmSidebar, type CrmActiveKey, type CrmInstallAction } from "@/components/business-crm/CrmSidebar";
+import CrmMobileNavigation from "@/components/business-crm/CrmMobileNavigation";
 import AppMarketplaceModal from "@/components/business-crm/AppMarketplaceModal";
 import CrmAssistantPanel from "@/components/business-crm/CrmAssistantPanel";
 import { CrmTopbar, type CrmOpenItem } from "@/components/business-crm/CrmTopbar";
@@ -12,6 +13,7 @@ import BusinessCrmContent from "@/components/business-crm/BusinessCrmContent";
 import { CrmContentBoundary } from "@/components/business-crm/CrmContentBoundary";
 import { CrmProvider, crmViewIdentity, type CrmContextValue, type CrmRecord, type CrmView } from "@/components/business-crm/CrmContext";
 import type { MarketingView } from "@/components/business-crm/MarketingLayout";
+import { clearCrmAsHomeScreenStart, markCrmAsHomeScreenStart } from "@/lib/crmHomeScreen";
 
 function records(value: unknown): CrmRecord[] {
   return Array.isArray(value) ? value.filter(Boolean) as CrmRecord[] : [];
@@ -175,7 +177,7 @@ function decodeClientId(value?: string): string | null {
   try { const decoded = decodeURIComponent(value).trim(); return decoded || null; } catch { return null; }
 }
 
-function viewFromPathname(pathname: string): CrmView {
+function viewFromPathname(pathname: string, mobileBaseEntry = false): CrmView {
   const path = pathname.replace(/^\/business-crm(?:\/|$)/, "").replace(/^\/+|\/+$/g, "");
   const segments = path ? path.split("/") : [];
   if (segments[0] === "inbox") return { kind: "inbox" };
@@ -189,7 +191,7 @@ function viewFromPathname(pathname: string): CrmView {
     if (["automatic", "broadcasts", "sent", "reports"].includes(subview || "")) return { kind: "marketing", subview: subview! };
     return { kind: "marketing", subview: "automatic" };
   }
-  return { kind: "inbox" };
+  return mobileBaseEntry && segments.length === 0 ? { kind: "sales" } : { kind: "inbox" };
 }
 
 function activeKeyForView(view: CrmView): CrmActiveKey {
@@ -217,10 +219,13 @@ function AuthGate() {
 
 export default function BusinessCrmLayout() {
   const location = useLocation();
-  const [view, setView] = useState<CrmView>(() => viewFromPathname(location.pathname));
+  const [view, setView] = useState<CrmView>(() => viewFromPathname(location.pathname, typeof window !== "undefined" && window.innerWidth < 768));
   const [user, setUser] = useState<CrmRecord | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileInstallAction, setMobileInstallAction] = useState<CrmInstallAction | null>(null);
+  const registerMobileInstallAction = useCallback((action: CrmInstallAction | null) => setMobileInstallAction(() => action), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const marketplaceTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -228,7 +233,21 @@ export default function BusinessCrmLayout() {
 
   useEffect(() => {
     let active = true;
-    User.me().then((currentUser) => { if (!active) return; if (!currentUser) { User.login(); return; } setUser(currentUser as CrmRecord); setAuthReady(true); }).catch(() => { if (active) User.login(); });
+    User.me()
+      .then((currentUser) => {
+        if (!active) return;
+        if (!currentUser) {
+          clearCrmAsHomeScreenStart();
+          User.login();
+          return;
+        }
+        markCrmAsHomeScreenStart();
+        setUser(currentUser as CrmRecord);
+        setAuthReady(true);
+      })
+      .catch(() => {
+        if (active) User.login();
+      });
     return () => { active = false; };
   }, []);
 
@@ -278,7 +297,10 @@ export default function BusinessCrmLayout() {
     setView(next);
     setSearch("");
     setSidebarOpen(false);
-    if (optionalTargetId && typeof window !== "undefined") window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.getElementById(optionalTargetId)?.scrollIntoView({ behavior: "smooth", block: "start" })));
+    if (optionalTargetId && typeof window !== "undefined") {
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.getElementById(optionalTargetId)?.scrollIntoView({ behavior, block: "start" })));
+    }
   }, []);
   const openAppMarketplace = useCallback((trigger?: HTMLButtonElement) => {
     marketplaceTriggerRef.current = trigger || null;
@@ -313,5 +335,5 @@ export default function BusinessCrmLayout() {
   }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, inquiriesQuery.isLoading, notificationCount, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, search, user, userLabel, view]);
 
   if (!authReady || !user) return <AuthGate />;
-  return <div dir="rtl" className="min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]" style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}><CrmSidebar isOpen={sidebarOpen} userName={userLabel} onClose={() => setSidebarOpen(false)} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} activeKey={activeKey} inboxCount={notificationCount} /><div className="min-h-screen lg:mr-[248px]"><CrmTopbar userLabel={userLabel} profileName={text(user?.full_name)} profileEmail={text(user?.email)} profileImageUrl={text(user?.profile_image_url)} onProfileUpdated={handleProfileUpdated} notificationCount={notificationCount} openItems={openItems} search={search} onSearch={setSearch} onOpenSidebar={() => setSidebarOpen(true)} onOpenAssistant={toggleAssistant} assistantOpen={isAssistantOpen} searchPlaceholder={searchCopy.placeholder} searchAriaLabel={searchCopy.ariaLabel} /><main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8"><CrmProvider value={crmContextValue}><CrmContentBoundary viewKey={viewKey}><BusinessCrmContent /></CrmContentBoundary></CrmProvider></main></div><CrmAssistantPanel isOpen={isAssistantOpen} onClose={closeAssistant} />{isMarketplaceOpen && <AppMarketplaceModal onClose={closeAppMarketplace} returnFocusRef={marketplaceTriggerRef} />}</div>;
+  return <div id="crm-root" dir="rtl" className="crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]" style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}><CrmSidebar isOpen={sidebarOpen} userName={userLabel} onClose={closeSidebar} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} onRegisterInstallAction={registerMobileInstallAction} activeKey={activeKey} inboxCount={notificationCount} /><div className="min-h-screen lg:mr-[248px]"><CrmTopbar userLabel={userLabel} profileName={text(user?.full_name)} profileEmail={text(user?.email)} profileImageUrl={text(user?.profile_image_url)} onProfileUpdated={handleProfileUpdated} notificationCount={notificationCount} openItems={openItems} search={search} onSearch={setSearch} onOpenSidebar={() => setSidebarOpen(true)} onOpenAssistant={toggleAssistant} assistantOpen={isAssistantOpen} searchPlaceholder={searchCopy.placeholder} searchAriaLabel={searchCopy.ariaLabel} /><main className="crm-main-content mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8"><CrmProvider value={crmContextValue}><CrmContentBoundary viewKey={viewKey}><BusinessCrmContent /></CrmContentBoundary></CrmProvider></main></div><CrmMobileNavigation view={view} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} onAddToHomeScreen={(trigger) => { if (mobileInstallAction) void mobileInstallAction(trigger); }} /><CrmAssistantPanel isOpen={isAssistantOpen} onClose={closeAssistant} />{isMarketplaceOpen && <AppMarketplaceModal onClose={closeAppMarketplace} returnFocusRef={marketplaceTriggerRef} />}</div>;
 }

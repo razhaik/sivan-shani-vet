@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, CalendarClock, Check, CheckCircle2, ChevronLeft, Clipboard, Clock3, CreditCard, Loader2, Mail, MoreHorizontal, PawPrint, Pencil, Phone, Plus, Send, StickyNote } from "lucide-react";
+import { AlertCircle, CalendarClock, Cat, Check, CheckCircle2, ChevronLeft, Clipboard, Clock3, CreditCard, Dog, Loader2, Mail, MoreHorizontal, PawPrint, Pencil, Phone, Plus, Send, StickyNote } from "lucide-react";
 import { ClientReminder } from "@/entities";
 import { ClientEmailComposer } from "@/components/business-crm/ClientEmailComposer";
 import { ClientProfileEditor } from "@/components/business-crm/ClientProfileEditor";
@@ -98,6 +98,7 @@ function ReadOnlyValue({ label, value, dir = "rtl" }: { label: string; value: st
 }
 
 function PetProfileCard({ pet }: { pet: ClientPet }) {
+  const PetIcon = pet.species === "dog" ? Dog : pet.species === "cat" ? Cat : PawPrint;
   const age = formatPetAge(pet.birthDate);
   const weight = formatPetWeight(pet.weightKg);
   const breed = fieldText(pet.breed);
@@ -105,7 +106,7 @@ function PetProfileCard({ pet }: { pet: ClientPet }) {
   const medicalNotes = fieldText(pet.medicalNotes);
   const hasDetails = Boolean(breed || age || weight || allergies || medicalNotes);
   return <article className="rounded-2xl border border-[#E1ECEC] bg-[#F9FCFC] p-3.5">
-    <div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F2D162]/30 text-[#69550C]"><PawPrint className="h-4 w-4" /></span><div className="min-w-0 flex-1"><h4 className="truncate text-sm font-black text-[#152E4D]">{pet.name}</h4><div className="mt-1 flex flex-wrap items-center gap-1.5">{pet.species ? <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-[#315A67]">{speciesLabel(pet.species)}</span> : <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-400">סוג לא צוין</span>}</div></div></div>
+    <div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F2D162]/30 text-[#69550C]"><PetIcon className="h-3.5 w-3.5 text-[#1A1A3E]" /></span><div className="min-w-0 flex-1"><h4 className="truncate text-sm font-black text-[#152E4D]">{pet.name}</h4><div className="mt-1 flex flex-wrap items-center gap-1.5">{pet.species ? <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-[#315A67]">{speciesLabel(pet.species)}</span> : <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-400">סוג לא צוין</span>}</div></div></div>
     {hasDetails ? <>
       <dl className="mt-3 grid gap-2 sm:grid-cols-3">
         {breed && <div className="rounded-xl border border-[#E8EFF0] bg-white px-3 py-2"><dt className="text-[10px] font-extrabold text-slate-400">גזע</dt><dd className="mt-1 text-xs font-bold text-[#152E4D]">{breed}</dd></div>}

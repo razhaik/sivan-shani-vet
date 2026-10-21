@@ -27,6 +27,7 @@ export interface InboxMessage {
   detailRows?: Array<{ label: string; value: string }>;
   attentionPetLabel?: string;
   attentionServiceLabel?: string;
+  attentionOriginalDateLabel?: string;
   attentionDateLabel?: string;
 }
 
@@ -156,6 +157,7 @@ export function MobileAttentionTray({ messages, selectedMessage, isMenuOpen, onT
   const attentionDetails = [
     selectedMessage.attentionPetLabel ? { label: "חיית מחמד", value: selectedMessage.attentionPetLabel } : null,
     selectedMessage.attentionServiceLabel ? { label: "שירות", value: selectedMessage.attentionServiceLabel } : null,
+    selectedMessage.kind === "reschedule_request" ? { label: "מועד מקורי", value: selectedMessage.attentionOriginalDateLabel || "המועד המקורי לא צוין" } : null,
     { label: selectedMessage.kind === "reschedule_request" ? "מועד מוצע" : "מועד מבוקש", value: selectedMessage.attentionDateLabel || selectedMessage.dateLabel },
   ].filter(Boolean) as Array<{ label: string; value: string }>;
 
@@ -194,9 +196,14 @@ export function MobileAttentionTray({ messages, selectedMessage, isMenuOpen, onT
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-2">
           {attentionDetails.map((detail) => {
-            const isDateDetail = detail.label === "מועד מוצע" || detail.label === "מועד מבוקש";
+            const isOriginalDate = detail.label === "מועד מקורי";
+            const isProposedDate = detail.label === "מועד מוצע";
+            const isDateDetail = isOriginalDate || isProposedDate || detail.label === "מועד מבוקש";
             const dateParts = isDateDetail ? splitDateAndTime(detail.value) : null;
-            return <div key={detail.label} className="min-w-0 rounded-lg bg-[#F7F8FA] px-2.5 py-2"><dt className="text-[10px] font-extrabold text-slate-400">{detail.label}</dt><dd className={`mt-0.5 ${dateParts ? "break-words" : "truncate"} text-xs font-black text-[#1A1A3E]`} title={detail.value} aria-label={dateParts ? detail.value : undefined}>{dateParts ? <><span className="block break-words">{dateParts.date}</span>{dateParts.time && <span dir={dateParts.time.includes(":") ? "ltr" : undefined} className="mt-0.5 block text-right text-[11px] font-black leading-4 tabular-nums text-[#5267A8]">{dateParts.time}</span>}</> : detail.value}</dd></div>;
+            const cardTone = isProposedDate ? "border border-[#DCE2F4] bg-[#F2F5FF]" : isOriginalDate ? "border border-[#E5E7EB] bg-[#F7F8FA]" : "bg-[#F7F8FA]";
+            const labelTone = isProposedDate ? "text-[#5267A8]" : isOriginalDate ? "text-slate-500" : "text-slate-400";
+            const timeTone = isOriginalDate ? "text-slate-500" : "text-[#5267A8]";
+            return <div key={detail.label} className={`min-w-0 rounded-lg px-2.5 py-2 ${cardTone}`}><dt className={`text-[10px] font-extrabold ${labelTone}`}>{detail.label}</dt><dd className={`mt-0.5 ${dateParts ? "break-words" : "truncate"} text-xs font-black text-[#1A1A3E]`} title={detail.value} aria-label={dateParts ? detail.value : undefined}>{dateParts ? <><span className="block break-words">{dateParts.date}</span>{dateParts.time && <span dir={dateParts.time.includes(":") ? "ltr" : undefined} className={`mt-0.5 block text-right text-[11px] font-black leading-4 tabular-nums ${timeTone}`}>{dateParts.time}</span>}</> : detail.value}</dd></div>;
           })}
         </dl>
         {selectedMessage.kind === "appointment" && selectedMessage.status === "requested" && <AppointmentDecisionActions compact message={selectedMessage} state={appointmentActionState} feedback={appointmentFeedbackForMessage} onApprove={(message) => { onCloseMenu(); return onApproveAppointment(message); }} onReject={(message) => { onCloseMenu(); return onRejectAppointment(message); }} />}

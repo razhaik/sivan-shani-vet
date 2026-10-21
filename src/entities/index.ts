@@ -16,6 +16,7 @@ export const MarketingBroadcastDraft = superdevClient.entity("MarketingBroadcast
 export const MarketingSendLog = superdevClient.entity("MarketingSendLog");
 export const MarketingRecipientStatus = superdevClient.entity("MarketingRecipientStatus");
 export const DashboardLayoutPreference = superdevClient.entity("DashboardLayoutPreference");
+export const DashboardLayout = superdevClient.entity("DashboardLayout");
 export const ClientListPreference = superdevClient.entity("ClientListPreference");
 export const ClientReminder = superdevClient.entity("ClientReminder");
 export const ClinicService = superdevClient.entity("ClinicService");

@@ -29,7 +29,15 @@ import {
   type CustomerEmailTemplateSelections,
   type CustomerEmailTypeKey,
 } from "@/lib/emailTemplates";
-import { getBrowserPushStatus, requestBrowserPushPermission, type BrowserPushStatus } from "@/lib/onesignalPush";
+import {
+  getBrowserPushDiagnostics,
+  observeBrowserPushSubscriptionChanges,
+  requestBrowserPushPermission,
+  sendBrowserPushTest,
+  type BrowserPushDiagnostics,
+  type BrowserPushStatus,
+  type BrowserPushTestResult,
+} from "@/lib/onesignalPush";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
 import { ChevronValue, SettingsGroup, SettingsRow, StatusPill, type StatusTone } from "@/components/business-crm/SettingsPrimitives";
 
@@ -143,7 +151,10 @@ export default function BusinessCrmRemindersSettings({
   const [savingToggle, setSavingToggle] = useState<ToggleKey | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [browserPushStatus, setBrowserPushStatus] = useState<BrowserPushStatus>("loading");
+  const [browserPushDiagnostics, setBrowserPushDiagnostics] = useState<BrowserPushDiagnostics | null>(null);
   const [isRequestingBrowserPush, setIsRequestingBrowserPush] = useState(false);
+  const [isSendingTestPush, setIsSendingTestPush] = useState(false);
+  const [testPushFeedback, setTestPushFeedback] = useState<Feedback | null>(null);
   const [timingEditor, setTimingEditor] = useState<TemplateKey | null>(null);
   const [timingDraft, setTimingDraft] = useState("");
   const [timingError, setTimingError] = useState<string | null>(null);
@@ -177,12 +188,18 @@ export default function BusinessCrmRemindersSettings({
 
   useEffect(() => {
     let active = true;
-    setBrowserPushStatus("loading");
-    void getBrowserPushStatus().then((status) => {
-      if (active) setBrowserPushStatus(status);
+    const applyDiagnostics = (diagnostics: BrowserPushDiagnostics) => {
+      if (!active) return;
+      setBrowserPushDiagnostics(diagnostics);
+      setBrowserPushStatus(diagnostics.status);
+    };
+    void getBrowserPushDiagnostics().then(applyDiagnostics).catch(() => {
+      if (active) setBrowserPushStatus("error");
     });
+    const stopObserving = observeBrowserPushSubscriptionChanges(applyDiagnostics);
     return () => {
       active = false;
+      stopObserving();
     };
   }, []);
 
@@ -210,7 +227,7 @@ export default function BusinessCrmRemindersSettings({
   const browserPushStatusMessage: Record<BrowserPushStatus, string> = {
     loading: "טוענות את שירות ההתראות. בקשת הרשאה תופיע רק אחרי לחיצה שלך על מתג ההפעלה.",
     ready: "שירות ההתראות מוכן. הפעילי את המתג כדי לבקש הרשאה מהדפדפן; הבדיקה עצמה לא מציגה בקשת הרשאה.",
-    subscribed: "OneSignal מזהה הרשמה פעילה בדפדפן הזה, והרשאת הדפדפן מאושרת. תורים ופניות חדשות יוכלו להופיע גם כשהאתר סגור.",
+    subscribed: "הדפדפן ו-OneSignal מדווחים על הרשמה פעילה. הסטטוס הזה אינו מאשר שהתראה נוצרה, נמסרה או הוצגה במכשיר.",
     unsupported: "הדפדפן או מצב הגלישה הנוכחי אינם תומכים בהתראות Web Push.",
     denied: "הרשאת ההתראות חסומה בדפדפן. שני אותה בהגדרות האתר ואז לחצי על „בדקי שוב”.",
     unconfigured: "לא נמצא מזהה אפליקציית OneSignal בהגדרת האתר. צריך להוסיף אותו לפני שאפשר לבדוק או להפעיל התראות.",
@@ -252,13 +269,16 @@ export default function BusinessCrmRemindersSettings({
   };
 
   const handleBrowserPushStatusRetry = async () => {
-    if (isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "subscribed" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured" || browserPushStatus === "origin-mismatch") return;
+    if (isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured" || browserPushStatus === "origin-mismatch") return;
 
     setIsRequestingBrowserPush(true);
     setBrowserPushStatus("loading");
+    setTestPushFeedback(null);
     clearFeedback();
     try {
-      const nextStatus = await getBrowserPushStatus();
+      const diagnostics = await getBrowserPushDiagnostics();
+      setBrowserPushDiagnostics(diagnostics);
+      const nextStatus = diagnostics.status;
       setBrowserPushStatus(nextStatus);
       if (nextStatus === "ready") {
         setFeedback({ kind: "success", message: "שירות ההתראות זמין. המתג יבקש הרשאה רק כשתבחרי להפעיל אותו." });
@@ -285,7 +305,10 @@ export default function BusinessCrmRemindersSettings({
     setBrowserPushStatus("loading");
     clearFeedback();
     try {
-      const nextStatus = await requestBrowserPushPermission();
+      await requestBrowserPushPermission();
+      const diagnostics = await getBrowserPushDiagnostics();
+      setBrowserPushDiagnostics(diagnostics);
+      const nextStatus = diagnostics.status;
       setBrowserPushStatus(nextStatus);
       if (nextStatus === "subscribed") {
         setFeedback({ kind: "success", message: "התראות הצוות הופעלו בדפדפן הזה." });
@@ -304,6 +327,44 @@ export default function BusinessCrmRemindersSettings({
       setFeedback({ kind: "error", message: "לא הצלחנו לחבר את ההתראות. נסי שוב." });
     } finally {
       setIsRequestingBrowserPush(false);
+    }
+  };
+
+  const handleBrowserPushTest = async () => {
+    const diagnostics = browserPushDiagnostics;
+    if (isSendingTestPush || isRequestingBrowserPush || !diagnostics?.canTargetDevice || !diagnostics.subscriptionId) return;
+
+    setIsSendingTestPush(true);
+    setTestPushFeedback(null);
+    try {
+      const result: BrowserPushTestResult = await sendBrowserPushTest(diagnostics.subscriptionId);
+      if (result.status === "created" || result.status === "created_with_warning") {
+        const recipientText = result.recipientCount !== undefined ? ` OneSignal דיווח על ${result.recipientCount} נמענים.` : "";
+        const warningText = result.status === "created_with_warning" ? " OneSignal דיווח על אזהרה חלקית." : "";
+        const idText = result.notificationId ? ` מזהה התראה: ${result.notificationId}.` : "";
+        setTestPushFeedback({
+          kind: "success",
+          message: `OneSignal אישר יצירת התראה.${recipientText}${warningText} זה אינו אישור שהמכשיר קיבל או הציג אותה.${idText}`,
+        });
+      } else if (result.status === "no_target") {
+        setTestPushFeedback({
+          kind: "error",
+          message: "OneSignal החזיר תשובה ללא מזהה התראה, ולכן לא נוצרה התראה למנוי הזה. בדקי שוב את פרטי המכשיר.",
+        });
+      } else if (result.status === "rejected") {
+        setTestPushFeedback({
+          kind: "error",
+          message: `OneSignal דחה את בקשת הבדיקה${result.httpStatus ? ` (HTTP ${result.httpStatus})` : ""}. לא התקבל אישור ליצירת התראה.`,
+        });
+      } else if (result.status === "invalid_response") {
+        setTestPushFeedback({ kind: "error", message: "OneSignal החזיר תשובה שלא ניתן לאמת. לא התקבל אישור ליצירת התראה." });
+      } else {
+        setTestPushFeedback({ kind: "error", message: "לא הצלחנו להתחבר ל-OneSignal כדי לשלוח את בדיקת הפוש. נסי שוב." });
+      }
+    } catch {
+      setTestPushFeedback({ kind: "error", message: "בקשת בדיקת הפוש לא הושלמה. בדקי את החיבור ונסי שוב." });
+    } finally {
+      setIsSendingTestPush(false);
     }
   };
 
@@ -528,6 +589,77 @@ export default function BusinessCrmRemindersSettings({
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2F8794]" aria-hidden="true" />
               <p>באייפון ובאייפד יש להוסיף את האתר למסך הבית דרך Safari, ב־iOS או iPadOS 16.4 ומעלה, ואז להפעיל כאן את ההתראות.</p>
             </div>
+            {browserPushDiagnostics && (
+              <div className="mt-3 rounded-xl border border-[#C9DDE3] bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-extrabold text-[#16344D]">אבחון המכשיר הזה</p>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${browserPushDiagnostics.canTargetDevice ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
+                    {browserPushDiagnostics.canTargetDevice ? "מוכן לבדיקה ממוקדת" : "חלק מפרטי המנוי חסרים"}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  {[
+                    {
+                      label: "מזהה מנוי OneSignal",
+                      value: !browserPushDiagnostics.subscriptionIdPresent ? "חסר" : browserPushDiagnostics.subscriptionIdValid ? "נמצא" : "לא תקין",
+                      ok: browserPushDiagnostics.subscriptionIdValid,
+                    },
+                    {
+                      label: "הרשאת מכשיר",
+                      value: browserPushDiagnostics.permission === "granted" ? "מאושרת" : browserPushDiagnostics.permission === "denied" ? "חסומה" : browserPushDiagnostics.permission === "default" ? "לא אושרה" : "לא נתמכת",
+                      ok: browserPushDiagnostics.permission === "granted",
+                    },
+                    {
+                      label: "הרשמה ב-OneSignal",
+                      value: browserPushDiagnostics.optedIn ? "פעילה" : "כבויה",
+                      ok: browserPushDiagnostics.optedIn,
+                    },
+                    {
+                      label: "Worker /push/onesignal/",
+                      value: browserPushDiagnostics.workerRegistered ? "נמצא" : "חסר",
+                      ok: browserPushDiagnostics.workerRegistered,
+                    },
+                    {
+                      label: "מנוי Push במכשיר",
+                      value: browserPushDiagnostics.nativeSubscriptionPresent ? "קיים" : "חסר",
+                      ok: browserPushDiagnostics.nativeSubscriptionPresent,
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="min-w-0 rounded-lg border border-[#E2EBEE] bg-[#F8FBFB] px-2.5 py-2">
+                      <p className="text-[10px] font-bold leading-4 text-[#738790]">{item.label}</p>
+                      <p className={`mt-1 text-xs font-extrabold ${item.ok ? "text-emerald-800" : "text-amber-900"}`}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {!browserPushDiagnostics.canTargetDevice && (
+                  <p className="mt-2 text-[11px] font-semibold leading-5 text-[#647A83]">
+                    {browserPushDiagnostics.status === "subscribed"
+                      ? "הסטטוס המקומי פעיל, אבל חסר מזהה מנוי, Worker ייעודי או מנוי Push שאפשר למקד אליו."
+                      : "שליחת בדיקה תופיע רק לאחר שההרשאה, ההרשמה ורישום ה־Worker יאפשרו למקד את המכשיר הזה."}
+                  </p>
+                )}
+              </div>
+            )}
+            {browserPushDiagnostics?.canTargetDevice && browserPushStatus === "subscribed" && (
+              <div className="mt-3 rounded-xl border border-[#C9DDE3] bg-white px-3 py-3">
+                <Button
+                  type="button"
+                  onClick={() => void handleBrowserPushTest()}
+                  disabled={isSendingTestPush || isRequestingBrowserPush}
+                  className="min-h-11 w-full rounded-xl bg-[#1D6472] px-4 text-sm font-extrabold text-white hover:bg-[#15525E] sm:w-auto"
+                >
+                  {isSendingTestPush ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <BellRing className="h-4 w-4" aria-hidden="true" />}
+                  {isSendingTestPush ? "שולחת בדיקה למכשיר הזה..." : "שליחת פוש בדיקה למכשיר הזה"}
+                </Button>
+                <p className="mt-2 text-[11px] font-semibold leading-5 text-[#647A83]">השליחה מוגבלת למנוי של המכשיר הזה. אישור OneSignal ליצירה אינו מוכיח שההתראה הוצגה.</p>
+                {testPushFeedback && (
+                  <div role={testPushFeedback.kind === "error" ? "alert" : "status"} aria-live="polite" className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold leading-5 ${testPushFeedback.kind === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                    {testPushFeedback.kind === "error" ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+                    <span>{testPushFeedback.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex min-h-[58px] flex-col gap-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2 text-xs font-semibold leading-5 text-[#738790]">
@@ -549,11 +681,11 @@ export default function BusinessCrmRemindersSettings({
                 type="button"
                 variant="outline"
                 onClick={() => void handleBrowserPushStatusRetry()}
-                disabled={isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "subscribed" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured"}
+                disabled={isRequestingBrowserPush || browserPushStatus === "loading" || browserPushStatus === "unsupported" || browserPushStatus === "unconfigured"}
                 className="min-h-9 shrink-0 rounded-xl border-[#C9DDE3] bg-white px-3 text-xs font-extrabold text-[#1D6472] hover:bg-[#EAF6F7] hover:text-[#102E47]"
               >
                 {browserPushStatus === "loading" ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-                {browserPushStatus === "subscribed" ? "התראות פעילות" : browserPushStatus === "unsupported" ? "לא נתמך" : browserPushStatus === "unconfigured" ? "חסרה הגדרה" : browserPushStatus === "ready" ? "בדיקת מצב" : browserPushStatus === "denied" ? "בדקי שוב" : browserPushStatus === "loading" ? "בודקות..." : "נסי שוב"}
+                {browserPushStatus === "unsupported" ? "לא נתמך" : browserPushStatus === "unconfigured" ? "חסרה הגדרה" : browserPushStatus === "loading" ? "בודקות..." : browserPushStatus === "ready" ? "בדיקת מצב" : "בדקי שוב"}
               </Button>
             )}
           </div>

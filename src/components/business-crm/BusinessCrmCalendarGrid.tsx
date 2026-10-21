@@ -47,6 +47,7 @@ interface CalendarGridProps {
   onSelectDate: (date: Date) => void;
   onSelectSlot: (date: Date, time: string) => void;
   onSelectAppointment: (record: CrmRecord) => void;
+  isMobile?: boolean;
 }
 interface PositionedAppointment {
   record: CrmRecord;
@@ -428,8 +429,38 @@ function AgendaBlockRow({ block }: { block: CalendarBlockDisplay }) {
   return <div role="img" aria-label={label} title={label} className="pointer-events-none flex items-center gap-3 rounded-xl border border-dashed border-[#AAB2BE] bg-[#F3F5F7] p-3 text-right" style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(100, 116, 139, 0.13) 0px, rgba(100, 116, 139, 0.13) 2px, transparent 2px, transparent 8px" }}><span className="w-16 shrink-0 text-xs font-black text-slate-600" dir="ltr">{text(block.start_time).slice(0, 5)}–{text(block.end_time).slice(0, 5)}</span><LockKeyhole className="h-4 w-4 shrink-0 text-slate-500" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-slate-700">סגירת חלון זמן</span><span className="mt-1 block truncate text-xs font-semibold text-slate-500">{text(block.reason) || "זמן סגור לבחירת לקוחות"}</span></span><span className="shrink-0 rounded-full border border-[#CBD2DB] bg-white/80 px-2 py-1 text-[10px] font-black text-slate-600">סגור</span></div>;
 }
 
-function Agenda({ selectedDate, appointments, calendarBusy, googleEvents, calendarBlocks, services, onSelectDate, onSelectAppointment }: Omit<CalendarGridProps, "mode" | "monthDate" | "now" | "onSelectSlot">) {
-  const visibleWeekKeys = new Set(visibleDates(selectedDate, "week").map(dateKey));
+function agendaRowsForGroup(group: AgendaGroup, services: Service[]): AgendaRow[] {
+  return [
+    ...group.blocks.map((block, index) => ({ kind: "block" as const, block, index, start: timeToMinutes(block.start_time) || 0 })),
+    ...group.googleEvents.map((event, index) => ({ kind: "google" as const, event, index, start: event.allDay ? 0 : (timeToMinutes(event.start) || 0) })),
+    ...group.records.map((record, index) => {
+      const serviceId = serviceIdForRecord(record, services);
+      const service = services.find((item) => item.id === serviceId);
+      return { kind: "appointment" as const, record, service, index, start: appointmentStartMinutes(record) };
+    }),
+  ].sort((left, right) => left.start - right.start || (left.kind === "block" ? -1 : left.kind === "google" ? -1 : 1));
+}
+
+function agendaRowKey(row: AgendaRow) {
+  if (row.kind === "block") return `${row.block.id}-${row.index}`;
+  if (row.kind === "google") return googleEventKey(row.event, row.index);
+  return recordKey(row.record, row.index);
+}
+
+function AgendaRowCard({ row, services, onSelectAppointment }: { row: AgendaRow; services: Service[]; onSelectAppointment: (record: CrmRecord) => void }) {
+  if (row.kind === "block") return <AgendaBlockRow block={row.block} />;
+  if (row.kind === "google") return <AgendaGoogleRow event={row.event} />;
+  const { record, service } = row;
+  const serviceId = serviceIdForRecord(record, services);
+  const tone = appointmentStatusTone(record.status);
+  const requested = tone === "requested";
+  const { accessibilityLabel } = appointmentDisplay(record, service);
+  const appointmentLabel = requested ? `${accessibilityLabel}, ממתין להחלטה` : tone === "no_show" ? `${accessibilityLabel}, לא הגיע` : accessibilityLabel;
+  return <button type="button" onClick={() => onSelectAppointment(record)} aria-label={appointmentLabel} title={appointmentLabel} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-right transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${requested ? "bg-transparent hover:bg-[#FFFDF2]" : tone === "no_show" ? "border-[#E7B68E] bg-[#FFF8F3] hover:bg-[#FFF1E6]" : "border-[#EEF0F3] bg-[#FBFCFD] hover:border-[#F2D162] hover:bg-[#FFFDF2]"}`} style={requested ? { borderColor: serviceColor(serviceId) } : undefined}><span className="w-16 shrink-0 text-xs font-black text-[#1A1A3E]" dir="ltr">{text(record.start_time).slice(0, 5)}</span><span className="h-9 w-1 shrink-0 rounded-full" style={{ backgroundColor: tone === "no_show" ? "#B9652A" : serviceColor(serviceId) }} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#1A1A3E]">{text(record.client_name) || "לקוח ללא שם"}</span><span className="mt-1 block truncate text-xs font-semibold text-slate-500">{requested ? "ממתין להחלטה · " : ""}{service?.label || text(record.appointment_type) || "שירות לא צוין"}{text(record.pet_name) ? ` · ${text(record.pet_name)}` : ""}</span></span><span className={`rounded-full px-2 py-1 text-[10px] font-black ${statusClass(tone)}`}>{statusLabel(record.status)}</span></button>;
+}
+
+function Agenda({ selectedDate, appointments, calendarBusy, googleEvents, calendarBlocks, services, onSelectDate, onSelectAppointment, dayOnly = false }: Omit<CalendarGridProps, "mode" | "monthDate" | "now" | "onSelectSlot" | "isMobile"> & { dayOnly?: boolean }) {
+  const visibleDateKeys = new Set(dayOnly ? [dateKey(selectedDate)] : visibleDates(selectedDate, "week").map(dateKey));
   const groups = new Map<string, AgendaGroup>();
   const ensureGroup = (key: string) => {
     const current = groups.get(key);
@@ -438,29 +469,48 @@ function Agenda({ selectedDate, appointments, calendarBusy, googleEvents, calend
     groups.set(key, next);
     return next;
   };
+  if (dayOnly) ensureGroup(dateKey(selectedDate));
 
   appointments
-    .filter((record) => visibleWeekKeys.has(appointmentDateKey(record)))
+    .filter((record) => visibleDateKeys.has(appointmentDateKey(record)))
     .sort((a, b) => `${appointmentDateKey(a)} ${text(a.start_time)}`.localeCompare(`${appointmentDateKey(b)} ${text(b.start_time)}`))
     .forEach((record) => ensureGroup(appointmentDateKey(record)).records.push(record));
 
   (Array.isArray(googleEvents) ? googleEvents : [])
-    .filter((event) => visibleWeekKeys.has(text(event.date)))
+    .filter((event) => visibleDateKeys.has(text(event.date)))
     .sort((a, b) => `${text(a.date)} ${text(a.start)}`.localeCompare(`${text(b.date)} ${text(b.start)}`))
     .forEach((event) => ensureGroup(text(event.date)).googleEvents.push(event));
 
   (Array.isArray(calendarBlocks) ? calendarBlocks : [])
-    .filter((block) => visibleWeekKeys.has(block.date))
+    .filter((block) => visibleDateKeys.has(block.date))
     .sort((a, b) => `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`))
     .forEach((block) => ensureGroup(block.date).blocks.push(block));
 
   const sortedGroups = [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
   const safeBusyCount = Array.isArray(calendarBusy) ? calendarBusy.length : 0;
-  return <section data-calendar-busy-count={safeBusyCount} className="rounded-2xl border border-[#E5E7EB] bg-white p-4" aria-label="תצוגת סדר יום"><div className="mb-4 flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#5267A8]" /><div><h2 className="text-base font-black text-[#1A1A3E]">סדר היום</h2><p className="text-xs font-semibold text-slate-500">רשימת הפגישות, סגירות הזמן ואירועי Google Calendar בטווח התצוגה.</p></div></div>{sortedGroups.length === 0 ? <div className="rounded-2xl border border-dashed border-[#D9DEE5] bg-[#FBFCFD] px-5 py-14 text-center"><PawPrint className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-extrabold text-[#1A1A3E]">אין פגישות, סגירות או אירועי Google Calendar להצגה</p><p className="mt-1 text-xs font-semibold text-slate-500">כאן מופיעים תורים שנשמרו, חלונות זמן סגורים ואירועים מיומן Google.</p></div> : <div className="space-y-5">{sortedGroups.map(([key, group]) => { const date = new Date(`${key}T12:00:00`); const rows: AgendaRow[] = [...group.blocks.map((block, index) => ({ kind: "block" as const, block, index, start: timeToMinutes(block.start_time) || 0 })), ...group.googleEvents.map((event, index) => ({ kind: "google" as const, event, index, start: event.allDay ? 0 : (timeToMinutes(event.start) || 0) })), ...group.records.map((record, index) => { const serviceId = serviceIdForRecord(record, services); const service = services.find((item) => item.id === serviceId); return { kind: "appointment" as const, record, service, index, start: appointmentStartMinutes(record) }; })].sort((left, right) => left.start - right.start || (left.kind === "block" ? -1 : left.kind === "google" ? -1 : 1)); const appointmentCountLabel = group.records.length ? `${group.records.length} ${group.records.length === 1 ? "פגישה" : "פגישות"}` : ""; const googleCountLabel = group.googleEvents.length ? `${group.googleEvents.length} ${group.googleEvents.length === 1 ? "אירוע Google" : "אירועי Google"}` : ""; const blockCountLabel = group.blocks.length ? `${group.blocks.length} ${group.blocks.length === 1 ? "סגירה" : "סגירות"}` : ""; const countLabel = [appointmentCountLabel, blockCountLabel, googleCountLabel].filter(Boolean).join(" · "); return <div key={key}><button type="button" onClick={() => onSelectDate(date)} className="mb-2 flex items-center gap-2 text-right focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4C7] text-sm font-black text-[#69550C]">{format(date, "d")}</span><span><span className="block text-sm font-black text-[#1A1A3E]">{format(date, "EEEE, d בMMMM", { locale: he })}</span><span className="block text-[10px] font-bold text-slate-400">{countLabel}</span></span></button><div className="space-y-2">{rows.map((row) => row.kind === "block" ? <AgendaBlockRow key={`${row.block.id}-${row.index}`} block={row.block} /> : row.kind === "google" ? <AgendaGoogleRow key={googleEventKey(row.event, row.index)} event={row.event} /> : (() => { const { record, service } = row; const serviceId = serviceIdForRecord(record, services); const tone = appointmentStatusTone(record.status); const requested = tone === "requested"; const { accessibilityLabel } = appointmentDisplay(record, service); const appointmentLabel = requested ? `${accessibilityLabel}, ממתין להחלטה` : tone === "no_show" ? `${accessibilityLabel}, לא הגיע` : accessibilityLabel; return <button key={recordKey(record, row.index)} type="button" onClick={() => onSelectAppointment(record)} aria-label={appointmentLabel} title={appointmentLabel} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-right transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${requested ? "bg-transparent hover:bg-[#FFFDF2]" : tone === "no_show" ? "border-[#E7B68E] bg-[#FFF8F3] hover:bg-[#FFF1E6]" : "border-[#EEF0F3] bg-[#FBFCFD] hover:border-[#F2D162] hover:bg-[#FFFDF2]"}`} style={requested ? { borderColor: serviceColor(serviceId) } : undefined}><span className="w-16 shrink-0 text-xs font-black text-[#1A1A3E]" dir="ltr">{text(record.start_time).slice(0, 5)}</span><span className="h-9 w-1 shrink-0 rounded-full" style={{ backgroundColor: tone === "no_show" ? "#B9652A" : serviceColor(serviceId) }} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#1A1A3E]">{text(record.client_name) || "לקוח ללא שם"}</span><span className="mt-1 block truncate text-xs font-semibold text-slate-500">{requested ? "ממתין להחלטה · " : ""}{service?.label || text(record.appointment_type) || "שירות לא צוין"}{text(record.pet_name) ? ` · ${text(record.pet_name)}` : ""}</span></span><span className={`rounded-full px-2 py-1 text-[10px] font-black ${statusClass(tone)}`}>{statusLabel(record.status)}</span></button>; })())}</div></div>; })}</div>}</section>;
+  return <section data-calendar-busy-count={safeBusyCount} className={`rounded-2xl border border-[#E5E7EB] bg-white ${dayOnly ? "p-3" : "p-4"}`} aria-label={dayOnly ? "תצוגת סדר היום לתאריך הנבחר" : "תצוגת סדר יום"}>
+    {!dayOnly && <div className="mb-4 flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#5267A8]" /><div><h2 className="text-base font-black text-[#1A1A3E]">סדר היום</h2><p className="text-xs font-semibold text-slate-500">רשימת הפגישות, סגירות הזמן ואירועי Google Calendar בטווח התצוגה.</p></div></div>}
+    {sortedGroups.length === 0 ? <div className="rounded-2xl border border-dashed border-[#D9DEE5] bg-[#FBFCFD] px-5 py-14 text-center"><PawPrint className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-extrabold text-[#1A1A3E]">אין פגישות, סגירות או אירועי Google Calendar להצגה</p><p className="mt-1 text-xs font-semibold text-slate-500">כאן מופיעים תורים שנשמרו, חלונות זמן סגורים ואירועים מיומן Google.</p></div> : <div className={dayOnly ? "space-y-3" : "space-y-5"}>{sortedGroups.map(([key, group]) => {
+      const date = new Date(`${key}T12:00:00`);
+      const rows = agendaRowsForGroup(group, services);
+      const appointmentCountLabel = group.records.length ? `${group.records.length} ${group.records.length === 1 ? "פגישה" : "פגישות"}` : "";
+      const googleCountLabel = group.googleEvents.length ? `${group.googleEvents.length} ${group.googleEvents.length === 1 ? "אירוע Google" : "אירועי Google"}` : "";
+      const blockCountLabel = group.blocks.length ? `${group.blocks.length} ${group.blocks.length === 1 ? "סגירה" : "סגירות"}` : "";
+      const countLabel = [appointmentCountLabel, blockCountLabel, googleCountLabel].filter(Boolean).join(" · ");
+      return <div key={key}>
+        <button type="button" onClick={() => onSelectDate(date)} className={`mb-2 flex items-center gap-2 text-right focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${dayOnly ? "w-full rounded-xl px-2 py-2 hover:bg-[#FBFCFD]" : ""}`}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF4C7] text-sm font-black text-[#69550C]">{format(date, "d")}</span>
+          <span className="min-w-0"><span className="block text-sm font-black text-[#1A1A3E]">{format(date, "EEEE, d בMMMM", { locale: he })}{dayOnly && isToday(date) ? " · היום" : ""}</span><span className="block text-[10px] font-bold text-slate-400">{countLabel || (dayOnly ? "אין תורים או אירועים מתוכננים" : "")}</span></span>
+        </button>
+        {rows.length === 0 ? <div className="rounded-2xl border border-dashed border-[#D9DEE5] bg-[#FBFCFD] px-4 py-8 text-center"><PawPrint className="mx-auto h-7 w-7 text-slate-300" /><p className="mt-2 text-sm font-extrabold text-[#1A1A3E]">אין תורים מתוכננים ליום הזה</p><p className="mt-1 text-xs font-semibold leading-5 text-slate-500">אפשר לבחור יום אחר בסרגל התאריכים או להוסיף תור חדש.</p></div> : <div className="space-y-2">{rows.map((row) => <AgendaRowCard key={agendaRowKey(row)} row={row} services={services} onSelectAppointment={onSelectAppointment} />)}</div>}
+      </div>;
+    })}</div>}
+  </section>;
 }
 
-export function BusinessCrmCalendarGrid({ mode, selectedDate, monthDate, appointments, calendarBusy, googleEvents, calendarBlocks, services, now, onSelectDate, onSelectSlot, onSelectAppointment }: CalendarGridProps) {
+export function BusinessCrmCalendarGrid({ mode, selectedDate, monthDate, appointments, calendarBusy, googleEvents, calendarBlocks, services, now, onSelectDate, onSelectSlot, onSelectAppointment, isMobile = false }: CalendarGridProps) {
   if (mode === "month") return <MonthGrid selectedDate={selectedDate} monthDate={monthDate} appointments={appointments} calendarBusy={calendarBusy} googleEvents={googleEvents} calendarBlocks={calendarBlocks} services={services} onSelectDate={onSelectDate} onSelectAppointment={onSelectAppointment} />;
   if (mode === "agenda") return <Agenda selectedDate={selectedDate} appointments={appointments} calendarBusy={calendarBusy} googleEvents={googleEvents} calendarBlocks={calendarBlocks} services={services} onSelectDate={onSelectDate} onSelectAppointment={onSelectAppointment} />;
+  if (mode === "day" && isMobile) return <Agenda selectedDate={selectedDate} appointments={appointments} calendarBusy={calendarBusy} googleEvents={googleEvents} calendarBlocks={calendarBlocks} services={services} onSelectDate={onSelectDate} onSelectAppointment={onSelectAppointment} dayOnly />;
   return <DayWeekGrid mode={mode} selectedDate={selectedDate} appointments={appointments} calendarBusy={calendarBusy} googleEvents={googleEvents} calendarBlocks={calendarBlocks} services={services} now={now} onSelectDate={onSelectDate} onSelectSlot={onSelectSlot} onSelectAppointment={onSelectAppointment} />;
 }

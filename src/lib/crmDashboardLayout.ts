@@ -1,116 +1,158 @@
 export const DEFAULT_CRM_WIDGET_ORDER = [
-  "quick-actions",
-  "customers",
-  "sales",
-  "appointments",
-  "leads",
-  "ai-chat",
-  "marketing",
-  "campaigns",
+  "appointmentCalendar",
+  "pendingApprovals",
+  "quickMenu",
+  "appointmentsThisMonth",
+  "clients",
+  "newLeads",
 ] as const;
 
 export type CrmWidgetId = typeof DEFAULT_CRM_WIDGET_ORDER[number];
+export type CrmWidgetSize = "small" | "wide" | "tall" | "large";
 export type CrmWidgetSizeMode = "compact" | "medium" | "expanded";
-
-export const MIN_CRM_WIDGET_COLUMN_SPAN = 3;
-export const MAX_CRM_WIDGET_COLUMN_SPAN = 12;
-export const MIN_CRM_WIDGET_ROW_SPAN = 1;
-export const MAX_CRM_WIDGET_ROW_SPAN = 8;
 
 export interface CrmWidgetLayout {
   widget_id: CrmWidgetId;
-  column_span: number;
-  row_span: number;
+  size: CrmWidgetSize;
 }
 
-const DEFAULT_SIZE_BY_ID: Record<CrmWidgetId, Omit<CrmWidgetLayout, "widget_id">> = {
-  "quick-actions": { column_span: 4, row_span: 3 },
-  customers: { column_span: 4, row_span: 3 },
-  sales: { column_span: 4, row_span: 3 },
-  appointments: { column_span: 8, row_span: 4 },
-  leads: { column_span: 4, row_span: 2 },
-  "ai-chat": { column_span: 4, row_span: 2 },
-  marketing: { column_span: 4, row_span: 3 },
-  campaigns: { column_span: 4, row_span: 3 },
+export interface StoredCrmDashboardWidget {
+  widget_id: CrmWidgetId;
+  size: CrmWidgetSize;
+}
+
+const SIZE_SET = new Set<string>(["small", "wide", "tall", "large"]);
+const WIDGET_SET = new Set<string>(DEFAULT_CRM_WIDGET_ORDER);
+
+export const DEFAULT_CRM_WIDGET_LAYOUT: Record<CrmWidgetId, CrmWidgetLayout> = {
+  appointmentCalendar: { widget_id: "appointmentCalendar", size: "large" },
+  pendingApprovals: { widget_id: "pendingApprovals", size: "small" },
+  quickMenu: { widget_id: "quickMenu", size: "small" },
+  appointmentsThisMonth: { widget_id: "appointmentsThisMonth", size: "small" },
+  clients: { widget_id: "clients", size: "wide" },
+  newLeads: { widget_id: "newLeads", size: "small" },
 };
 
-export const DEFAULT_CRM_WIDGET_LAYOUT: Record<CrmWidgetId, CrmWidgetLayout> = Object.fromEntries(
-  DEFAULT_CRM_WIDGET_ORDER.map((widgetId) => [widgetId, { widget_id: widgetId, ...DEFAULT_SIZE_BY_ID[widgetId] }]),
-) as Record<CrmWidgetId, CrmWidgetLayout>;
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizedSpan(value: unknown, min: number, max: number, fallback: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return clamp(Math.round(value), min, max);
-}
+const LEGACY_WIDGET_MAP: Record<string, CrmWidgetId | undefined> = {
+  appointments: "appointmentCalendar",
+  "quick-actions": "quickMenu",
+  customers: "clients",
+  leads: "newLeads",
+};
 
 export function createDefaultCrmWidgetLayout(): CrmWidgetLayout[] {
   return DEFAULT_CRM_WIDGET_ORDER.map((widgetId) => ({ ...DEFAULT_CRM_WIDGET_LAYOUT[widgetId] }));
 }
 
-export function normalizeWidgetOrder(value: unknown): CrmWidgetId[] {
-  const validIds = new Set<string>(DEFAULT_CRM_WIDGET_ORDER);
-  const seen = new Set<CrmWidgetId>();
-  const normalized: CrmWidgetId[] = [];
-  const candidates = Array.isArray(value) ? value : [];
-
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string" || !validIds.has(candidate) || seen.has(candidate as CrmWidgetId)) continue;
-    const widgetId = candidate as CrmWidgetId;
-    seen.add(widgetId);
-    normalized.push(widgetId);
-  }
-  for (const widgetId of DEFAULT_CRM_WIDGET_ORDER) {
-    if (!seen.has(widgetId)) normalized.push(widgetId);
-  }
-  return normalized;
+function isCrmWidgetId(value: unknown): value is CrmWidgetId {
+  return typeof value === "string" && WIDGET_SET.has(value);
 }
 
-export function normalizeWidgetLayout(value: unknown): CrmWidgetLayout[] {
-  const seen = new Set<CrmWidgetId>();
-  const normalized: CrmWidgetLayout[] = [];
+function isCrmWidgetSize(value: unknown): value is CrmWidgetSize {
+  return typeof value === "string" && SIZE_SET.has(value);
+}
+
+function entryWidgetId(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const entry = value as Record<string, unknown>;
+  return typeof entry.widget_id === "string" ? entry.widget_id : typeof entry.id === "string" ? entry.id : "";
+}
+
+export function normalizeCrmDashboardLayout(value: unknown) {
   const candidates = Array.isArray(value) ? value : [];
+  const seen = new Set<CrmWidgetId>();
+  const sizes = new Map<CrmWidgetId, CrmWidgetSize>();
+  const order: CrmWidgetId[] = [];
 
   for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object") continue;
+    const widgetIdValue = entryWidgetId(candidate);
+    if (!isCrmWidgetId(widgetIdValue) || seen.has(widgetIdValue)) continue;
     const entry = candidate as Record<string, unknown>;
-    const widgetId = entry.widget_id;
-    if (typeof widgetId !== "string" || !DEFAULT_CRM_WIDGET_ORDER.includes(widgetId as CrmWidgetId) || seen.has(widgetId as CrmWidgetId)) continue;
-    const id = widgetId as CrmWidgetId;
-    const defaults = DEFAULT_CRM_WIDGET_LAYOUT[id];
-    seen.add(id);
-    normalized.push({
-      widget_id: id,
-      column_span: normalizedSpan(entry.column_span, MIN_CRM_WIDGET_COLUMN_SPAN, MAX_CRM_WIDGET_COLUMN_SPAN, defaults.column_span),
-      row_span: normalizedSpan(entry.row_span, MIN_CRM_WIDGET_ROW_SPAN, MAX_CRM_WIDGET_ROW_SPAN, defaults.row_span),
-    });
+    const size = isCrmWidgetSize(entry.size) ? entry.size : DEFAULT_CRM_WIDGET_LAYOUT[widgetIdValue].size;
+    seen.add(widgetIdValue);
+    order.push(widgetIdValue);
+    sizes.set(widgetIdValue, size);
   }
+
   for (const widgetId of DEFAULT_CRM_WIDGET_ORDER) {
-    if (!seen.has(widgetId)) normalized.push({ ...DEFAULT_CRM_WIDGET_LAYOUT[widgetId] });
+    if (seen.has(widgetId)) continue;
+    seen.add(widgetId);
+    order.push(widgetId);
+    sizes.set(widgetId, DEFAULT_CRM_WIDGET_LAYOUT[widgetId].size);
   }
-  return normalized;
+
+  return {
+    order,
+    widgetLayout: order.map((widgetId) => ({ widget_id: widgetId, size: sizes.get(widgetId) || DEFAULT_CRM_WIDGET_LAYOUT[widgetId].size })),
+  };
 }
 
-export function normalizeCrmDashboardLayout(orderValue: unknown, layoutValue: unknown) {
-  return {
-    order: normalizeWidgetOrder(orderValue),
-    widgetLayout: normalizeWidgetLayout(layoutValue),
-  };
+function mergeNewWidgetsIntoLegacyOrder(order: CrmWidgetId[]): CrmWidgetId[] {
+  const merged = [...order];
+  const seen = new Set(merged);
+
+  for (let defaultIndex = 0; defaultIndex < DEFAULT_CRM_WIDGET_ORDER.length; defaultIndex += 1) {
+    const widgetId = DEFAULT_CRM_WIDGET_ORDER[defaultIndex];
+    if (seen.has(widgetId)) continue;
+
+    const previousAnchor = [...DEFAULT_CRM_WIDGET_ORDER.slice(0, defaultIndex)].reverse().find((candidate) => seen.has(candidate));
+    if (previousAnchor) {
+      merged.splice(merged.indexOf(previousAnchor) + 1, 0, widgetId);
+    } else {
+      const nextAnchor = DEFAULT_CRM_WIDGET_ORDER.slice(defaultIndex + 1).find((candidate) => seen.has(candidate));
+      if (nextAnchor) merged.splice(merged.indexOf(nextAnchor), 0, widgetId);
+      else merged.push(widgetId);
+    }
+    seen.add(widgetId);
+  }
+
+  return merged;
+}
+
+export function migrateLegacyCrmDashboardLayout(orderValue: unknown, legacyLayoutValue: unknown) {
+  const candidates = [
+    ...(Array.isArray(orderValue) ? orderValue : []),
+    ...(Array.isArray(legacyLayoutValue) ? legacyLayoutValue : []),
+  ];
+  const seen = new Set<CrmWidgetId>();
+  const migratedOrder: CrmWidgetId[] = [];
+
+  for (const candidate of candidates) {
+    const legacyId = typeof candidate === "string" ? candidate : entryWidgetId(candidate);
+    const widgetId = LEGACY_WIDGET_MAP[legacyId];
+    if (!widgetId || seen.has(widgetId)) continue;
+    seen.add(widgetId);
+    migratedOrder.push(widgetId);
+  }
+
+  if (migratedOrder.length === 0) return normalizeCrmDashboardLayout(createDefaultCrmWidgetLayout());
+
+  // Legacy 12-column dimensions do not map cleanly to square 1x1 and 2x2 cells.
+  // Keep each matching widget's relative order and use the new fixed-size defaults.
+  const mergedOrder = mergeNewWidgetsIntoLegacyOrder(migratedOrder);
+  return normalizeCrmDashboardLayout(mergedOrder.map((widgetId) => ({
+    widget_id: widgetId,
+    size: DEFAULT_CRM_WIDGET_LAYOUT[widgetId].size,
+  })));
 }
 
 export function getWidgetLayout(layout: CrmWidgetLayout[], widgetId: CrmWidgetId): CrmWidgetLayout {
   return layout.find((item) => item.widget_id === widgetId) || { ...DEFAULT_CRM_WIDGET_LAYOUT[widgetId] };
 }
 
-export function getCrmWidgetSizeMode(widgetId: CrmWidgetId, currentLayout: CrmWidgetLayout): CrmWidgetSizeMode {
-  const defaults = DEFAULT_CRM_WIDGET_LAYOUT[widgetId];
-  const widthRatio = currentLayout.column_span / defaults.column_span;
-  const heightRatio = currentLayout.row_span / defaults.row_span;
-  const areaRatio = (currentLayout.column_span * currentLayout.row_span) / (defaults.column_span * defaults.row_span);
-  if (areaRatio <= 0.68 || widthRatio <= 0.75 || heightRatio <= 0.75) return "compact";
-  if (areaRatio >= 1.3 || widthRatio >= 1.4 || heightRatio >= 1.35) return "expanded";
+export function getCrmWidgetSizeMode(size: CrmWidgetSize): CrmWidgetSizeMode {
+  if (size === "small") return "compact";
+  if (size === "large") return "expanded";
   return "medium";
+}
+
+export function getWidgetDimensions(size: CrmWidgetSize): { columns: number; rows: number } {
+  if (size === "wide") return { columns: 2, rows: 1 };
+  if (size === "tall") return { columns: 1, rows: 2 };
+  if (size === "large") return { columns: 2, rows: 2 };
+  return { columns: 1, rows: 1 };
+}
+
+export function isCrmWidgetSizeOption(value: string): value is CrmWidgetSize {
+  return isCrmWidgetSize(value);
 }

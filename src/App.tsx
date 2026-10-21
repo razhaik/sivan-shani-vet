@@ -11,29 +11,37 @@ import AccessibilityStatement from "./pages/AccessibilityStatement";
 import NotFound from "./pages/NotFound";
 import { BrandingBadge } from "./components/BrandingBadge";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { shouldRedirectToCrm } from "@/lib/crmHomeScreen";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Navigate to="/business-crm" replace />} />
-          <Route path="/business-crm/*" element={<ErrorBoundary><BusinessCrmLayout /></ErrorBoundary>} />
-          <Route path="/appointments" element={<AppointmentBooking />} />
-          <Route path="/manage-appointment" element={<AppointmentManagement />} />
-          <Route path="/accessibility" element={<AccessibilityStatement />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      <BrandingBadge />
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  if (typeof window !== "undefined" && shouldRedirectToCrm(window.location.pathname)) {
+    window.location.replace("/business-crm");
+    return null;
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Navigate to="/business-crm" replace />} />
+            <Route path="/business-crm/*" element={<ErrorBoundary><BusinessCrmLayout /></ErrorBoundary>} />
+            <Route path="/appointments" element={<AppointmentBooking />} />
+            <Route path="/manage-appointment" element={<AppointmentManagement />} />
+            <Route path="/accessibility" element={<AccessibilityStatement />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <BrandingBadge />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

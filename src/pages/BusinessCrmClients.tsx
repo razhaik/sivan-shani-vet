@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -12,7 +13,9 @@ import {
   RefreshCw,
   Send,
   Settings2,
+  Search,
   Trash2,
+  Upload,
   UserPlus,
   Users,
   X,
@@ -41,8 +44,10 @@ import {
   type ClientActionSummary,
 } from "@/lib/clientActions";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
+import { useIsMobile } from "@/hooks/use-mobile";
 type SegmentKey = "all" | "leads" | "future" | "quotes" | "payments";
 type ActivityFilter = "all" | "7" | "30" | "90" | "older";
+type MobileQuickFilter = "all" | "new" | "today";
 type StatusFilter = "all" | "new" | "active" | "lead" | "imported";
 type SpeciesFilter = "all" | "dog" | "cat" | "other" | "unknown";
 type SelectionFeedback = { kind: "success" | "error"; text: string; details?: string };
@@ -172,6 +177,33 @@ function clientSearchText(row: ClientRow): string {
     .trim();
 }
 
+function isInboxRecord(record: CrmRecord): boolean {
+  return !text(record.inbox_deleted_at) && !text(record.inbox_archived_at);
+}
+
+function isOpenRequestedAppointment(record: CrmRecord): boolean {
+  return text(record.status).toLowerCase() === "requested" && isInboxRecord(record);
+}
+
+function isUnhandledInboxInquiry(record: CrmRecord): boolean {
+  return !text(record.inbox_handled_at) && isInboxRecord(record);
+}
+
+function isPendingInboxReschedule(record: CrmRecord): boolean {
+  return text(record.status).toLowerCase() === "pending" && isInboxRecord(record);
+}
+
+function clinicDateKey(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: VETERINARY_CLINIC_PROFILE.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 function ClientDataProgress({ progress, compact = false }: { progress: CrmDataLoadProgress; compact?: boolean }) {
   const total = Math.max(0, progress.total);
   const completed = total > 0 ? Math.min(Math.max(progress.completed, 0), total) : 0;
@@ -261,7 +293,7 @@ function DisplaySettingsDialog({ open, columns, rowsPerPage, preferenceStatus, o
   }, [onClose, open]);
 
   if (!open) return null;
-  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-[#1A1A3E]/[0.35] p-3 backdrop-blur-sm sm:items-center" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div id="display-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="display-settings-title" aria-describedby="display-settings-description" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-2xl" dir="rtl"><div className="flex items-start justify-between gap-3"><div><h2 id="display-settings-title" className="text-lg font-black text-[#1A1A3E]">הגדרות תצוגה</h2><p id="display-settings-description" className="mt-1 text-xs font-medium leading-5 text-slate-500">בחרי אילו עמודות יוצגו ברשימת הלקוחות וכמה שורות יופיעו בכל עמוד. השינויים חלים מיד על הטבלה ועל כרטיסי הלקוחות, נשמרים אוטומטית ויישארו בביקור הבא שלך.</p><DisplayPreferenceStatus status={preferenceStatus} /></div><button type="button" onClick={onClose} autoFocus className="rounded-xl p-2 text-slate-400 hover:bg-[#F7F7F7] focus:outline-none focus:ring-2 focus:ring-[#F2D162]" aria-label="סגירת הגדרות תצוגה"><X className="h-5 w-5" /></button></div><fieldset className="mt-5"><legend className="text-sm font-black text-[#1A1A3E]">עמודות שיוצגו</legend><p className="mt-1 text-xs font-medium leading-5 text-slate-500">אפשר להציג או להסתיר כל שדה אמיתי. עמודת הלקוח מוצגת תמיד כדי לפתוח את כרטיס הלקוח.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{clientColumns.map((column) => <label key={column.key} className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-xs font-extrabold transition ${columns.includes(column.key) ? "border-[#F2D162] bg-[#FFFBEA] text-[#1A1A3E]" : "border-[#EEF0F3] text-slate-500"}`}><input type="checkbox" checked={columns.includes(column.key)} disabled={column.required} onChange={() => onToggle(column.key)} aria-label={`${column.label}${column.required ? ", עמודה חובה" : ""}`} className="h-4 w-4 rounded border-slate-300 accent-[#1A1A3E] focus:ring-[#F2D162]" />{column.label}{column.required && <span className="mr-auto text-[10px] text-slate-400">חובה</span>}</label>)}</div></fieldset><div className="mt-5 rounded-2xl border border-[#E5E7EB] bg-[#FBFCFD] p-4"><label className="flex items-center justify-between gap-4"><span><span className="block text-sm font-black text-[#1A1A3E]">מספר שורות בעמוד</span><span className="mt-1 block text-xs font-medium leading-5 text-slate-500">השינוי מחזיר אותך לעמוד הראשון ברשימת הלקוחות.</span></span><select value={rowsPerPage} onChange={(event) => onRowsPerPageChange(Number(event.target.value))} aria-label="מספר שורות בעמוד" className="h-10 shrink-0 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-bold text-[#1A1A3E] outline-none focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]"><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label></div><div className="mt-5 flex justify-start"><button type="button" onClick={onClose} className="min-h-11 rounded-xl bg-[#1A1A3E] px-5 text-sm font-extrabold text-white transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162]">סגירה</button></div></div></div>;
+  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-[#1A1A3E]/[0.35] p-3 backdrop-blur-sm sm:items-center" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div id="display-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="display-settings-title" aria-describedby="display-settings-description" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-2xl" dir="rtl"><div className="flex items-start justify-between gap-3"><div><h2 id="display-settings-title" className="text-lg font-black text-[#1A1A3E]">הגדרות תצוגה</h2><p id="display-settings-description" className="mt-1 text-xs font-medium leading-5 text-slate-500">בחרי אילו עמודות יוצגו בטבלה במסך רחב וכמה שורות יופיעו בכל עמוד. רשימת הטלפונים שומרת על פרטי קשר ופעילות תמציתיים. השינויים נשמרים אוטומטית ויישארו בביקור הבא שלך.</p><p className="mt-2 rounded-lg bg-[#F7F8FA] px-3 py-2 text-[11px] font-medium leading-5 text-slate-500 md:hidden">בחירת העמודות משנה רק את הטבלה במחשב. פרטי השורה ברשימת הטלפון נשארים קבועים, ומספר השורות בעמוד ממשיך להשתנות לפי ההגדרה למטה.</p><DisplayPreferenceStatus status={preferenceStatus} /></div><button type="button" onClick={onClose} autoFocus className="rounded-xl p-2 text-slate-400 hover:bg-[#F7F7F7] focus:outline-none focus:ring-2 focus:ring-[#F2D162]" aria-label="סגירת הגדרות תצוגה"><X className="h-5 w-5" /></button></div><fieldset className="mt-5"><legend className="text-sm font-black text-[#1A1A3E]">עמודות שיוצגו</legend><p className="mt-1 text-xs font-medium leading-5 text-slate-500">אפשר להציג או להסתיר כל שדה אמיתי. עמודת הלקוח מוצגת תמיד כדי לפתוח את כרטיס הלקוח.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{clientColumns.map((column) => <label key={column.key} className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-xs font-extrabold transition ${columns.includes(column.key) ? "border-[#F2D162] bg-[#FFFBEA] text-[#1A1A3E]" : "border-[#EEF0F3] text-slate-500"}`}><input type="checkbox" checked={columns.includes(column.key)} disabled={column.required} onChange={() => onToggle(column.key)} aria-label={`${column.label}${column.required ? ", עמודה חובה" : ""}`} className="h-4 w-4 rounded border-slate-300 accent-[#1A1A3E] focus:ring-[#F2D162]" />{column.label}{column.required && <span className="mr-auto text-[10px] text-slate-400">חובה</span>}</label>)}</div></fieldset><div className="mt-5 rounded-2xl border border-[#E5E7EB] bg-[#FBFCFD] p-4"><label className="flex items-center justify-between gap-4"><span><span className="block text-sm font-black text-[#1A1A3E]">מספר שורות בעמוד</span><span className="mt-1 block text-xs font-medium leading-5 text-slate-500">השינוי מחזיר אותך לעמוד הראשון ברשימת הלקוחות.</span></span><select value={rowsPerPage} onChange={(event) => onRowsPerPageChange(Number(event.target.value))} aria-label="מספר שורות בעמוד" className="h-10 shrink-0 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-bold text-[#1A1A3E] outline-none focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]"><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label></div><div className="mt-5 flex justify-start"><button type="button" onClick={onClose} className="min-h-11 rounded-xl bg-[#1A1A3E] px-5 text-sm font-extrabold text-white transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162]">סגירה</button></div></div></div>;
 }
 
 function SafeClientActionDialog({ open, selectedCount, importedOnlyCount, historyCount, isProcessing, onClose, onConfirm }: { open: boolean; selectedCount: number; importedOnlyCount: number; historyCount: number; isProcessing: boolean; onClose: () => void; onConfirm: () => void }) {
@@ -371,12 +403,16 @@ function validatedManualClientPayload(payload: CreateClientPayload, existingRows
 }
 
 export default function BusinessCrmClients() {
-  const { user, appointments, inquiries, businessClients, archivedClientKeys, hasDataSnapshot, dataLoadProgress, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, openView } = useCrmContext();
+  const { user, appointments, inquiries, rescheduleRequests, businessClients, archivedClientKeys, hasDataSnapshot, dataLoadProgress, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, openView } = useCrmContext();
   const userIdentity = String(user?.id || user?.email || "");
+  const isMobileViewport = useIsMobile();
   const initialPreferenceSnapshot = readCachedDisplayPreference(userIdentity) || { columns: [...DEFAULT_VISIBLE_COLUMNS], rowsPerPage: 20, sortKey: DEFAULT_SORT_KEY, sortDirection: DEFAULT_SORT_DIRECTION };
   const [segment, setSegment] = useState<SegmentKey>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const [mobileQuickFilter, setMobileQuickFilter] = useState<MobileQuickFilter>("all");
+  const [mobileSelectionMode, setMobileSelectionMode] = useState(false);
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
   const [createClientOpen, setCreateClientOpen] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
@@ -389,6 +425,7 @@ export default function BusinessCrmClients() {
   const [sortKey, setSortKey] = useState<ClientSortKey>(() => initialPreferenceSnapshot.sortKey);
   const [sortDirection, setSortDirection] = useState<ClientSortDirection>(() => initialPreferenceSnapshot.sortDirection);
   const [page, setPage] = useState(1);
+  const [mobilePage, setMobilePage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(() => initialPreferenceSnapshot.rowsPerPage);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [visibleColumns, setVisibleColumns] = useState<ClientColumnKey[]>(() => [...initialPreferenceSnapshot.columns]);
@@ -413,6 +450,24 @@ export default function BusinessCrmClients() {
   const allRows = useMemo(() => sourceRows.filter((row) => !archivedClientKeys.has(row.id)), [archivedClientKeys, sourceRows]);
   const customerRows = useMemo(() => allRows.filter((row) => row.status !== "lead"), [allRows]);
   const leadRows = useMemo(() => allRows.filter((row) => row.status === "lead"), [allRows]);
+  const pendingRescheduleAppointmentIds = useMemo(() => new Set(
+    rescheduleRequests
+      .filter(isPendingInboxReschedule)
+      .map((record) => text(record.appointment_id))
+      .filter(Boolean),
+  ), [rescheduleRequests]);
+  const mobileNewRequestIds = useMemo(() => new Set(allRows
+    .filter((row) => row.appointments.some(isOpenRequestedAppointment)
+      || row.inquiries.some(isUnhandledInboxInquiry)
+      || row.appointments.some((record) => pendingRescheduleAppointmentIds.has(text(record.id))))
+    .map((row) => row.id)), [allRows, pendingRescheduleAppointmentIds]);
+  const clinicToday = clinicDateKey();
+  const mobileTodayAppointmentIds = useMemo(() => new Set(allRows
+    .filter((row) => row.appointments.some((record) => {
+      const statusValue = text(record.status).toLowerCase();
+      return (statusValue === "requested" || statusValue === "confirmed") && text(record.date) === clinicToday;
+    }))
+    .map((row) => row.id)), [allRows, clinicToday]);
   const segmentRows = useMemo(() => segment === "all" ? customerRows : segment === "leads" ? leadRows : segment === "future" ? customerRows.filter((row) => row.futureAppointments.length > 0) : [], [customerRows, leadRows, segment]);
   const filteredRows = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("he").replace(/\s+/g, " ");
@@ -432,8 +487,27 @@ export default function BusinessCrmClients() {
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / rowsPerPage));
   const currentPage = Math.min(page, totalPages);
   const pageRows = sortedRows.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-  const selectedRows = useMemo(() => sortedRows.filter((row) => selectedIds.has(row.id)), [selectedIds, sortedRows]);
-  const exportRows = useMemo(() => selectedRows.length ? selectedRows : sortedRows, [selectedRows, sortedRows]);
+  const mobileQuickFilterCounts = useMemo(() => ({
+    all: filteredRows.length,
+    new: filteredRows.filter((row) => mobileNewRequestIds.has(row.id)).length,
+    today: filteredRows.filter((row) => mobileTodayAppointmentIds.has(row.id)).length,
+  }), [filteredRows, mobileNewRequestIds, mobileTodayAppointmentIds]);
+  const mobileFilteredRows = useMemo(() => filteredRows.filter((row) => (
+    mobileQuickFilter === "all"
+      || (mobileQuickFilter === "new" && mobileNewRequestIds.has(row.id))
+      || (mobileQuickFilter === "today" && mobileTodayAppointmentIds.has(row.id))
+  )), [filteredRows, mobileNewRequestIds, mobileQuickFilter, mobileTodayAppointmentIds]);
+  const mobileSortedRows = useMemo(() => [...mobileFilteredRows].sort((first, second) => {
+    if (!first.lastActivityTimestamp && second.lastActivityTimestamp) return 1;
+    if (first.lastActivityTimestamp && !second.lastActivityTimestamp) return -1;
+    return second.lastActivityTimestamp - first.lastActivityTimestamp || first.name.localeCompare(second.name, "he");
+  }), [mobileFilteredRows]);
+  const mobileTotalPages = Math.max(1, Math.ceil(mobileSortedRows.length / rowsPerPage));
+  const mobileCurrentPage = Math.min(mobilePage, mobileTotalPages);
+  const mobilePageRows = mobileSortedRows.slice((mobileCurrentPage - 1) * rowsPerPage, mobileCurrentPage * rowsPerPage);
+  const selectedRows = useMemo(() => (isMobileViewport ? mobileSortedRows : sortedRows).filter((row) => selectedIds.has(row.id)), [isMobileViewport, mobileSortedRows, selectedIds, sortedRows]);
+  const exportAllRows = isMobileViewport ? mobileSortedRows : sortedRows;
+  const exportRows = useMemo(() => selectedRows.length ? selectedRows : exportAllRows, [exportAllRows, selectedRows]);
   const selectedImportedOnlyCount = selectedRows.filter(isImportedOnlyClientRow).length;
   const selectedHistoryCount = selectedRows.filter(clientRowHasHistory).length;
   const selectedSmsClients = useMemo<BulkSmsClient[]>(() => selectedRows.map((row) => ({ key: smsKeyForRow(row), name: row.name, eligiblePhones: eligibleSmsPhonesForRow(row, businessClients as CrmRecord[]) })), [businessClients, selectedRows]);
@@ -589,10 +663,27 @@ export default function BusinessCrmClients() {
   }, [userIdentity]);
 
   useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [activity, search, segment, species, status, rowsPerPage]);
-  useEffect(() => { const allowed = new Set(pageRows.map((row) => row.id)); setSelectedIds((current) => { const next = new Set([...current].filter((id) => allowed.has(id))); return next.size === current.size ? current : next; }); }, [pageRows]);
+  useEffect(() => { setMobilePage(1); setSelectedIds(new Set()); }, [activity, mobileQuickFilter, search, segment, species, status, rowsPerPage]);
+  useEffect(() => {
+    const visibleRows = isMobileViewport ? mobilePageRows : pageRows;
+    const allowed = new Set(visibleRows.map((row) => row.id));
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => allowed.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [isMobileViewport, mobilePageRows, pageRows]);
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setMobileSelectionMode(false);
+  }, [isMobileViewport]);
   useEffect(() => { if (selectedRows.length === 0) { setSmsComposerOpen(false); setEmailComposerOpen(false); } }, [selectedRows.length]);
 
   const toggleSelection = (id: string) => setSelectedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const toggleMobileSelectionMode = () => {
+    setSelectedIds(new Set());
+    setActionFeedback(null);
+    setMobileSelectionMode((current) => !current);
+  };
   const toggleColumn = (key: ClientColumnKey) => {
     if (key === "client") return;
     const current = visibleColumnsRef.current;
@@ -625,7 +716,7 @@ export default function BusinessCrmClients() {
     setSelectedIds(new Set());
     enqueuePreferenceSave({ columns: visibleColumnsRef.current, rowsPerPage: rowsPerPageRef.current, sortKey: nextKey, sortDirection: nextDirection });
   };
-  const clearFilters = () => { setSearch(""); setStatus("all"); setSpecies("all"); setActivity("all"); setSegment("all"); };
+  const clearFilters = () => { setSearch(""); setStatus("all"); setSpecies("all"); setActivity("all"); setSegment("all"); setMobileQuickFilter("all"); };
 
   async function handleSafeClientAction() {
     if (!selectedRows.length || isProcessingSelection) return;
@@ -714,31 +805,86 @@ export default function BusinessCrmClients() {
   const emptyTitle = allRowsArchived ? "כל הרשומות הפעילות הוסתרו" : queryEmpty ? "אין עדיין לקוחות או לידים" : segment === "quotes" || segment === "payments" ? "אין מקור נתונים לפלח הזה" : activeFilterCount ? "לא נמצאו לקוחות תואמים" : onlyUnconvertedLeads && segment === "all" ? "אין עדיין לקוחות" : onlyUnconvertedLeads && segment === "future" ? "אין לקוחות עם תורים עתידיים" : "אין רשומות בפלח הזה";
   const emptyBody = allRowsArchived ? "היסטוריית התורים והפניות נשמרה. לקוחות שהוסתרו לא יופיעו ברשימה הזו." : queryEmpty ? "לקוחות או פניות יופיעו כאן לאחר שמירת תורים, פניות או ייבוא לקוחות." : segment === "quotes" || segment === "payments" ? "המערכת אינה מחוברת להצעות מחיר או לתשלומים, לכן לא יוצגו נתונים מומצאים." : activeFilterCount ? "נסי לשנות את החיפוש או לנקות את הסינון כדי לראות רשומות נוספות." : onlyUnconvertedLeads && segment === "all" ? `נמצאו ${leadRows.length} הצעות עסקיות, אך עדיין אין לקוחות עם תורים שנשמרו במערכת. עברי לפלח הצעות עסקיות כדי לצפות בהן.` : onlyUnconvertedLeads && segment === "future" ? "פניות שעדיין לא הפכו ללקוחות אינן מופיעות בפלח הזימונים העתידיים." : "רשומות חדשות שייווצרו במערכת יופיעו כאן.";
   const segments: Array<{ key: SegmentKey; label: string; count: number | null; note?: string }> = [{ key: "all", label: "כל הלקוחות", count: customerRows.length }, { key: "leads", label: "הצעות עסקיות", count: leadRows.length }, { key: "quotes", label: "הצעות מחיר ממתינות לאישור", count: null, note: "אין מקור נתונים" }, { key: "future", label: "לקוחות עם תורים עתידיים", count: customerRows.filter((row) => row.futureAppointments.length > 0).length }, { key: "payments", label: "תשלומים פתוחים", count: null, note: "אין מקור נתונים" }];
+  const mobileQuickFilterOptions: Array<{ key: MobileQuickFilter; label: string; count: number }> = [
+    { key: "all", label: "הכל", count: mobileQuickFilterCounts.all },
+    { key: "new", label: "בקשות חדשות", count: mobileQuickFilterCounts.new },
+    { key: "today", label: "תור היום", count: mobileQuickFilterCounts.today },
+  ];
+  const mobileEmptyTitle = mobileQuickFilter !== "all" && filteredRows.length > 0 && mobileFilteredRows.length === 0
+    ? mobileQuickFilter === "new" ? "אין לקוחות עם בקשה חדשה" : "אין לקוחות עם תור היום"
+    : emptyTitle;
+  const mobileEmptyBody = mobileQuickFilter !== "all" && filteredRows.length > 0 && mobileFilteredRows.length === 0
+    ? mobileQuickFilter === "new" ? "לקוחות עם בקשות שעדיין ממתינות בתיבת הדואר יופיעו כאן." : "לקוחות עם תור מבוקש או מאושר לתאריך של היום יופיעו כאן."
+    : emptyBody;
 
   return (
     <>
       <SEO title={`לקוחות | ${VETERINARY_CLINIC_PROFILE.businessName}`} description="ניהול לקוחות ופניות במערכת העסקית של המרפאה הווטרינרית." url={`${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}/clients`} noindex siteName={VETERINARY_CLINIC_PROFILE.businessName} />
-      {dataError && !hasDataSnapshot ? <ContentError onRetry={refreshData} /> : isDataLoading && !hasDataSnapshot ? <ContentLoading progress={dataLoadProgress} /> : <div dir="rtl">{(isDataFetching || dataLoadProgress.status === "loading") && <div className="mb-4"><ClientDataProgress progress={dataLoadProgress} compact /></div>}{dataError && hasDataSnapshot && <div className="mb-4"><RefreshErrorBanner onRetry={refreshData} /></div>}<div className="max-w-3xl"><p className="mb-2 text-xs font-extrabold tracking-wide text-slate-500">{VETERINARY_CLINIC_PROFILE.businessName}</p><h1 className="text-3xl font-black tracking-tight text-[#1A1A3E] sm:text-4xl">לקוחות</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">כאן ניתן לנהל את הלקוחות בעזרת מידע מפולטר מותאם לצרכי העסק שלך</p></div><div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:gap-3 sm:overflow-x-auto sm:pb-2" role="tablist" aria-label="פלחי לקוחות">{segments.map((item) => { const disabled = item.count === null; return <button key={item.key} type="button" role="tab" aria-selected={segment === item.key} disabled={disabled} onClick={() => { setSegment(item.key); setMoreOpen(false); }} title={disabled ? "אין מקור נתונים לפלח הזה" : undefined} className={`min-w-0 rounded-2xl border p-3 text-right transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:min-w-[180px] sm:p-4 ${segment === item.key ? "border-[#1A1A3E] bg-[#1A1A3E] text-white shadow-lg" : disabled ? "cursor-not-allowed border-[#E5E7EB] bg-white/60 text-slate-400 opacity-80" : "border-[#E5E7EB] bg-white text-[#1A1A3E] hover:-translate-y-0.5 hover:border-[#F2D162]"}`}><span className="block text-xs font-extrabold leading-5">{item.label}</span><span className="mt-3 block text-2xl font-black">{item.count === null ? "—" : item.count}</span><span className={`mt-1 block text-[10px] font-bold ${segment === item.key ? "text-white/70" : "text-slate-400"}`}>{item.note || "רשומות זמינות"}</span></button>; })}</div>
+      {dataError && !hasDataSnapshot ? <ContentError onRetry={refreshData} /> : isDataLoading && !hasDataSnapshot ? <ContentLoading progress={dataLoadProgress} /> : <div dir="rtl">{(isDataFetching || dataLoadProgress.status === "loading") && <div className="mb-4"><ClientDataProgress progress={dataLoadProgress} compact /></div>}{dataError && hasDataSnapshot && <div className="mb-4"><RefreshErrorBanner onRetry={refreshData} /></div>}<div className="hidden md:block max-w-3xl"><p className="mb-2 text-xs font-extrabold tracking-wide text-slate-500">{VETERINARY_CLINIC_PROFILE.businessName}</p><h1 className="text-3xl font-black tracking-tight text-[#1A1A3E] sm:text-4xl">לקוחות</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">כאן ניתן לנהל את הלקוחות בעזרת מידע מפולטר מותאם לצרכי העסק שלך</p></div><div className="hidden md:flex mt-6 grid-cols-2 gap-2 sm:flex sm:gap-3 sm:overflow-x-auto sm:pb-2" role="tablist" aria-label="פלחי לקוחות">{segments.map((item) => { const disabled = item.count === null; return <button key={item.key} type="button" role="tab" aria-selected={segment === item.key} disabled={disabled} onClick={() => { setSegment(item.key); setMoreOpen(false); }} title={disabled ? "אין מקור נתונים לפלח הזה" : undefined} className={`min-w-0 rounded-2xl border p-3 text-right transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:min-w-[180px] sm:p-4 ${segment === item.key ? "border-[#1A1A3E] bg-[#1A1A3E] text-white shadow-lg" : disabled ? "cursor-not-allowed border-[#E5E7EB] bg-white/60 text-slate-400 opacity-80" : "border-[#E5E7EB] bg-white text-[#1A1A3E] hover:-translate-y-0.5 hover:border-[#F2D162]"}`}><span className="block text-xs font-extrabold leading-5">{item.label}</span><span className="mt-3 block text-2xl font-black">{item.count === null ? "—" : item.count}</span><span className={`mt-1 block text-[10px] font-bold ${segment === item.key ? "text-white/70" : "text-slate-400"}`}>{item.note || "רשומות זמינות"}</span></button>; })}</div>
 
         <section aria-labelledby="customer-list-heading" className="mt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-3 md:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="customer-list-heading-mobile" className="text-xl font-black tracking-tight text-[#1A1A3E]">לקוחות</h2>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-500" aria-live="polite">{mobileSortedRows.length.toLocaleString("he-IL")} {segment === "leads" ? "פניות" : "לקוחות"}</p>
+              </div>
+              <button type="button" onClick={toggleMobileSelectionMode} aria-pressed={mobileSelectionMode} aria-label={mobileSelectionMode ? "סיום בחירת לקוחות" : "בחירת לקוחות"} className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${mobileSelectionMode ? "border-[#1A1A3E] bg-[#1A1A3E] text-[#F2D162]" : "border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}>
+                {mobileSelectionMode ? "סיום בחירה" : "בחר"}
+                {mobileSelectionMode && selectedRows.length > 0 && <span className="rounded-full bg-[#F2D162] px-1.5 py-0.5 text-[10px] text-[#1A1A3E]">{selectedRows.length}</span>}
+              </button>
+            </div>
+            <label className="relative mt-3 block">
+              <span className="sr-only">חיפוש לפי שם, חיית מחמד או טלפון</span>
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="שם, חיית מחמד או טלפון" aria-label="חיפוש לפי שם, חיית מחמד או טלפון" className="h-10 w-full rounded-xl border border-[#D9DEE5] bg-white pr-9 pl-3 text-xs font-semibold text-[#1A1A3E] outline-none transition placeholder:text-slate-400 focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]" />
+            </label>
+            <div className="mt-2 grid grid-cols-3 gap-1.5" role="tablist" aria-label="סינון מהיר של לקוחות">
+              {mobileQuickFilterOptions.map((option) => {
+                const active = mobileQuickFilter === option.key;
+                return <button key={option.key} type="button" role="tab" aria-selected={active} onClick={() => setMobileQuickFilter(option.key)} className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1.5 text-[10px] font-black whitespace-nowrap transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${active ? "border-[#1A1A3E] bg-[#1A1A3E] text-[#F2D162]" : "border-[#E5E7EB] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}>
+                  <span className="truncate">{option.label}</span><span className={`shrink-0 text-[9px] ${active ? "text-[#F2D162]/80" : "text-slate-400"}`}>{option.count}</span>
+                </button>;
+              })}
+            </div>
+            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5">
+              <label className="relative min-w-0">
+                <span className="sr-only">בחירת פלח לקוחות</span>
+                <select value={segment} onChange={(event) => { setSegment(event.target.value as SegmentKey); setMobileToolsOpen(false); }} aria-label="בחירת פלח לקוחות" className="h-10 w-full appearance-none rounded-xl border border-[#D9DEE5] bg-white py-2 pr-3 pl-8 text-right text-[11px] font-extrabold text-[#1A1A3E] outline-none focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]">
+                  {segments.map((item) => <option key={item.key} value={item.key} disabled={item.count === null}>{item.label}{item.count === null ? " · אין מקור נתונים" : ` · ${item.count}`}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              </label>
+              <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} className={`inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${filtersOpen || activeFilterCount ? "border-[#1A1A3E] bg-[#1A1A3E] text-white" : "border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}><Filter className="h-3.5 w-3.5" />סינון{activeFilterCount > 0 && <span className="rounded-full bg-[#F2D162] px-1 text-[9px] text-[#1A1A3E]">{activeFilterCount}</span>}</button>
+              <button type="button" onClick={() => setMobileToolsOpen((open) => !open)} aria-expanded={mobileToolsOpen} aria-controls="mobile-client-tools" className={`inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${mobileToolsOpen ? "border-[#1A1A3E] bg-[#1A1A3E] text-white" : "border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}><MoreHorizontal className="h-3.5 w-3.5" />כלים</button>
+            </div>
+            {mobileToolsOpen && <div id="mobile-client-tools" role="group" aria-label="כלי ניהול לקוחות" className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-sm">
+              <button type="button" onClick={() => { setActionFeedback(null); setCreateClientOpen(true); setMobileToolsOpen(false); }} aria-haspopup="dialog" aria-expanded={createClientOpen} aria-controls="create-client-dialog" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-[#1A1A3E] px-2 text-[11px] font-extrabold text-white focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><UserPlus className="h-3.5 w-3.5" />לקוח חדש</button>
+              <button type="button" onClick={() => { void refreshData(); setMobileToolsOpen(false); }} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#D9DEE5] bg-white px-2 text-[11px] font-extrabold text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><RefreshCw className={isDataFetching ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />רענון</button>
+              <button type="button" onClick={() => { setImportExportMode("import"); setMobileToolsOpen(false); }} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#D9DEE5] bg-white px-2 text-[11px] font-extrabold text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Upload className="h-3.5 w-3.5" />ייבוא לקוחות</button>
+              <button type="button" onClick={() => { setImportExportMode("export"); setMobileToolsOpen(false); }} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#D9DEE5] bg-white px-2 text-[11px] font-extrabold text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Download className="h-3.5 w-3.5" />ייצוא לקוחות</button>
+              <button type="button" onClick={() => { setDisplaySettingsOpen(true); setMobileToolsOpen(false); }} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog" className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#D9DEE5] bg-white px-2 text-[11px] font-extrabold text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Settings2 className="h-3.5 w-3.5" />הגדרות תצוגה</button>
+            </div>}
+            {mobileSelectionMode && <p role="status" className="mt-2 text-[10px] font-bold text-[#5267A8]">הקישי על שורה כדי לבחור לקוח. סיום בחירה יבטל את כל הסימונים.</p>}
+          </div>
+          <div className="hidden md:flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 id="customer-list-heading" className="text-lg font-black text-[#1A1A3E]">{sortedRows.length} לקוחות</h2>
               <p className="mt-1 text-xs font-medium text-slate-500">{segment === "all" ? "לקוחות עם תורים או רשומות שיובאו למערכת" : segments.find((item) => item.key === segment)?.label}</p>
             </div>
             <div className="flex items-center gap-2"><button type="button" onClick={() => { setActionFeedback(null); setCreateClientOpen(true); }} aria-haspopup="dialog" aria-expanded={createClientOpen} aria-controls="create-client-dialog" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1A1A3E] px-3 text-xs font-extrabold text-white transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><UserPlus className="h-4 w-4" />לקוח חדש</button><button type="button" onClick={refreshData} className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162]" title="רענון נתוני לקוחות"><RefreshCw className={isDataFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />רענון</button></div>
           </div>
-          <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center"><div className="grid w-full grid-cols-2 gap-2 sm:contents"><div className="relative"><button type="button" onClick={() => setMoreOpen((open) => !open)} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start"><MoreHorizontal className="h-4 w-4" />אפשרויות נוספות</button>{moreOpen && <div className="absolute right-0 top-12 z-20 w-full max-w-[calc(100vw-2rem)] rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-xl sm:w-52 sm:max-w-none"><button type="button" onClick={() => { setImportExportMode("import"); setMoreOpen(false); }} className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-right text-xs font-extrabold text-[#1A1A3E] transition hover:bg-[#FFFDF2] sm:min-h-0">ייבוא לקוחות</button><button type="button" onClick={() => { setImportExportMode("export"); setMoreOpen(false); }} className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-right text-xs font-extrabold text-[#1A1A3E] transition hover:bg-[#FFFDF2] sm:min-h-0">ייצוא לקוחות</button></div>}</div><button type="button" onClick={() => setDisplaySettingsOpen(true)} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start"><Settings2 className="h-4 w-4" />הגדרות תצוגה</button><button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start ${filtersOpen || activeFilterCount ? "border-[#1A1A3E] bg-[#1A1A3E] text-white" : "border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}><Filter className="h-4 w-4" />אפשרויות סינון{activeFilterCount > 0 && <span className="rounded-full bg-[#F2D162] px-1.5 py-0.5 text-[10px] text-[#1A1A3E]">{activeFilterCount}</span>}</button></div><label className="order-first relative w-full sm:order-none sm:min-w-[220px] sm:flex-1"><span className="sr-only">חיפוש לקוחות</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש לפי שם, טלפון, תעודת זהות, כתובת או פרטים נוספים" aria-label="חיפוש לפי שם, טלפון, תעודת זהות, כתובת או פרטים נוספים" className="h-10 w-full rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-semibold text-[#1A1A3E] outline-none transition placeholder:text-slate-400 focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]" /></label></div>
+          <div className="hidden md:flex mt-3 flex-col gap-2 rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center"><div className="grid w-full grid-cols-2 gap-2 sm:contents"><div className="relative"><button type="button" onClick={() => setMoreOpen((open) => !open)} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start"><MoreHorizontal className="h-4 w-4" />אפשרויות נוספות</button>{moreOpen && <div className="absolute right-0 top-12 z-20 w-full max-w-[calc(100vw-2rem)] rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-xl sm:w-52 sm:max-w-none"><button type="button" onClick={() => { setImportExportMode("import"); setMoreOpen(false); }} className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-right text-xs font-extrabold text-[#1A1A3E] transition hover:bg-[#FFFDF2] sm:min-h-0">ייבוא לקוחות</button><button type="button" onClick={() => { setImportExportMode("export"); setMoreOpen(false); }} className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-right text-xs font-extrabold text-[#1A1A3E] transition hover:bg-[#FFFDF2] sm:min-h-0">ייצוא לקוחות</button></div>}</div><button type="button" onClick={() => setDisplaySettingsOpen(true)} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start"><Settings2 className="h-4 w-4" />הגדרות תצוגה</button><button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start ${filtersOpen || activeFilterCount ? "border-[#1A1A3E] bg-[#1A1A3E] text-white" : "border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}><Filter className="h-4 w-4" />אפשרויות סינון{activeFilterCount > 0 && <span className="rounded-full bg-[#F2D162] px-1.5 py-0.5 text-[10px] text-[#1A1A3E]">{activeFilterCount}</span>}</button></div><label className="order-first relative w-full sm:order-none sm:min-w-[220px] sm:flex-1"><span className="sr-only">חיפוש לקוחות</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש לפי שם, טלפון, תעודת זהות, כתובת או פרטים נוספים" aria-label="חיפוש לפי שם, טלפון, תעודת זהות, כתובת או פרטים נוספים" className="h-10 w-full rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-semibold text-[#1A1A3E] outline-none transition placeholder:text-slate-400 focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]" /></label></div>
         {filtersOpen && <section className="mt-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm"><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><SelectField value={status} onChange={(value) => setStatus(value as StatusFilter)} label="סטטוס איש קשר"><option value="all">כל הסטטוסים</option><option value="new">לקוח חדש</option><option value="active">לקוח פעיל</option><option value="lead">ליד חדש</option><option value="imported">לקוח מיובא</option></SelectField><SelectField value={species} onChange={(value) => setSpecies(value as SpeciesFilter)} label="סוג חיית מחמד"><option value="all">כל הסוגים</option><option value="dog">כלב</option><option value="cat">חתול</option><option value="other">אחר</option><option value="unknown">לא ידוע</option></SelectField><SelectField value={activity} onChange={(value) => setActivity(value as ActivityFilter)} label="פעילות אחרונה"><option value="all">כל טווחי הזמן</option><option value="7">7 הימים האחרונים</option><option value="30">30 הימים האחרונים</option><option value="90">90 הימים האחרונים</option><option value="older">לפני יותר מ-90 יום</option></SelectField></div>{activeFilterCount > 0 && <div className="mt-4 flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-slate-500">מסננים פעילים: {activeFilterCount}</span><button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-[#5267A8] hover:bg-[#F7F7F7] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><X className="h-3.5 w-3.5" />ניקוי סינון</button></div>}</section>}
         {selectedRows.length > 0 && <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-[#E5E7EB] bg-white p-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0" role="toolbar" aria-label="פעולות ללקוחות שנבחרו"><div className="min-w-0"><p className="text-sm font-black text-[#1A1A3E]" role="status" aria-live="polite">{selectedRows.length} {selectedRows.length === 1 ? "לקוח נבחר" : "לקוחות נבחרו"}</p><p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">{selectedImportedOnlyCount > 0 ? `${selectedImportedOnlyCount} למחיקה לצמיתות` : "אין רשומות מיובאות למחיקה"}{selectedHistoryCount > 0 ? ` · ${selectedHistoryCount} להסתרה בטוחה` : ""}</p></div><div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center"><button type="button" onClick={openSmsComposer} aria-label="שליחת SMS ללקוחות שנבחרו" className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#D8ECEB] bg-[#F5FBFA] px-3 text-xs font-black text-[#236B68] transition hover:border-[#B8DCD9] hover:bg-[#EAF7F5] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Send className="h-4 w-4" />שליחת SMS</button><button type="button" onClick={openEmailComposer} aria-label="שליחת אימייל ללקוחות שנבחרו" className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#E6DDF4] bg-[#FBF9FE] px-3 text-xs font-black text-[#705493] transition hover:border-[#CDBBE2] hover:bg-[#F5F0FB] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Mail className="h-4 w-4" />שליחת אימייל</button><button type="button" onClick={() => { setImportExportMode("export"); setMoreOpen(false); }} className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-black text-[#1A1A3E] transition hover:border-[#F2D162] hover:bg-[#FFFDF2] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Download className="h-4 w-4" />ייצוא נבחרים</button><button type="button" onClick={() => { setActionFeedback(null); setSafeActionDialogOpen(true); }} className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-red-200 bg-[#FFF8F8] px-3 text-xs font-black text-[#A93434] transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Trash2 className="h-4 w-4" />מחיקה/הסתרה בטוחה</button><button type="button" onClick={() => setSelectedIds(new Set())} className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-slate-600 transition hover:border-[#F2D162] hover:bg-[#FFFDF2] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><X className="h-4 w-4" />ניקוי בחירה</button></div></div>}
         {smsComposerOpen && selectedRows.length > 0 && <div className="mt-4"><BulkSmsComposer selectedClients={selectedSmsClients} onClose={() => setSmsComposerOpen(false)} onSuccess={handleSmsSuccess} /></div>}
         {emailComposerOpen && selectedRows.length > 0 && <div className="mt-4"><BulkEmailComposer selectedClients={selectedRows} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setEmailComposerOpen(false)} onSuccess={handleEmailSuccess} /></div>}
         {actionFeedback && <div role={actionFeedback.kind === "error" ? "alert" : "status"} className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-bold ${actionFeedback.kind === "error" ? "border-red-100 bg-red-50 text-red-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}><div className="flex items-start gap-2">{actionFeedback.kind === "error" ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}<div><p>{actionFeedback.text}</p>{actionFeedback.details && <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{actionFeedback.details}</p>}</div></div></div>}
-          <div className="mt-4"><ClientsTable rows={pageRows} columns={visibleColumns} selectedIds={selectedIds} loading={false} sortKey={sortKey} sortDirection={sortDirection} onToggle={toggleSelection} onToggleAll={toggleAll} onSort={sort} onRefresh={refreshData} onOpenClient={(id) => openView({ kind: "client-details", clientId: id })} emptyTitle={emptyTitle} emptyBody={emptyBody} /></div><div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs font-bold text-slate-500"><span>עמוד {currentPage} מתוך {totalPages}</span><div className="flex items-center gap-2"><button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד קודם"><ChevronRight className="h-4 w-4" /></button><button type="button" disabled={currentPage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד הבא"><ChevronLeft className="h-4 w-4" /></button></div></div></section></div>}
+          <div className="mt-4"><ClientsTable rows={pageRows} mobileRows={mobilePageRows} mobileSelectionMode={mobileSelectionMode} mobileNewRequestIds={mobileNewRequestIds} mobileEmptyTitle={mobileEmptyTitle} mobileEmptyBody={mobileEmptyBody} columns={visibleColumns} selectedIds={selectedIds} loading={false} sortKey={sortKey} sortDirection={sortDirection} onToggle={toggleSelection} onToggleAll={toggleAll} onSort={sort} onRefresh={refreshData} onOpenClient={(id) => openView({ kind: "client-details", clientId: id })} emptyTitle={emptyTitle} emptyBody={emptyBody} /></div><div className="mt-4 hidden md:flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs font-bold text-slate-500"><span>עמוד {currentPage} מתוך {totalPages}</span><div className="flex items-center gap-2"><button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד קודם"><ChevronRight className="h-4 w-4" /></button><button type="button" disabled={currentPage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד הבא"><ChevronLeft className="h-4 w-4" /></button></div></div><div className="mt-3 flex md:hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs font-bold text-slate-500"><span>עמוד {mobileCurrentPage} מתוך {mobileTotalPages} · {mobileSortedRows.length.toLocaleString("he-IL")} {segment === "leads" ? "פניות" : "לקוחות"}</span><div className="flex items-center gap-2"><button type="button" disabled={mobileCurrentPage <= 1} onClick={() => setMobilePage(Math.max(1, mobileCurrentPage - 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד קודם"><ChevronRight className="h-4 w-4" /></button><button type="button" disabled={mobileCurrentPage >= mobileTotalPages} onClick={() => setMobilePage(Math.min(mobileTotalPages, mobileCurrentPage + 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד הבא"><ChevronLeft className="h-4 w-4" /></button></div></div></section></div>}
       <DisplaySettingsDialog open={displaySettingsOpen} columns={visibleColumns} rowsPerPage={rowsPerPage} preferenceStatus={displayPreferenceStatus} onToggle={toggleColumn} onRowsPerPageChange={handleRowsPerPageChange} onClose={() => setDisplaySettingsOpen(false)} />
       <CreateClientDialog open={createClientOpen} existingRows={customerRows} isSaving={isCreatingClient} onClose={() => setCreateClientOpen(false)} onCreate={handleCreateClient} />
       <SafeClientActionDialog open={safeActionDialogOpen} selectedCount={selectedRows.length} importedOnlyCount={selectedImportedOnlyCount} historyCount={selectedHistoryCount} isProcessing={isProcessingSelection} onClose={() => setSafeActionDialogOpen(false)} onConfirm={handleSafeClientAction} />
-      <ClientImportExportModal open={Boolean(importExportMode)} mode={importExportMode || "import"} existingRows={customerRows} exportRows={exportRows} exportScopeLabel={selectedRows.length ? `ייצוא של ${selectedRows.length} הלקוחות שנבחרו` : `ייצוא של כל ${sortedRows.length} הלקוחות לאחר הסינון`} onClose={() => setImportExportMode(null)} onImport={async (plan, onProgress) => { const result = await saveClientImportPlan(plan, businessClients as CrmRecord[], customerRows, onProgress); await refreshData(); return result; }} />
+      <ClientImportExportModal open={Boolean(importExportMode)} mode={importExportMode || "import"} existingRows={customerRows} exportRows={exportRows} exportScopeLabel={selectedRows.length ? `ייצוא של ${selectedRows.length} הלקוחות שנבחרו` : `ייצוא של כל ${exportAllRows.length} הלקוחות לאחר הסינון`} onClose={() => setImportExportMode(null)} onImport={async (plan, onProgress) => { const result = await saveClientImportPlan(plan, businessClients as CrmRecord[], customerRows, onProgress); await refreshData(); return result; }} />
     </>
   );
 }

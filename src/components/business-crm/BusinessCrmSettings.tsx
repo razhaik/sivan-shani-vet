@@ -8,6 +8,7 @@ import BusinessCrmRemindersSettings, { type ReminderSettingsPatch } from "@/comp
 import BusinessCrmServicesSettings from "@/components/business-crm/BusinessCrmServicesSettings";
 import BusinessCrmNotificationsSettings from "@/components/business-crm/BusinessCrmNotificationsSettings";
 import BusinessCrmSelfServiceSettings, { type SelfServiceSettingsPayload } from "@/components/business-crm/BusinessCrmSelfServiceSettings";
+import CalendarAppointmentSyncSection from "@/components/business-crm/CalendarAppointmentSyncSection";
 import { SettingsGroup } from "@/components/business-crm/SettingsPrimitives";
 import { type WeeklyAvailability } from "@/lib/clinicAvailability";
 import type { CrmSettingsSection } from "@/components/business-crm/CrmContext";
@@ -86,6 +87,11 @@ export default function BusinessCrmSettings({ initialSection }: BusinessCrmSetti
   const selectedSetting = settingsSection === null
     ? undefined
     : settingsOptions.find((option) => option.id === settingsSection);
+  const activeSettingsTitle = selectedSetting?.label || "הגדרות המרפאה";
+
+  useEffect(() => {
+    if (typeof document !== "undefined") document.title = `${activeSettingsTitle} | ${VETERINARY_CLINIC_PROFILE.shortName}`;
+  }, [activeSettingsTitle]);
 
   const handleSave = async (weeklyAvailability: WeeklyAvailability) => {
     if (settingsQuery.isLoading) {
@@ -274,6 +280,10 @@ export default function BusinessCrmSettings({ initialSection }: BusinessCrmSetti
                   <GeneralAvailabilitySettings value={setting?.weekly_availability} isLoading={settingsQuery.isLoading} onSave={handleSave} />
                 </div>
               </section>
+
+              <div className="crm-calendar-sync-settings-mobile">
+                <CalendarAppointmentSyncSection />
+              </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <article className="rounded-[20px] border border-[#DCE8EC] bg-[#F9FCFC] p-5 shadow-[0_8px_24px_rgba(15,40,66,0.04)]">
