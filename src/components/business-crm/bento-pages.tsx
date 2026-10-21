@@ -7,7 +7,6 @@ import type { AppointmentDecisionAction } from "@/lib/crmAppointmentDecision";
 import type { DashboardClientSummary } from "@/lib/crmDashboardData";
 import {
   AppointmentCard,
-  BentoDock,
   clinicShortDate,
   formatCount,
   initials,
@@ -239,9 +238,9 @@ export function DashboardPage({
     <motion.div
       className="bn"
       dir="rtl"
-      initial={reducedMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reducedMotion ? { duration: 0 } : { duration: 0.34, ease: [0.2, 0.7, 0.2, 1] }}
+      initial={reducedMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: 0.15, ease: "easeOut" }}
     >
       <div className="wrap">
         <header className="hdr">
@@ -374,13 +373,6 @@ export function DashboardPage({
                 ))}
               </div>}
       </div>
-
-      <BentoDock
-        active="dashboard"
-        onChange={actions.onNavigate}
-        onAdd={actions.onNewAppointment}
-        badgeCount={notificationCount}
-      />
     </motion.div>
   );
 }
@@ -552,9 +544,9 @@ export function CalendarPage({
     <motion.div
       className="bn bn-calendar"
       dir="rtl"
-      initial={reducedMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reducedMotion ? { duration: 0 } : { duration: 0.34, ease: [0.2, 0.7, 0.2, 1] }}
+      initial={reducedMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: 0.15, ease: "easeOut" }}
     >
       <div className="wrap">
         <header className="calendar-header">
@@ -727,13 +719,6 @@ export function CalendarPage({
           </>
         )}
       </div>
-
-      <BentoDock
-        active="calendar"
-        onChange={actions.onNavigate}
-        onAdd={actions.onNewAppointment}
-        badgeCount={data.notificationCount}
-      />
     </motion.div>
   );
 }

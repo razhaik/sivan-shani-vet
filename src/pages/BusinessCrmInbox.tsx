@@ -5,7 +5,6 @@ import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Mail, MessageCircle
 import { Appointment, AppointmentRescheduleRequest, ContactInquiry } from "@/entities";
 import { useCrmContext, type CrmRecord } from "@/components/business-crm/CrmContext";
 import { SEO } from "@/components/SEO";
-import { BentoDock, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import { CrmInboxFolders, type InboxFolderKey } from "@/components/business-crm/CrmInboxFolders";
 import { CrmInboxMessageList, MobileAttentionTray, type AppointmentAction, type AppointmentActionState, type InboxActionFeedback, type InboxBulkAction, type InboxBulkActionFeedback, type InboxMessage, type RescheduleAction, type RescheduleActionState } from "@/components/business-crm/CrmInboxMessageList";
 import InboxReplyComposer, { type InboxReplyResult } from "@/components/business-crm/InboxReplyComposer";
@@ -297,12 +296,6 @@ export default function BusinessCrmInbox() {
       : (activeFolder === "inbox" || activeFolder === "attention") && attentionCount > 0
         ? `${attentionCount} בקשות עדיין ממתינות להחלטה`
         : "אין הודעות חדשות בתיקייה";
-  const navigateBentoTab = (tab: BentoDockTab) => {
-    if (tab === "dashboard") openView({ kind: "overview" });
-    else if (tab === "calendar") openView({ kind: "calendar" });
-    else if (tab === "clients") openView({ kind: "clients" });
-    else openView({ kind: "inbox" });
-  };
   const toggleMessage = (id: string) => setSelectedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   const markMessageHandled = async (message: InboxMessage) => {
@@ -501,9 +494,6 @@ export default function BusinessCrmInbox() {
             <CrmInboxMessageList messages={visibleMessages} unreadCount={visibleUnreadCount} selectedIds={selectedIds} selectedMessageId={selectedMessageId} onToggleMessage={toggleMessage} onMarkHandled={markMessageHandled} onSelectMessage={toggleExpandedMessage} onSelectAll={() => setSelectedIds(new Set(visibleMessages.map((message) => message.id)))} onClearSelection={() => setSelectedIds(new Set())} onRefresh={refreshData} isRefreshing={isDataFetching} emptyStateTitle={emptyState.title} emptyStateBody={emptyState.body} inboxActionState={inboxActionState} inboxActionFeedback={inboxActionFeedback} onInboxAction={handleInboxAction} appointmentActionState={appointmentActionState} actionFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} />
           </div>
         </div>}
-      </div>
-      <div className="bn crm-inbox-mobile-dock md:hidden" dir="rtl">
-        <BentoDock active="inbox" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
       </div>
       {replyMessages && <InboxReplyComposer selectedMessages={replyMessages} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setReplyMessages(null)} onSuccess={handleReplySuccess} />}
     </>

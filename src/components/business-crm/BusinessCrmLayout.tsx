@@ -12,7 +12,7 @@ import type { CrmProfileUpdate } from "@/components/business-crm/CrmProfileMenu"
 import BusinessCrmContent from "@/components/business-crm/BusinessCrmContent";
 import { CrmContentBoundary } from "@/components/business-crm/CrmContentBoundary";
 import { CrmProvider, crmViewIdentity, type CrmCalendarLaunchRequest, type CrmContextValue, type CrmMobileAppointmentDecisionNotice, type CrmRecord, type CrmView } from "@/components/business-crm/CrmContext";
-import { BentoToastLayer } from "@/components/business-crm/bento-ui";
+import { BentoDock, BentoToastLayer, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import type { AppointmentDecisionAction, AppointmentDecisionResult } from "@/lib/crmAppointmentDecision";
 import type { MarketingView } from "@/components/business-crm/MarketingLayout";
 import { clearCrmAsHomeScreenStart, markCrmAsHomeScreenStart } from "@/lib/crmHomeScreen";
@@ -214,6 +214,23 @@ function activeKeyForView(view: CrmView): CrmActiveKey {
   if (view.kind === "sales") return "sales";
   return "overview";
 }
+
+// One persistent phone dock for the bento screens. It lives in the layout, not in
+// the pages, so switching tabs never unmounts, re-animates or restyles it.
+function dockTabForView(view: CrmView): BentoDockTab | null {
+  if (view.kind === "overview") return "dashboard";
+  if (view.kind === "calendar") return "calendar";
+  if (view.kind === "clients" || view.kind === "client-details") return "clients";
+  if (view.kind === "inbox") return "inbox";
+  return null;
+}
+
+const dockTabViews: Record<BentoDockTab, CrmView> = {
+  dashboard: { kind: "overview" },
+  calendar: { kind: "calendar" },
+  clients: { kind: "clients" },
+  inbox: { kind: "inbox" },
+};
 
 function topbarCopy(view: CrmView) {
   if (view.kind === "settings") return { placeholder: "חיפוש בהגדרות", ariaLabel: "חיפוש בהגדרות היומן" };
@@ -469,6 +486,18 @@ export default function BusinessCrmLayout() {
     undoMobileAppointmentDecision,
   }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
 
+  const dockTab = dockTabForView(view);
+  const handleDockChange = useCallback((tab: BentoDockTab) => {
+    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (tab === dockTabForView(view) && view.kind !== "client-details") {
+      // Tapping the active tab scrolls back to the top, like an iOS tab bar.
+      window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+      return;
+    }
+    openView(dockTabViews[tab]);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [openView, view]);
+
   if (!authReady || !user) return <AuthGate />;
   return (
     <div id="crm-root" dir="rtl" className={`crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]${view.kind === "inbox" ? " crm-bento-inbox" : ""}${view.kind === "overview" ? " crm-bento-home" : ""}${view.kind === "calendar" ? " crm-bento-calendar" : ""}${view.kind === "clients" ? " crm-bento-clients" : ""}${view.kind === "client-details" ? " crm-bento-client-details" : ""}`} style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}>
@@ -484,6 +513,11 @@ export default function BusinessCrmLayout() {
         </main>
       </div>
       <CrmMobileNavigation view={view} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} moreOpenRequest={mobileMoreRequest} moreReturnFocusTarget={mobileMoreReturnFocusTarget} />
+      {dockTab && (
+        <div className="bn bn-dock-host md:hidden" dir="rtl">
+          <BentoDock active={dockTab} onChange={handleDockChange} onAdd={openNewAppointment} badgeCount={notificationCount} />
+        </div>
+      )}
       <BentoToastLayer notice={mobileAppointmentDecision} onUndo={undoMobileAppointmentDecision} />
       <CrmAssistantPanel isOpen={isAssistantOpen} onClose={closeAssistant} />
       {isMarketplaceOpen && <AppMarketplaceModal onClose={closeAppMarketplace} returnFocusRef={marketplaceTriggerRef} />}

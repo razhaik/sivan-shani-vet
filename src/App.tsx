@@ -14,7 +14,17 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { shouldRedirectToCrm } from "@/lib/crmHomeScreen";
 import "@/components/business-crm/bento-theme.css";
 
-const queryClient = new QueryClient();
+// Keep fetched data fresh for a few minutes so returning to a tab shows it
+// instantly instead of reloading it; explicit refreshes still refetch.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
 
 const App = () => {
   if (typeof window !== "undefined" && shouldRedirectToCrm(window.location.pathname)) {

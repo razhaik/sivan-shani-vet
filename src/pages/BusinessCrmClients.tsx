@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useCrmContext, type CrmDataLoadProgress } from "@/components/business-crm/CrmContext";
-import { BentoDock, formatCount, type BentoDockTab } from "@/components/business-crm/bento-ui";
+import { formatCount } from "@/components/business-crm/bento-ui";
 import { BusinessClient, ClientListPreference } from "@/entities";
 import { SEO } from "@/components/SEO";
 import { ClientsTable, clientColumns, type ClientColumnKey, type ClientSortKey } from "@/components/business-crm/ClientsTable";
@@ -870,12 +870,6 @@ export default function BusinessCrmClients() {
   const mobileEmptyBody = mobileQuickFilter !== "all" && filteredRows.length > 0 && mobileFilteredRows.length === 0
     ? mobileQuickFilter === "new" ? "לקוחות עם בקשות שעדיין ממתינות בתיבת הדואר יופיעו כאן." : "לקוחות עם תור מבוקש או מאושר לתאריך של היום יופיעו כאן."
     : emptyBody;
-  const navigateBentoTab = (tab: BentoDockTab) => {
-    if (tab === "dashboard") openView({ kind: "overview" });
-    else if (tab === "calendar") openView({ kind: "calendar" });
-    else if (tab === "clients") openView({ kind: "clients" });
-    else openView({ kind: "inbox" });
-  };
   const mobileSegmentLabel = segment === "leads" ? "פניות" : "לקוחות";
   const isMobileFilterActive = activeFilterCount > 0 || mobileQuickFilter !== "all";
   const mobileActiveFilterCount = activeFilterCount + (mobileQuickFilter === "all" ? 0 : 1);
@@ -886,7 +880,7 @@ export default function BusinessCrmClients() {
 
   const mobileClientScreen = (
     <div className="bn bn-client-list md:hidden" dir="rtl">
-      <motion.div className="wrap" initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.24, ease: "easeOut" }}>
+      <motion.div className="wrap" initial={prefersReducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: prefersReducedMotion ? 0 : 0.15, ease: "easeOut" }}>
         <header className="client-list-header">
           <div className="client-list-heading-copy">
             <span className="client-list-eyebrow">{VETERINARY_CLINIC_PROFILE.businessName}</span>
@@ -1130,7 +1124,6 @@ export default function BusinessCrmClients() {
           )}
         </section>
       </motion.div>
-      <BentoDock active="clients" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
     </div>
   );
 

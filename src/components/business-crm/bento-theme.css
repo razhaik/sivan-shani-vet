@@ -3020,13 +3020,13 @@
   stroke-width: 2;
 }
 
-.bn-client-list .dock {
+.bn-dock-host .dock {
   border-color: var(--line);
   background: var(--card);
   color: var(--ink3);
 }
 
-.bn-client-list .dock .dk {
+.bn-dock-host .dock .dk {
   border: 0;
   padding: 0;
   background: transparent;
@@ -3038,8 +3038,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.bn-client-list .dock .dk svg,
-.bn-client-list .dock .fab svg {
+.bn-dock-host .dock .dk svg,
+.bn-dock-host .dock .fab svg {
   width: 1em;
   height: 1em;
   flex-shrink: 0;
@@ -3050,22 +3050,22 @@
   stroke-linejoin: round;
 }
 
-.bn-client-list .dock .dk.on {
+.bn-dock-host .dock .dk.on {
   color: var(--ink);
 }
 
-.bn-client-list .dock .dk.on::before {
+.bn-dock-host .dock .dk.on::before {
   background: var(--gold);
 }
 
-.bn-client-list .dock .dk .bd {
+.bn-dock-host .dock .dk .bd {
   border: 1px solid var(--card);
   color: #fff;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
 }
 
-.bn-client-list .dock .fab {
+.bn-dock-host .dock .fab {
   border: 4px solid var(--bg);
   background: var(--navy);
   color: var(--gold);
@@ -3073,7 +3073,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.bn-client-list .dock .fab:hover {
+.bn-dock-host .dock .fab:hover {
   transform: translateY(-2px);
 }
 
@@ -4473,5 +4473,27 @@
 
   #crm-root.crm-bento-inbox .crm-inbox-decision-buttons {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Persistent phone dock host (rendered once in BusinessCrmLayout). The host is
+   only a mount point: the dock itself is position: fixed. */
+.bn.bn-dock-host {
+  position: static;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.bn-dock-host .dock {
+  transform: translateZ(0);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bn-dock-host .dock {
+    background: var(--card);
   }
 }
