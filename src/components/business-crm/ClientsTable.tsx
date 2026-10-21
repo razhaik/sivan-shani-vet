@@ -114,12 +114,12 @@ function MobilePetChips({ row }: { row: ClientRow }) {
   const remainingCount = Math.max(0, savedPets.length - shownPets.length);
   if (shownPets.length === 0) return null;
 
-  return <span className="flex min-w-0 max-w-[min(42vw,140px)] shrink items-center gap-1">
+  return <span className="client-mobile-pet-chips flex min-w-0 max-w-[min(42vw,140px)] shrink items-center gap-1">
     {shownPets.map((pet) => {
       const PetIcon = pet.species === "dog" ? Dog : pet.species === "cat" ? Cat : PawPrint;
-      return <span key={pet.key} title={pet.name} className="inline-flex min-w-0 max-w-[112px] items-center gap-0.5 truncate rounded-full bg-[#F2D162]/[0.28] px-1.5 py-0.5 text-xs font-bold text-[#1A1A3E]"><PetIcon className="h-3.5 w-3.5 shrink-0 text-[#1A1A3E]" aria-hidden="true" /><span className="min-w-0 truncate">{pet.name}</span></span>;
+      return <span key={pet.key} title={pet.name} className="client-mobile-pet-chip inline-flex min-w-0 max-w-[112px] items-center gap-0.5 truncate rounded-full bg-[#F2D162]/[0.28] px-1.5 py-0.5 text-xs font-bold text-[#1A1A3E]"><PetIcon className="h-3.5 w-3.5 shrink-0 text-[#1A1A3E]" aria-hidden="true" /><span className="min-w-0 truncate">{pet.name}</span></span>;
     })}
-    {remainingCount > 0 && <span className="shrink-0 rounded-full bg-[#F2D162]/[0.28] px-1.5 py-0.5 text-[10px] font-extrabold text-[#1A1A3E]" aria-label={`${remainingCount} חיות מחמד נוספות`}>+{remainingCount}</span>}
+    {remainingCount > 0 && <span className="client-mobile-pet-count shrink-0 rounded-full bg-[#F2D162]/[0.28] px-1.5 py-0.5 text-[10px] font-extrabold text-[#1A1A3E]" aria-label={`${remainingCount} חיות מחמד נוספות`}>+{remainingCount}</span>}
   </span>;
 }
 
@@ -129,10 +129,10 @@ function MobileContactDetails({ row, onOpenClient }: { row: ClientRow; onOpenCli
   const canonicalPhone = normalizedPhone?.replace(/[\s().-]+/g, "") || null;
   const validPhone = isValidClientPhone(canonicalPhone) ? canonicalPhone : "";
   const email = row.email.trim();
-  const callButtonClass = "inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162]";
+  const callButtonClass = "client-mobile-action inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162]";
 
-  return <div className="bg-[#F7F8FA] px-3 pb-3 pt-2.5" dir="rtl">
-    <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold text-slate-600" aria-label="פרטי קשר">
+  return <div className="client-mobile-details bg-[#F7F8FA] px-3 pb-3 pt-2.5" dir="rtl">
+    <div className="client-mobile-contact-row flex min-w-0 items-center gap-2 text-[11px] font-semibold text-slate-600" aria-label="פרטי קשר">
       <span className="flex min-w-0 max-w-[46%] items-center gap-1">
         <Phone className="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true" />
         {rawPhone ? validPhone ? <a href={`tel:${validPhone}`} dir="ltr" className="min-w-0 truncate font-bold text-[#1A1A3E]">{rawPhone}</a> : <span dir="ltr" className="min-w-0 truncate">{rawPhone}</span> : <span className="truncate">טלפון לא צוין</span>}
@@ -150,9 +150,9 @@ function MobileContactDetails({ row, onOpenClient }: { row: ClientRow; onOpenCli
     </div>
 
     <div className="mt-3 grid grid-cols-3 gap-1.5" role="group" aria-label={`פעולות עבור ${row.name}`}>
-      {validPhone ? <a href={`tel:${validPhone}`} className={`${callButtonClass} border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#1A1A3E]/30`} aria-label={`התקשר אל ${row.name}`}><Phone className="h-3.5 w-3.5" aria-hidden="true" />התקשר</a> : <button type="button" disabled className={`${callButtonClass} cursor-not-allowed border-[#E5E7EB] bg-[#F1F2F3] text-slate-400`}><Phone className="h-3.5 w-3.5" aria-hidden="true" />התקשר</button>}
-      {validPhone ? <a href={`https://wa.me/${validPhone.slice(1)}`} target="_blank" rel="noopener noreferrer" className={`${callButtonClass} border-[#B8DCD9] bg-[#F5FBFA] text-[#236B68] hover:border-[#236B68]`} aria-label={`פתיחת שיחת WhatsApp עם ${row.name}`}><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />וואטסאפ</a> : <button type="button" disabled className={`${callButtonClass} cursor-not-allowed border-[#E5E7EB] bg-[#F1F2F3] text-slate-400`}><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />וואטסאפ</button>}
-      <button type="button" onClick={() => onOpenClient(row.id)} className={`${callButtonClass} border-[#1A1A3E] bg-[#1A1A3E] text-white hover:bg-[#2A2A5A]`} aria-label={`פתיחת כרטיס הלקוח ${row.name}`}><UserRound className="h-3.5 w-3.5" aria-hidden="true" />כרטיס לקוח</button>
+      {validPhone ? <a href={`tel:${validPhone}`} className={`${callButtonClass} client-mobile-action--call border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#1A1A3E]/30`} aria-label={`התקשר אל ${row.name}`}><Phone className="h-3.5 w-3.5" aria-hidden="true" />התקשר</a> : <button type="button" disabled className={`${callButtonClass} client-mobile-action--disabled cursor-not-allowed border-[#E5E7EB] bg-[#F1F2F3] text-slate-400`}><Phone className="h-3.5 w-3.5" aria-hidden="true" />התקשר</button>}
+      {validPhone ? <a href={`https://wa.me/${validPhone.slice(1)}`} target="_blank" rel="noopener noreferrer" className={`${callButtonClass} client-mobile-action--whatsapp border-[#B8DCD9] bg-[#F5FBFA] text-[#236B68] hover:border-[#236B68]`} aria-label={`פתיחת שיחת WhatsApp עם ${row.name}`}><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />וואטסאפ</a> : <button type="button" disabled className={`${callButtonClass} client-mobile-action--disabled cursor-not-allowed border-[#E5E7EB] bg-[#F1F2F3] text-slate-400`}><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />וואטסאפ</button>}
+      <button type="button" onClick={() => onOpenClient(row.id)} className={`${callButtonClass} client-mobile-action--profile border-[#1A1A3E] bg-[#1A1A3E] text-white hover:bg-[#2A2A5A]`} aria-label={`פתיחת כרטיס הלקוח ${row.name}`}><UserRound className="h-3.5 w-3.5" aria-hidden="true" />כרטיס לקוח</button>
     </div>
   </div>;
 }
@@ -173,29 +173,29 @@ function MobileContactRow({ row, selected, selectionMode, hasNewRequest, isExpan
   };
   const activityDate = compactActivityDate(row.lastActivityTimestamp);
 
-  return <article className="min-w-0">
-    <div className="flex h-[70px] min-w-0 items-center" dir="rtl">
-      {selectionMode && <label className="flex h-full w-10 shrink-0 cursor-pointer items-center justify-center" aria-label={`בחירת ${row.name}`}>
+  return <article className="client-mobile-row min-w-0">
+    <div className="client-mobile-row-head flex h-[70px] min-w-0 items-center" dir="rtl">
+      {selectionMode && <label className="client-mobile-select-label flex h-full w-10 shrink-0 cursor-pointer items-center justify-center" aria-label={`בחירת ${row.name}`}>
         <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`בחירת ${row.name}`} className="h-4 w-4 rounded border-slate-300 accent-[#1A1A3E] focus:ring-[#F2D162]" />
       </label>}
-      <button type="button" onClick={handleRowPress} aria-label={selectionMode ? `בחירת ${row.name}` : `${isExpanded ? "סגירת" : "פתיחת"} פרטי ${row.name}`} aria-expanded={selectionMode ? undefined : isExpanded} aria-pressed={selectionMode ? selected : undefined} className="group flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-right transition-colors hover:bg-[#FBFCFD] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F2D162]">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-[10px] font-black text-[#F2D162]" aria-hidden="true">{initials(row.name)}</span>
+      <button type="button" onClick={handleRowPress} aria-label={selectionMode ? `בחירת ${row.name}` : `${isExpanded ? "סגירת" : "פתיחת"} פרטי ${row.name}`} aria-expanded={selectionMode ? undefined : isExpanded} aria-pressed={selectionMode ? selected : undefined} className="client-mobile-row-toggle group flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-right transition-colors hover:bg-[#FBFCFD] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F2D162]">
+        <span className="client-mobile-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-[10px] font-black text-[#F2D162]" aria-hidden="true">{initials(row.name)}</span>
         <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="min-w-[3rem] flex-1 truncate text-[15px] font-extrabold leading-5 text-[#1A1A3E]">{row.name}</span>
+            <span className="client-mobile-name min-w-[3rem] flex-1 truncate text-[15px] font-extrabold leading-5 text-[#1A1A3E]">{row.name}</span>
             <MobilePetChips row={row} />
           </span>
-          <span className="block truncate text-xs font-medium leading-4 text-slate-500">{row.lastActivityTimestamp ? row.lastActivityLabel : "אין פעילות מתועדת"}</span>
+          <span className="client-mobile-activity block truncate text-xs font-medium leading-4 text-slate-500">{row.lastActivityTimestamp ? row.lastActivityLabel : "אין פעילות מתועדת"}</span>
         </span>
-        <span className="flex shrink-0 items-center gap-1">
-          {hasNewRequest && <><span className="h-1.5 w-1.5 rounded-full bg-[#3B82F6]" aria-hidden="true" /><span className="sr-only">בקשה חדשה בתיבת הדואר</span></>}
-          <span dir="ltr" className="min-w-[30px] text-[11px] font-semibold text-slate-400">{activityDate || "—"}</span>
+        <span className="client-mobile-row-meta flex shrink-0 items-center gap-1">
+          {hasNewRequest && <><span className="client-mobile-request-dot h-1.5 w-1.5 rounded-full bg-[#3B82F6]" aria-hidden="true" /><span className="sr-only">בקשה חדשה בתיבת הדואר</span></>}
+          <span dir="ltr" className="client-mobile-date min-w-[30px] text-[11px] font-semibold text-slate-400">{activityDate || "—"}</span>
         </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${isExpanded && !selectionMode ? "rotate-180" : ""}`} aria-hidden="true" />
+        <ChevronDown className={`client-mobile-row-chevron h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${isExpanded && !selectionMode ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
     </div>
     <AnimatePresence initial={false}>
-      {isExpanded && !selectionMode && <motion.div key={row.id} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="overflow-hidden border-t border-[#EEF0F3]">
+      {isExpanded && !selectionMode && <motion.div key={row.id} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="client-mobile-expansion overflow-hidden border-t border-[#EEF0F3]">
         <MobileContactDetails row={row} onOpenClient={onOpenClient} />
       </motion.div>}
     </AnimatePresence>
@@ -203,8 +203,8 @@ function MobileContactRow({ row, selected, selectionMode, hasNewRequest, isExpan
 }
 
 function EmptyTable({ title, body, loading, onRefresh }: { title: string; body: string; loading?: boolean; onRefresh: () => void }) {
-  if (loading) return <div className="space-y-3 p-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-[#F2F4F6]" />)}</div>;
-  return <div className="flex min-h-[270px] flex-col items-center justify-center px-5 py-12 text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#F7F7F7] text-slate-400"><Users className="h-6 w-6" /></span><h3 className="mt-4 text-base font-extrabold text-[#1A1A3E]">{title}</h3><p className="mt-2 max-w-md text-sm font-medium leading-6 text-slate-500">{body}</p><button type="button" onClick={onRefresh} className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-4 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162]">רענון נתונים</button></div>;
+  if (loading) return <div className="client-mobile-empty-loading space-y-3 p-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-[#F2F4F6]" />)}</div>;
+  return <div className="client-mobile-empty flex min-h-[270px] flex-col items-center justify-center px-5 py-12 text-center"><span className="client-mobile-empty-icon flex h-14 w-14 items-center justify-center rounded-full bg-[#F7F7F7] text-slate-400"><Users className="h-6 w-6" /></span><h3 className="client-mobile-empty-title mt-4 text-base font-extrabold text-[#1A1A3E]">{title}</h3><p className="client-mobile-empty-copy mt-2 max-w-md text-sm font-medium leading-6 text-slate-500">{body}</p><button type="button" onClick={onRefresh} className="client-mobile-empty-action mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-4 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162]">רענון נתונים</button></div>;
 }
 
 export function ClientsTable({
@@ -239,7 +239,7 @@ export function ClientsTable({
     if (expandedRowId && !phoneRows.some((row) => row.id === expandedRowId)) setExpandedRowId(null);
   }, [expandedRowId, phoneRows]);
 
-  return <section className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_14px_38px_-30px_rgba(26,26,62,0.6)]">
+  return <section className="client-mobile-table overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_14px_38px_-30px_rgba(26,26,62,0.6)]">
     <div className="hidden overflow-x-auto md:block">
       <table className="min-w-[980px] w-full text-right">
         <thead className="border-b border-[#EEF0F3] bg-[#FBFCFD]">
@@ -255,7 +255,7 @@ export function ClientsTable({
     </div>
 
     <div className="md:hidden">
-      {loading ? <EmptyTable title="טוען את הלקוחות..." body="הנתונים יוצגו לאחר טעינת התורים, הפניות והלקוחות המיובאים." loading onRefresh={onRefresh} /> : phoneRows.length ? <div className="divide-y divide-[#EEF0F3]" dir="rtl">
+      {loading ? <EmptyTable title="טוען את הלקוחות..." body="הנתונים יוצגו לאחר טעינת התורים, הפניות והלקוחות המיובאים." loading onRefresh={onRefresh} /> : phoneRows.length ? <div className="client-mobile-row-list" dir="rtl">
         {phoneRows.map((row) => <MobileContactRow key={row.id} row={row} selected={selectedIds.has(row.id)} selectionMode={mobileSelectionMode} hasNewRequest={mobileNewRequestIds.has(row.id)} isExpanded={expandedRowId === row.id} onToggle={() => onToggle(row.id)} onExpand={() => setExpandedRowId((current) => current === row.id ? null : row.id)} onOpenClient={onOpenClient} />)}
       </div> : <EmptyTable title={mobileEmptyTitle || emptyTitle} body={mobileEmptyBody || emptyBody} onRefresh={onRefresh} />}
     </div>

@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import { BrandingBadge } from "./components/BrandingBadge";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { shouldRedirectToCrm } from "@/lib/crmHomeScreen";
+import "@/components/business-crm/bento-theme.css";
 
 const queryClient = new QueryClient();
 

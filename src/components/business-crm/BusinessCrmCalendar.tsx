@@ -25,6 +25,8 @@ import { BusinessCrmCalendarSlotActionDialog } from "@/components/business-crm/B
 import { CalendarEventDetails, CalendarQuickBooking, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
 import CalendarAppointmentSyncSection from "@/components/business-crm/CalendarAppointmentSyncSection";
 import CrmMobileSkeleton from "@/components/business-crm/CrmMobileSkeleton";
+import { CalendarPage } from "@/components/business-crm/bento-pages";
+import type { BentoDockTab } from "@/components/business-crm/bento-ui";
 import type { CalendarBlockDisplay } from "@/components/business-crm/BusinessCrmCalendarGrid";
 import type { AppointmentEditorMode } from "@/components/business-crm/BusinessCrmCalendarAppointmentEditor";
 
@@ -225,12 +227,13 @@ function CalendarState({ loading, onRetry }: { loading?: boolean; onRetry?: () =
 }
 
 export default function BusinessCrmCalendar() {
-  const { user, userLabel, appointments, inquiries, businessClients, search, isDataLoading, dataError, refreshData, openView, setSearch } = useCrmContext();
+  const { user, userLabel, appointments, inquiries, businessClients, search, setSearch, notificationCount, isDataLoading, dataError, refreshData, openView, openNewAppointment, calendarLaunchRequest, consumeCalendarLaunchRequest } = useCrmContext();
   const isMobile = useIsMobile();
   const isMobileCalendar = isMobile || (typeof window !== "undefined" && window.innerWidth < 768);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [mode, setMode] = useState<CalendarMode>(() => typeof window !== "undefined" && window.innerWidth < 768 ? "day" : "week");
+  const [mobileCalendarView, setMobileCalendarView] = useState<"timeline" | "agenda">("timeline");
   const [now, setNow] = useState(() => new Date());
   const [sidePanelOpen, setSidePanelOpen] = useState(() => typeof window === "undefined" || window.innerWidth >= 768);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
@@ -264,6 +267,7 @@ export default function BusinessCrmCalendar() {
   const [savingNote, setSavingNote] = useState(false);
   const [calendarSyncFeedback, setCalendarSyncFeedback] = useCalendarSyncFeedback();
   const noteRequestRef = useRef(0);
+  const handledCalendarLaunchRef = useRef<number | null>(null);
   const canManageClinicCalendar = ["administrator", "user"].includes(String(user?.role || "").toLowerCase());
   const canManagePrivateNotes = ["administrator", "user"].includes(String(user?.role || "").toLowerCase());
 
@@ -543,8 +547,26 @@ export default function BusinessCrmCalendar() {
 
   const selectDate = (date: Date) => { setSelectedDate(date); setMonthDate(date); };
   const moveDate = (direction: -1 | 1) => { const next = navigationDate(selectedDate, mode, direction); selectDate(next); };
-  const openAppointment = (record: CrmRecord) => { setAppointmentFeedback(null); setEditorFeedback(null); setSelectedAppointment(record); };
-  const openQuickBooking = (date: Date, time: string) => { if (isPastCalendarMoment(date, time, new Date())) return; setQuickBooking({ date, time, draft: emptyDraft(), feedback: "", customerMode: "existing", customerSearch: "", selectedCustomerId: null }); setServicePickerOpen(false); };
+  const openAppointment = useCallback((record: CrmRecord) => { setAppointmentFeedback(null); setEditorFeedback(null); setSelectedAppointment(record); }, []);
+  const openQuickBooking = useCallback((date: Date, time: string) => { if (isPastCalendarMoment(date, time, new Date())) return; setQuickBooking({ date, time, draft: emptyDraft(), feedback: "", customerMode: "existing", customerSearch: "", selectedCustomerId: null }); setServicePickerOpen(false); }, []);
+  useEffect(() => {
+    if (!calendarLaunchRequest || handledCalendarLaunchRef.current === calendarLaunchRequest.requestId) return;
+    handledCalendarLaunchRef.current = calendarLaunchRequest.requestId;
+    if (calendarLaunchRequest.kind === "new") {
+      const nowAtLaunch = new Date();
+      let bookingDate = new Date(nowAtLaunch);
+      let bookingTime = suggestedBookingTime || "09:00";
+      if (isPastCalendarMoment(bookingDate, bookingTime, nowAtLaunch)) {
+        bookingDate.setDate(bookingDate.getDate() + 1);
+        bookingTime = "09:00";
+      }
+      openQuickBooking(bookingDate, bookingTime);
+    } else {
+      const record = allAppointmentRecords.find((item) => text(item.id) === calendarLaunchRequest.appointmentId) || calendarLaunchRequest.record;
+      if (record) openAppointment(record);
+    }
+    consumeCalendarLaunchRequest(calendarLaunchRequest.requestId);
+  }, [allAppointmentRecords, calendarLaunchRequest, consumeCalendarLaunchRequest, openAppointment, openQuickBooking, suggestedBookingTime]);
   const openSlotAction = (date: Date, time: string) => { setSlotAction({ date, time }); };
   const updateQuickDraft = (field: keyof QuickBookingDraft, value: string) => setQuickBooking((current) => current ? { ...current, feedback: "", draft: { ...current.draft, [field]: value } } : current);
   const updateQuickCustomerSearch = (value: string) => setQuickBooking((current) => {
@@ -1051,16 +1073,78 @@ export default function BusinessCrmCalendar() {
       : null;
   const visibleNotesRetryable = notesBelongToSelection && notesRetryable;
 
-  if (isDataLoading) return <><div className="crm-mobile-loading-only"><CrmMobileSkeleton variant="calendar" label="טוען את נתוני היומן..." /></div><div className="crm-desktop-loading-only"><CalendarState loading /></div></>;
-  if (dataError) return <CalendarState onRetry={() => void refreshData()} />;
+  const calendarBlockNotice = (blockFeedback || calendarBlocksQuery.error) ? <div role={calendarBlocksQuery.error ? "alert" : "status"} className={`crm-calendar-block-feedback flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-xs font-bold leading-5 ${calendarBlocksQuery.error ? "border-red-100 bg-red-50 text-red-800" : "border-emerald-100 bg-emerald-50 text-emerald-800"}`}><span className="inline-flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{calendarBlocksQuery.error ? "לא הצלחנו לטעון את סגירות הזמן בטווח הזה. התורים נשארו זמינים, נסי לרענן את היומן." : blockFeedback}</span>{calendarBlocksQuery.error && <button type="button" onClick={() => void calendarBlocksQuery.refetch()} className="rounded-lg border border-current px-3 py-1.5 text-[11px] font-black">נסי שוב</button>}</div> : null;
+  const mobileCalendarPageData = {
+    appointments: visibleAppointments,
+    allAppointments,
+    selectedDate,
+    now,
+    search,
+    notificationCount,
+    visibleServiceCount: calendarFilterItems.length,
+    visibleServiceIds,
+  };
+  const navigateBentoTab = (tab: BentoDockTab) => {
+    if (tab === "dashboard") openView({ kind: "overview" });
+    else if (tab === "calendar") openView({ kind: "calendar" });
+    else if (tab === "clients") openView({ kind: "clients" });
+    else openView({ kind: "inbox" });
+  };
+  const openMobileAgenda = () => {
+    setMobileCalendarView("agenda");
+    setMode("agenda");
+  };
+  const openMobileDay = () => {
+    setMobileCalendarView("timeline");
+    setMode("day");
+    setServicePickerOpen(false);
+  };
+  const calendarPageActions = {
+    onNavigate: navigateBentoTab,
+    onNewAppointment: openNewAppointment,
+    onOpenAppointment: openAppointment,
+    onSelectDate: selectDate,
+    onOpenAgenda: openMobileAgenda,
+    onOpenDay: openMobileDay,
+    onOpenBlock: () => openBlockDialog(selectedDate),
+    onSearchChange: setSearch,
+  };
+  const mobileAgendaContent = (
+    <div className="calendar-agenda-stack">
+      <BusinessCrmCalendarToolbar mode={mode} selectedDate={selectedDate} isTodayView={isTodayView} canCreateBooking={canCreateBooking} unsyncedCount={unsyncedConfirmedCount} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} servicePickerOpen={servicePickerOpen} sidePanelOpen={sidePanelOpen} onModeChange={setMode} onPrevious={() => moveDate(-1)} onNext={() => moveDate(1)} onToday={() => selectDate(new Date())} onSelectDate={selectDate} onRefresh={() => { void refreshData(); void calendarBlocksQuery.refetch(); }} onToggleServicePicker={() => setServicePickerOpen((open) => !open)} onToggleService={toggleService} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} onNewBooking={() => openQuickBooking(selectedDate, suggestedBookingTime)} onOpenBlock={openBlockDialog} onOpenSettings={() => openView({ kind: "settings", section: "calendar" })} />
+      <CalendarAppointmentSyncSection className="crm-calendar-sync-in-calendar" syncFeedback={calendarSyncFeedback} onRetrySingle={(appointmentId) => void retrySingleCalendarAction(appointmentId)} onSyncSettled={refreshCrmAndGoogleCalendar} />
+      <div className={`grid min-w-0 gap-5 ${sidePanelOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "grid-cols-1"}`} dir="ltr"><div className="min-w-0" dir="rtl"><BusinessCrmCalendarGrid mode={mode} selectedDate={selectedDate} monthDate={monthDate} isMobile={isMobileCalendar} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} services={appointmentServiceItems} now={now} onSelectDate={selectDate} onSelectSlot={openSlotAction} onSelectAppointment={openAppointment} calendarBlocks={normalizedCalendarBlocks} /></div>{sidePanelOpen && <BusinessCrmCalendarSidePanel selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} calendarBlocks={normalizedCalendarBlocks} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} onSelectDate={selectDate} onChangeMonth={setMonthDate} onToggleService={toggleService} onDeleteBlock={(block) => { void deleteCalendarBlock(block); }} />}</div>
+    </div>
+  );
+
+  if (isDataLoading) {
+    if (isMobileCalendar) return <CalendarPage data={{ ...mobileCalendarPageData, appointments: [], allAppointments: [] }} actions={calendarPageActions} agendaMode={false} statusContent={<CrmMobileSkeleton variant="calendar" label="טוען את נתוני היומן..." />} />;
+    return <><div className="crm-mobile-loading-only"><CrmMobileSkeleton variant="calendar" label="טוען את נתוני היומן..." /></div><div className="crm-desktop-loading-only"><CalendarState loading /></div></>;
+  }
+  if (dataError) {
+    if (isMobileCalendar) return <CalendarPage data={{ ...mobileCalendarPageData, appointments: [], allAppointments: [] }} actions={calendarPageActions} agendaMode={false} statusNotice={calendarBlockNotice} statusContent={<CalendarState onRetry={() => void refreshData()} />} />;
+    return <CalendarState onRetry={() => void refreshData()} />;
+  }
   return <>
-    <div dir="rtl" className="space-y-5">
+    {isMobileCalendar ? (
+      <CalendarPage
+        data={mobileCalendarPageData}
+        actions={calendarPageActions}
+        agendaMode={mobileCalendarView === "agenda"}
+        agendaContent={mobileAgendaContent}
+        statusNotice={calendarBlockNotice}
+      />
+    ) : (
+      <>
+        <div dir="rtl" className="space-y-5">
       <BusinessCrmCalendarToolbar mode={mode} selectedDate={selectedDate} isTodayView={isTodayView} canCreateBooking={canCreateBooking} unsyncedCount={unsyncedConfirmedCount} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} servicePickerOpen={servicePickerOpen} sidePanelOpen={sidePanelOpen} onModeChange={setMode} onPrevious={() => moveDate(-1)} onNext={() => moveDate(1)} onToday={() => selectDate(new Date())} onSelectDate={selectDate} onRefresh={() => { void refreshData(); void calendarBlocksQuery.refetch(); }} onToggleServicePicker={() => setServicePickerOpen((open) => !open)} onToggleService={toggleService} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} onNewBooking={() => openQuickBooking(selectedDate, suggestedBookingTime)} onOpenBlock={openBlockDialog} onOpenSettings={() => openView({ kind: "settings", section: "calendar" })} />
       <CalendarAppointmentSyncSection className="crm-calendar-sync-in-calendar" syncFeedback={calendarSyncFeedback} onRetrySingle={(appointmentId) => void retrySingleCalendarAction(appointmentId)} onSyncSettled={refreshCrmAndGoogleCalendar} />
       {(blockFeedback || calendarBlocksQuery.error) && <div role={calendarBlocksQuery.error ? "alert" : "status"} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-xs font-bold leading-5 ${calendarBlocksQuery.error ? "border-red-100 bg-red-50 text-red-800" : "border-emerald-100 bg-emerald-50 text-emerald-800"}`}><span className="inline-flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{calendarBlocksQuery.error ? "לא הצלחנו לטעון את סגירות הזמן בטווח הזה. התורים נשארו זמינים, נסי לרענן את היומן." : blockFeedback}</span>{calendarBlocksQuery.error && <button type="button" onClick={() => void calendarBlocksQuery.refetch()} className="rounded-lg border border-current px-3 py-1.5 text-[11px] font-black">נסי שוב</button>}</div>}
       <div className={`grid min-w-0 gap-5 ${sidePanelOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "grid-cols-1"}`} dir="ltr"><div className="min-w-0" dir="rtl"><BusinessCrmCalendarGrid mode={mode} selectedDate={selectedDate} monthDate={monthDate} isMobile={isMobileCalendar} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} services={appointmentServiceItems} now={now} onSelectDate={selectDate} onSelectSlot={openSlotAction} onSelectAppointment={openAppointment} calendarBlocks={normalizedCalendarBlocks} /></div>{sidePanelOpen && <BusinessCrmCalendarSidePanel selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} calendarBlocks={normalizedCalendarBlocks} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} onSelectDate={selectDate} onChangeMonth={setMonthDate} onToggleService={toggleService} onDeleteBlock={(block) => { void deleteCalendarBlock(block); }} />}</div>
     </div>
     <button type="button" className="crm-calendar-fab inline-flex min-h-12 items-center gap-2 rounded-full bg-[#1A1A3E] px-5 text-sm font-black text-white shadow-[0_12px_30px_rgba(26,26,62,0.25)] transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => openQuickBooking(selectedDate, suggestedBookingTime)} disabled={!canCreateBooking} title={!canCreateBooking ? "אפשר לקבוע פגישה רק היום בשעה עתידית או במועד עתידי." : undefined} aria-label="תור חדש"><Plus className="h-5 w-5" aria-hidden="true" />תור חדש</button>
+      </>
+    )}
     {slotAction && <BusinessCrmCalendarSlotActionDialog date={slotAction.date} time={slotAction.time} onChooseAppointment={chooseSlotAppointment} onChooseBlock={chooseSlotBlock} onClose={() => setSlotAction(null)} />}
     {blockDialogOpen && <BusinessCrmCalendarBlockDialog draft={blockDraft} feedback={blockFeedback} overlapWarning={blockOverlapWarning} saving={blockSaving} onChange={updateBlockDraft} onSubmit={() => void saveCalendarBlock()} onClose={() => { if (!blockSaving) setBlockDialogOpen(false); }} />}
     {quickBooking && <CalendarQuickBooking date={quickBooking.date} time={quickBooking.time} now={now} services={quickBookingServiceItems} managerWarnings={quickBookingWarnings} publicSuggestedTimes={publicSuggestedTimes} publicAvailabilityLoading={publicAvailabilityLoading} publicAvailabilityError={publicAvailabilityError} availabilityChecksLoading={quickBookingAvailabilityLoading} availabilityChecksError={quickBookingAvailabilityErrorMessage} customers={customerRows} customerMode={quickBooking.customerMode} customerSearch={quickBooking.customerSearch} selectedCustomerId={quickBooking.selectedCustomerId} selectedCustomer={selectedQuickCustomer} onCustomerModeChange={changeQuickCustomerMode} onCustomerSearchChange={updateQuickCustomerSearch} onSelectCustomer={selectQuickCustomer} draft={quickBooking.draft} feedback={quickBooking.feedback} saving={savingBooking} onChange={updateQuickDraft} onTimeChange={updateQuickBookingTime} onSubmit={() => void saveBooking()} onClose={() => { if (!savingBooking) setQuickBooking(null); }} />}

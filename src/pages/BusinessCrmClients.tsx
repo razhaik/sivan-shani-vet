@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -8,6 +9,7 @@ import {
   Download,
   Filter,
   Loader2,
+  ListChecks,
   Mail,
   MoreHorizontal,
   RefreshCw,
@@ -21,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useCrmContext, type CrmDataLoadProgress } from "@/components/business-crm/CrmContext";
+import { BentoDock, formatCount, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import { BusinessClient, ClientListPreference } from "@/entities";
 import { SEO } from "@/components/SEO";
 import { ClientsTable, clientColumns, type ClientColumnKey, type ClientSortKey } from "@/components/business-crm/ClientsTable";
@@ -270,6 +273,56 @@ function ContentError({ onRetry }: { onRetry: () => void }) {
   return <div dir="rtl" className="flex min-h-[260px] items-center justify-center rounded-2xl border border-red-100 bg-white px-5 text-center"><div className="max-w-md"><Users className="mx-auto h-9 w-9 text-red-500" /><h1 className="mt-4 text-lg font-extrabold text-[#1A1A3E]">לא הצלחנו לטעון את הלקוחות</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">אפשר לנסות שוב. אם הבעיה נמשכת, חזרי למערכת התורים הקיימת.</p><button type="button" onClick={onRetry} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1A1A3E] px-5 text-sm font-extrabold text-white transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><RefreshCw className="h-4 w-4" />נסי שוב</button></div></div>;
 }
 
+function BentoClientProgress({ progress, compact = false }: { progress: CrmDataLoadProgress; compact?: boolean }) {
+  const total = Math.max(0, progress.total);
+  const completed = total > 0 ? Math.min(Math.max(progress.completed, 0), total) : 0;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const isError = progress.status === "error";
+  const isComplete = progress.status === "complete";
+  const received = typeof progress.receivedCount === "number" && progress.receivedLabel
+    ? `${progress.receivedCount.toLocaleString("he-IL")} רשומות התקבלו מ${progress.receivedLabel}`
+    : "המספרים מתעדכנים לאחר קבלת המקורות";
+  const Icon = isError ? AlertTriangle : isComplete ? CheckCircle2 : Loader2;
+
+  return (
+    <section className={`client-state-card${compact ? " client-state-card--compact" : ""}${isError ? " is-error" : ""}`} role={isError ? "alert" : "status"} aria-live="polite" aria-busy={!isError && !isComplete}>
+      <span className="client-state-icon"><Icon className={!isError && !isComplete ? "animate-spin" : ""} aria-hidden="true" /></span>
+      <div className="client-state-copy">
+        <span className="client-state-label">{compact ? "עדכון הרשימה" : "טעינת נתוני המרפאה"}</span>
+        <strong>{progress.stage}</strong>
+        <p>{total > 0 ? `${completed.toLocaleString("he-IL")} מתוך ${total.toLocaleString("he-IL")} שלבים הושלמו` : "מתכוננת לטעינת הנתונים"} · {received}</p>
+      </div>
+      <div className="client-state-progress-track" role="progressbar" aria-label="התקדמות טעינת נתוני הלקוחות" aria-valuemin={0} aria-valuemax={total || 1} aria-valuenow={completed} aria-valuetext={total > 0 ? `${completed} מתוך ${total}` : "מתכוננת לטעינה"}>
+        <span style={{ width: `${percentage}%` }} />
+      </div>
+    </section>
+  );
+}
+
+function BentoClientLoadError({ onRetry }: { onRetry: () => void | Promise<void> }) {
+  return (
+    <section className="client-state-card is-error" role="alert" dir="rtl">
+      <span className="client-state-icon"><AlertTriangle aria-hidden="true" /></span>
+      <div className="client-state-copy">
+        <span className="client-state-label">הנתונים לא נטענו</span>
+        <strong>לא הצלחנו לטעון את הלקוחות</strong>
+        <p>אפשר לנסות שוב. אם הבעיה נמשכת, הנתונים במערכת התורים נשארים זמינים.</p>
+      </div>
+      <button type="button" className="client-state-retry" onClick={() => void onRetry()}><RefreshCw aria-hidden="true" />נסי שוב</button>
+    </section>
+  );
+}
+
+function BentoClientRefreshError({ onRetry }: { onRetry: () => void | Promise<void> }) {
+  return (
+    <div className="client-refresh-error" role="alert" dir="rtl">
+      <AlertTriangle aria-hidden="true" />
+      <p>הרענון לא הושלם. הנתונים האחרונים שהתקבלו עדיין מוצגים.</p>
+      <button type="button" onClick={() => void onRetry()}><RefreshCw aria-hidden="true" />נסי שוב</button>
+    </div>
+  );
+}
+
 function SelectField({ value, onChange, label, children }: { value: string; onChange: (value: string) => void; label: string; children: ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-[11px] font-extrabold text-slate-500">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-bold text-[#1A1A3E] outline-none transition focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]">{children}</select></label>;
 }
@@ -403,9 +456,10 @@ function validatedManualClientPayload(payload: CreateClientPayload, existingRows
 }
 
 export default function BusinessCrmClients() {
-  const { user, appointments, inquiries, rescheduleRequests, businessClients, archivedClientKeys, hasDataSnapshot, dataLoadProgress, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, openView } = useCrmContext();
+  const { user, appointments, inquiries, rescheduleRequests, businessClients, archivedClientKeys, hasDataSnapshot, dataLoadProgress, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, notificationCount, openView, openNewAppointment } = useCrmContext();
   const userIdentity = String(user?.id || user?.email || "");
   const isMobileViewport = useIsMobile();
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const initialPreferenceSnapshot = readCachedDisplayPreference(userIdentity) || { columns: [...DEFAULT_VISIBLE_COLUMNS], rowsPerPage: 20, sortKey: DEFAULT_SORT_KEY, sortDirection: DEFAULT_SORT_DIRECTION };
   const [segment, setSegment] = useState<SegmentKey>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -816,10 +870,275 @@ export default function BusinessCrmClients() {
   const mobileEmptyBody = mobileQuickFilter !== "all" && filteredRows.length > 0 && mobileFilteredRows.length === 0
     ? mobileQuickFilter === "new" ? "לקוחות עם בקשות שעדיין ממתינות בתיבת הדואר יופיעו כאן." : "לקוחות עם תור מבוקש או מאושר לתאריך של היום יופיעו כאן."
     : emptyBody;
+  const navigateBentoTab = (tab: BentoDockTab) => {
+    if (tab === "dashboard") openView({ kind: "overview" });
+    else if (tab === "calendar") openView({ kind: "calendar" });
+    else if (tab === "clients") openView({ kind: "clients" });
+    else openView({ kind: "inbox" });
+  };
+  const mobileSegmentLabel = segment === "leads" ? "פניות" : "לקוחות";
+  const isMobileFilterActive = activeFilterCount > 0 || mobileQuickFilter !== "all";
+  const mobileActiveFilterCount = activeFilterCount + (mobileQuickFilter === "all" ? 0 : 1);
+  const mobileHasActiveCriteria = isMobileFilterActive || segment !== "all";
+  const mobileListCountLabel = mobileSortedRows.length === 1
+    ? segment === "leads" ? "פנייה אחת" : "לקוח אחד"
+    : `${formatCount(mobileSortedRows.length)} ${mobileSegmentLabel}`;
+
+  const mobileClientScreen = (
+    <div className="bn bn-client-list md:hidden" dir="rtl">
+      <motion.div className="wrap" initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.24, ease: "easeOut" }}>
+        <header className="client-list-header">
+          <div className="client-list-heading-copy">
+            <span className="client-list-eyebrow">{VETERINARY_CLINIC_PROFILE.businessName}</span>
+            <div className="client-list-heading-line">
+              <div className="client-list-title-block">
+                <h1 id="client-list-title">לקוחות</h1>
+                <p className="client-list-count" aria-live="polite"><strong>{mobileListCountLabel}</strong><span>ברשימה הנוכחית</span></p>
+              </div>
+              <div className="client-list-header-actions">
+                <button
+                  type="button"
+                  onClick={() => { setActionFeedback(null); setCreateClientOpen(true); setMobileToolsOpen(false); }}
+                  aria-haspopup="dialog"
+                  aria-expanded={createClientOpen}
+                  aria-controls="create-client-dialog"
+                  className="client-list-add-button press"
+                >
+                  <UserPlus aria-hidden="true" />
+                  <span>לקוח חדש</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleMobileSelectionMode}
+                  aria-pressed={mobileSelectionMode}
+                  aria-label={mobileSelectionMode ? "סיום בחירת לקוחות" : "בחירת לקוחות"}
+                  className={`client-list-select-button${mobileSelectionMode ? " is-active" : ""}`}
+                >
+                  <ListChecks aria-hidden="true" />
+                  <span>{mobileSelectionMode ? "סיום" : "בחר"}</span>
+                  {mobileSelectionMode && selectedRows.length > 0 && <b>{formatCount(selectedRows.length)}</b>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="client-list-search">
+          <label className="sr-only" htmlFor="client-list-search-mobile">חיפוש לפי שם, חיית מחמד או פרטי קשר</label>
+          <Search aria-hidden="true" />
+          <input
+            id="client-list-search-mobile"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="שם, חיית מחמד או טלפון"
+            inputMode="search"
+            autoComplete="off"
+          />
+          {search && <button type="button" onClick={() => setSearch("")} aria-label="ניקוי החיפוש"><X aria-hidden="true" /></button>}
+        </div>
+
+        <div className="client-quick-filters" role="tablist" aria-label="סינון מהיר של לקוחות">
+          {mobileQuickFilterOptions.map((option) => {
+            const active = mobileQuickFilter === option.key;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMobileQuickFilter(option.key)}
+                className={`client-quick-filter${active ? " is-active" : ""}`}
+              >
+                <span>{option.label}</span>
+                <b>{formatCount(option.count)}</b>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="client-list-controls">
+          <label className="client-segment-control">
+            <span className="sr-only">בחירת פלח לקוחות</span>
+            <select
+              value={segment}
+              onChange={(event) => { setSegment(event.target.value as SegmentKey); setMobileToolsOpen(false); }}
+              aria-label="בחירת פלח לקוחות"
+            >
+              {segments.map((item) => (
+                <option key={item.key} value={item.key} disabled={item.count === null}>
+                  {item.label}{item.count === null ? " · אין מקור נתונים" : ` · ${formatCount(item.count)}`}
+                </option>
+              ))}
+            </select>
+            <ChevronDown aria-hidden="true" />
+          </label>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            aria-controls="client-mobile-filter-panel"
+            className={`client-list-control-button${filtersOpen || isMobileFilterActive ? " is-active" : ""}`}
+          >
+            <Filter aria-hidden="true" />
+            <span>סינון</span>
+            {mobileActiveFilterCount > 0 && <b>{formatCount(mobileActiveFilterCount)}</b>}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileToolsOpen((open) => !open)}
+            aria-expanded={mobileToolsOpen}
+            aria-controls="client-list-tools-mobile"
+            className={`client-list-control-button${mobileToolsOpen ? " is-active" : ""}`}
+          >
+            <MoreHorizontal aria-hidden="true" />
+            <span>כלים</span>
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <section id="client-mobile-filter-panel" className="client-filter-panel" aria-label="אפשרויות סינון">
+            <div className="client-filter-grid">
+              <SelectField value={status} onChange={(value) => setStatus(value as StatusFilter)} label="סטטוס איש קשר">
+                <option value="all">כל הסטטוסים</option>
+                <option value="new">לקוח חדש</option>
+                <option value="active">לקוח פעיל</option>
+                <option value="lead">ליד חדש</option>
+                <option value="imported">לקוח מיובא</option>
+              </SelectField>
+              <SelectField value={species} onChange={(value) => setSpecies(value as SpeciesFilter)} label="סוג חיית מחמד">
+                <option value="all">כל הסוגים</option>
+                <option value="dog">כלב</option>
+                <option value="cat">חתול</option>
+                <option value="other">אחר</option>
+                <option value="unknown">לא ידוע</option>
+              </SelectField>
+              <SelectField value={activity} onChange={(value) => setActivity(value as ActivityFilter)} label="פעילות אחרונה">
+                <option value="all">כל טווחי הזמן</option>
+                <option value="7">7 הימים האחרונים</option>
+                <option value="30">30 הימים האחרונים</option>
+                <option value="90">90 הימים האחרונים</option>
+                <option value="older">לפני יותר מ-90 יום</option>
+              </SelectField>
+            </div>
+            {mobileHasActiveCriteria && (
+              <div className="client-filter-footer">
+                <span>{mobileActiveFilterCount > 0 ? `${formatCount(mobileActiveFilterCount)} מסננים פעילים` : "פלח לקוחות נבחר"}</span>
+                <button type="button" onClick={clearFilters}><X aria-hidden="true" />ניקוי הסינון</button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {mobileToolsOpen && (
+          <div id="client-list-tools-mobile" className="client-tools-panel" role="group" aria-label="כלי ניהול לקוחות">
+            <button type="button" onClick={() => { void refreshData(); setMobileToolsOpen(false); }}>
+              <RefreshCw className={isDataFetching ? "animate-spin" : ""} aria-hidden="true" />
+              <span>רענון הרשימה</span>
+            </button>
+            <button type="button" onClick={() => { setImportExportMode("import"); setMobileToolsOpen(false); }}>
+              <Upload aria-hidden="true" />
+              <span>ייבוא לקוחות</span>
+            </button>
+            <button type="button" onClick={() => { setImportExportMode("export"); setMobileToolsOpen(false); }}>
+              <Download aria-hidden="true" />
+              <span>ייצוא לקוחות</span>
+            </button>
+            <button type="button" onClick={() => { setDisplaySettingsOpen(true); setMobileToolsOpen(false); }} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog">
+              <Settings2 aria-hidden="true" />
+              <span>הגדרות תצוגה</span>
+            </button>
+          </div>
+        )}
+
+        {mobileSelectionMode && selectedRows.length === 0 && <p className="client-selection-hint" role="status">הקישי על שורות כדי לבחור לקוחות. בסיום הבחירה יופיעו הפעולות המתאימות.</p>}
+
+        {selectedRows.length > 0 && (
+          <div className="client-selected-toolbar" role="toolbar" aria-label="פעולות ללקוחות שנבחרו">
+            <div className="client-selected-heading">
+              <strong role="status" aria-live="polite">{formatCount(selectedRows.length)} {selectedRows.length === 1 ? "לקוח נבחר" : "לקוחות נבחרו"}</strong>
+              <span>{selectedImportedOnlyCount > 0 ? `${formatCount(selectedImportedOnlyCount)} למחיקה לצמיתות` : "אין רשומות מיובאות למחיקה"}{selectedHistoryCount > 0 ? ` · ${formatCount(selectedHistoryCount)} יוסתרו בבטחה` : ""}</span>
+            </div>
+            <div className="client-selected-actions">
+              <button type="button" className="client-selected-action is-sms" onClick={openSmsComposer} aria-label="שליחת SMS ללקוחות שנבחרו"><Send aria-hidden="true" />שליחת SMS</button>
+              <button type="button" className="client-selected-action is-email" onClick={openEmailComposer} aria-label="שליחת אימייל ללקוחות שנבחרו"><Mail aria-hidden="true" />שליחת אימייל</button>
+              <button type="button" className="client-selected-action" onClick={() => setImportExportMode("export")}><Download aria-hidden="true" />ייצוא נבחרים</button>
+              <button type="button" className="client-selected-action is-danger" onClick={() => { setActionFeedback(null); setSafeActionDialogOpen(true); }}><Trash2 aria-hidden="true" />מחיקה/הסתרה בטוחה</button>
+              <button type="button" className="client-selected-action is-clear" onClick={() => setSelectedIds(new Set())}><X aria-hidden="true" />ניקוי בחירה</button>
+            </div>
+          </div>
+        )}
+
+        {isMobileViewport && smsComposerOpen && selectedRows.length > 0 && (
+          <div className="client-mobile-composer"><BulkSmsComposer selectedClients={selectedSmsClients} onClose={() => setSmsComposerOpen(false)} onSuccess={handleSmsSuccess} /></div>
+        )}
+        {isMobileViewport && emailComposerOpen && selectedRows.length > 0 && (
+          <div className="client-mobile-composer"><BulkEmailComposer selectedClients={selectedRows} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setEmailComposerOpen(false)} onSuccess={handleEmailSuccess} /></div>
+        )}
+
+        {actionFeedback && (
+          <div className={`client-action-feedback${actionFeedback.kind === "error" ? " is-error" : " is-success"}`} role={actionFeedback.kind === "error" ? "alert" : "status"}>
+            {actionFeedback.kind === "error" ? <AlertTriangle aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}
+            <div><p>{actionFeedback.text}</p>{actionFeedback.details && <p className="client-action-feedback-details">{actionFeedback.details}</p>}</div>
+          </div>
+        )}
+
+        <section className="client-list-results" aria-labelledby="client-results-heading-mobile">
+          <div className="client-list-results-heading">
+            <div>
+              <h2 id="client-results-heading-mobile">פעילות אחרונה</h2>
+              <p>{mobileQuickFilterOptions.find((option) => option.key === mobileQuickFilter)?.label} · {mobileListCountLabel}</p>
+            </div>
+            <span className="client-list-sort-mark">העדכניים תחילה</span>
+          </div>
+
+          {!hasDataSnapshot ? (
+            dataError
+              ? <BentoClientLoadError onRetry={refreshData} />
+              : <BentoClientProgress progress={dataLoadProgress} />
+          ) : (
+            <>
+              {(isDataFetching || dataLoadProgress.status === "loading") && <BentoClientProgress progress={dataLoadProgress} compact />}
+              {dataError && <BentoClientRefreshError onRetry={refreshData} />}
+              <ClientsTable
+                rows={pageRows}
+                mobileRows={mobilePageRows}
+                mobileSelectionMode={mobileSelectionMode}
+                mobileNewRequestIds={mobileNewRequestIds}
+                mobileEmptyTitle={mobileEmptyTitle}
+                mobileEmptyBody={mobileEmptyBody}
+                columns={visibleColumns}
+                selectedIds={selectedIds}
+                loading={false}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onToggle={toggleSelection}
+                onToggleAll={toggleAll}
+                onSort={sort}
+                onRefresh={refreshData}
+                onOpenClient={(id) => openView({ kind: "client-details", clientId: id })}
+                emptyTitle={emptyTitle}
+                emptyBody={emptyBody}
+              />
+              <div className="client-list-pagination" aria-label="עמודי רשימת הלקוחות">
+                <p>עמוד {mobileCurrentPage} מתוך {mobileTotalPages}<span> · {mobileListCountLabel}</span></p>
+                <div>
+                  <button type="button" disabled={mobileCurrentPage <= 1} onClick={() => setMobilePage(Math.max(1, mobileCurrentPage - 1))} aria-label="עמוד קודם"><ChevronRight aria-hidden="true" /></button>
+                  <button type="button" disabled={mobileCurrentPage >= mobileTotalPages} onClick={() => setMobilePage(Math.min(mobileTotalPages, mobileCurrentPage + 1))} aria-label="עמוד הבא"><ChevronLeft aria-hidden="true" /></button>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      </motion.div>
+      <BentoDock active="clients" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
+    </div>
+  );
 
   return (
     <>
       <SEO title={`לקוחות | ${VETERINARY_CLINIC_PROFILE.businessName}`} description="ניהול לקוחות ופניות במערכת העסקית של המרפאה הווטרינרית." url={`${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}/clients`} noindex siteName={VETERINARY_CLINIC_PROFILE.businessName} />
+      {mobileClientScreen}
+      <div className="hidden md:block">
       {dataError && !hasDataSnapshot ? <ContentError onRetry={refreshData} /> : isDataLoading && !hasDataSnapshot ? <ContentLoading progress={dataLoadProgress} /> : <div dir="rtl">{(isDataFetching || dataLoadProgress.status === "loading") && <div className="mb-4"><ClientDataProgress progress={dataLoadProgress} compact /></div>}{dataError && hasDataSnapshot && <div className="mb-4"><RefreshErrorBanner onRetry={refreshData} /></div>}<div className="hidden md:block max-w-3xl"><p className="mb-2 text-xs font-extrabold tracking-wide text-slate-500">{VETERINARY_CLINIC_PROFILE.businessName}</p><h1 className="text-3xl font-black tracking-tight text-[#1A1A3E] sm:text-4xl">לקוחות</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">כאן ניתן לנהל את הלקוחות בעזרת מידע מפולטר מותאם לצרכי העסק שלך</p></div><div className="hidden md:flex mt-6 grid-cols-2 gap-2 sm:flex sm:gap-3 sm:overflow-x-auto sm:pb-2" role="tablist" aria-label="פלחי לקוחות">{segments.map((item) => { const disabled = item.count === null; return <button key={item.key} type="button" role="tab" aria-selected={segment === item.key} disabled={disabled} onClick={() => { setSegment(item.key); setMoreOpen(false); }} title={disabled ? "אין מקור נתונים לפלח הזה" : undefined} className={`min-w-0 rounded-2xl border p-3 text-right transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:min-w-[180px] sm:p-4 ${segment === item.key ? "border-[#1A1A3E] bg-[#1A1A3E] text-white shadow-lg" : disabled ? "cursor-not-allowed border-[#E5E7EB] bg-white/60 text-slate-400 opacity-80" : "border-[#E5E7EB] bg-white text-[#1A1A3E] hover:-translate-y-0.5 hover:border-[#F2D162]"}`}><span className="block text-xs font-extrabold leading-5">{item.label}</span><span className="mt-3 block text-2xl font-black">{item.count === null ? "—" : item.count}</span><span className={`mt-1 block text-[10px] font-bold ${segment === item.key ? "text-white/70" : "text-slate-400"}`}>{item.note || "רשומות זמינות"}</span></button>; })}</div>
 
         <section aria-labelledby="customer-list-heading" className="mt-4">
@@ -877,10 +1196,11 @@ export default function BusinessCrmClients() {
           <div className="hidden md:flex mt-3 flex-col gap-2 rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center"><div className="grid w-full grid-cols-2 gap-2 sm:contents"><div className="relative"><button type="button" onClick={() => setMoreOpen((open) => !open)} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start"><MoreHorizontal className="h-4 w-4" />אפשרויות נוספות</button>{moreOpen && <div className="absolute right-0 top-12 z-20 w-full max-w-[calc(100vw-2rem)] rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-xl sm:w-52 sm:max-w-none"><button type="button" onClick={() => { setImportExportMode("import"); setMoreOpen(false); }} className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-right text-xs font-extrabold text-[#1A1A3E] transition hover:bg-[#FFFDF2] sm:min-h-0">ייבוא לקוחות</button><button type="button" onClick={() => { setImportExportMode("export"); setMoreOpen(false); }} className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-right text-xs font-extrabold text-[#1A1A3E] transition hover:bg-[#FFFDF2] sm:min-h-0">ייצוא לקוחות</button></div>}</div><button type="button" onClick={() => setDisplaySettingsOpen(true)} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-[#1A1A3E] transition hover:border-[#F2D162] focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start"><Settings2 className="h-4 w-4" />הגדרות תצוגה</button><button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] sm:h-10 sm:w-auto sm:justify-start ${filtersOpen || activeFilterCount ? "border-[#1A1A3E] bg-[#1A1A3E] text-white" : "border-[#D9DEE5] bg-white text-[#1A1A3E] hover:border-[#F2D162]"}`}><Filter className="h-4 w-4" />אפשרויות סינון{activeFilterCount > 0 && <span className="rounded-full bg-[#F2D162] px-1.5 py-0.5 text-[10px] text-[#1A1A3E]">{activeFilterCount}</span>}</button></div><label className="order-first relative w-full sm:order-none sm:min-w-[220px] sm:flex-1"><span className="sr-only">חיפוש לקוחות</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש לפי שם, טלפון, תעודת זהות, כתובת או פרטים נוספים" aria-label="חיפוש לפי שם, טלפון, תעודת זהות, כתובת או פרטים נוספים" className="h-10 w-full rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-semibold text-[#1A1A3E] outline-none transition placeholder:text-slate-400 focus:border-[#1A1A3E]/40 focus:ring-2 focus:ring-[#F2D162]" /></label></div>
         {filtersOpen && <section className="mt-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm"><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><SelectField value={status} onChange={(value) => setStatus(value as StatusFilter)} label="סטטוס איש קשר"><option value="all">כל הסטטוסים</option><option value="new">לקוח חדש</option><option value="active">לקוח פעיל</option><option value="lead">ליד חדש</option><option value="imported">לקוח מיובא</option></SelectField><SelectField value={species} onChange={(value) => setSpecies(value as SpeciesFilter)} label="סוג חיית מחמד"><option value="all">כל הסוגים</option><option value="dog">כלב</option><option value="cat">חתול</option><option value="other">אחר</option><option value="unknown">לא ידוע</option></SelectField><SelectField value={activity} onChange={(value) => setActivity(value as ActivityFilter)} label="פעילות אחרונה"><option value="all">כל טווחי הזמן</option><option value="7">7 הימים האחרונים</option><option value="30">30 הימים האחרונים</option><option value="90">90 הימים האחרונים</option><option value="older">לפני יותר מ-90 יום</option></SelectField></div>{activeFilterCount > 0 && <div className="mt-4 flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-slate-500">מסננים פעילים: {activeFilterCount}</span><button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-[#5267A8] hover:bg-[#F7F7F7] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><X className="h-3.5 w-3.5" />ניקוי סינון</button></div>}</section>}
         {selectedRows.length > 0 && <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-[#E5E7EB] bg-white p-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0" role="toolbar" aria-label="פעולות ללקוחות שנבחרו"><div className="min-w-0"><p className="text-sm font-black text-[#1A1A3E]" role="status" aria-live="polite">{selectedRows.length} {selectedRows.length === 1 ? "לקוח נבחר" : "לקוחות נבחרו"}</p><p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">{selectedImportedOnlyCount > 0 ? `${selectedImportedOnlyCount} למחיקה לצמיתות` : "אין רשומות מיובאות למחיקה"}{selectedHistoryCount > 0 ? ` · ${selectedHistoryCount} להסתרה בטוחה` : ""}</p></div><div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center"><button type="button" onClick={openSmsComposer} aria-label="שליחת SMS ללקוחות שנבחרו" className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#D8ECEB] bg-[#F5FBFA] px-3 text-xs font-black text-[#236B68] transition hover:border-[#B8DCD9] hover:bg-[#EAF7F5] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Send className="h-4 w-4" />שליחת SMS</button><button type="button" onClick={openEmailComposer} aria-label="שליחת אימייל ללקוחות שנבחרו" className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#E6DDF4] bg-[#FBF9FE] px-3 text-xs font-black text-[#705493] transition hover:border-[#CDBBE2] hover:bg-[#F5F0FB] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Mail className="h-4 w-4" />שליחת אימייל</button><button type="button" onClick={() => { setImportExportMode("export"); setMoreOpen(false); }} className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-black text-[#1A1A3E] transition hover:border-[#F2D162] hover:bg-[#FFFDF2] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Download className="h-4 w-4" />ייצוא נבחרים</button><button type="button" onClick={() => { setActionFeedback(null); setSafeActionDialogOpen(true); }} className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-red-200 bg-[#FFF8F8] px-3 text-xs font-black text-[#A93434] transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><Trash2 className="h-4 w-4" />מחיקה/הסתרה בטוחה</button><button type="button" onClick={() => setSelectedIds(new Set())} className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10 sm:w-auto sm:justify-start rounded-xl border border-[#D9DEE5] bg-white px-3 text-xs font-extrabold text-slate-600 transition hover:border-[#F2D162] hover:bg-[#FFFDF2] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><X className="h-4 w-4" />ניקוי בחירה</button></div></div>}
-        {smsComposerOpen && selectedRows.length > 0 && <div className="mt-4"><BulkSmsComposer selectedClients={selectedSmsClients} onClose={() => setSmsComposerOpen(false)} onSuccess={handleSmsSuccess} /></div>}
-        {emailComposerOpen && selectedRows.length > 0 && <div className="mt-4"><BulkEmailComposer selectedClients={selectedRows} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setEmailComposerOpen(false)} onSuccess={handleEmailSuccess} /></div>}
+        {!isMobileViewport && smsComposerOpen && selectedRows.length > 0 && <div className="mt-4"><BulkSmsComposer selectedClients={selectedSmsClients} onClose={() => setSmsComposerOpen(false)} onSuccess={handleSmsSuccess} /></div>}
+        {!isMobileViewport && emailComposerOpen && selectedRows.length > 0 && <div className="mt-4"><BulkEmailComposer selectedClients={selectedRows} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setEmailComposerOpen(false)} onSuccess={handleEmailSuccess} /></div>}
         {actionFeedback && <div role={actionFeedback.kind === "error" ? "alert" : "status"} className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-bold ${actionFeedback.kind === "error" ? "border-red-100 bg-red-50 text-red-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}><div className="flex items-start gap-2">{actionFeedback.kind === "error" ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}<div><p>{actionFeedback.text}</p>{actionFeedback.details && <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{actionFeedback.details}</p>}</div></div></div>}
           <div className="mt-4"><ClientsTable rows={pageRows} mobileRows={mobilePageRows} mobileSelectionMode={mobileSelectionMode} mobileNewRequestIds={mobileNewRequestIds} mobileEmptyTitle={mobileEmptyTitle} mobileEmptyBody={mobileEmptyBody} columns={visibleColumns} selectedIds={selectedIds} loading={false} sortKey={sortKey} sortDirection={sortDirection} onToggle={toggleSelection} onToggleAll={toggleAll} onSort={sort} onRefresh={refreshData} onOpenClient={(id) => openView({ kind: "client-details", clientId: id })} emptyTitle={emptyTitle} emptyBody={emptyBody} /></div><div className="mt-4 hidden md:flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs font-bold text-slate-500"><span>עמוד {currentPage} מתוך {totalPages}</span><div className="flex items-center gap-2"><button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד קודם"><ChevronRight className="h-4 w-4" /></button><button type="button" disabled={currentPage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד הבא"><ChevronLeft className="h-4 w-4" /></button></div></div><div className="mt-3 flex md:hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs font-bold text-slate-500"><span>עמוד {mobileCurrentPage} מתוך {mobileTotalPages} · {mobileSortedRows.length.toLocaleString("he-IL")} {segment === "leads" ? "פניות" : "לקוחות"}</span><div className="flex items-center gap-2"><button type="button" disabled={mobileCurrentPage <= 1} onClick={() => setMobilePage(Math.max(1, mobileCurrentPage - 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד קודם"><ChevronRight className="h-4 w-4" /></button><button type="button" disabled={mobileCurrentPage >= mobileTotalPages} onClick={() => setMobilePage(Math.min(mobileTotalPages, mobileCurrentPage + 1))} className="rounded-lg border border-[#D9DEE5] p-2 text-[#1A1A3E] transition hover:border-[#F2D162] disabled:cursor-not-allowed disabled:opacity-40" aria-label="עמוד הבא"><ChevronLeft className="h-4 w-4" /></button></div></div></section></div>}
+      </div>
       <DisplaySettingsDialog open={displaySettingsOpen} columns={visibleColumns} rowsPerPage={rowsPerPage} preferenceStatus={displayPreferenceStatus} onToggle={toggleColumn} onRowsPerPageChange={handleRowsPerPageChange} onClose={() => setDisplaySettingsOpen(false)} />
       <CreateClientDialog open={createClientOpen} existingRows={customerRows} isSaving={isCreatingClient} onClose={() => setCreateClientOpen(false)} onCreate={handleCreateClient} />
       <SafeClientActionDialog open={safeActionDialogOpen} selectedCount={selectedRows.length} importedOnlyCount={selectedImportedOnlyCount} historyCount={selectedHistoryCount} isProcessing={isProcessingSelection} onClose={() => setSafeActionDialogOpen(false)} onConfirm={handleSafeClientAction} />

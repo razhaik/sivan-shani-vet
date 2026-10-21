@@ -57,11 +57,11 @@ export function CrmInboxFolders({
     <aside
       aria-label="תיקיות תיבת הדואר"
       className={cn(
-        "min-w-0 overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white shadow-[0_10px_30px_-24px_rgba(26,26,62,0.65)] transition-[width] duration-200",
+        "crm-inbox-folders min-w-0 overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white shadow-[0_10px_30px_-24px_rgba(26,26,62,0.65)] transition-[width] duration-200",
         collapsed ? "lg:w-[72px]" : "lg:w-full",
       )}
     >
-      <div className={cn("flex min-h-14 items-center justify-between gap-3 border-b border-[#EEF0F3] px-4", collapsed && "lg:justify-center lg:px-2")}>
+      <div className={cn("crm-inbox-folder-header flex min-h-14 items-center justify-between gap-3 border-b border-[#EEF0F3] px-4", collapsed && "lg:justify-center lg:px-2")}>
         <div className={cn("flex min-w-0 items-center gap-2", collapsed && "lg:hidden")}>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F2D162]/[0.28] text-[#1A1A3E]">
             <Inbox className="h-4 w-4" aria-hidden="true" />
@@ -74,7 +74,7 @@ export function CrmInboxFolders({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-[#F7F7F7] hover:text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"
+          className="crm-inbox-folder-collapse flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-[#F7F7F7] hover:text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"
           aria-label={collapsed ? "פתיחת רשימת התיקיות" : "כיווץ רשימת התיקיות"}
           title={collapsed ? "פתיחת תיקיות" : "כיווץ תיקיות"}
         >
@@ -82,8 +82,8 @@ export function CrmInboxFolders({
         </button>
       </div>
 
-      <div className={cn("p-3", collapsed && "hidden lg:block lg:p-2")}>
-        <div className="space-y-1" role="list" aria-label="תיקיות">
+      <div className={cn("crm-inbox-folder-list-wrap p-3", collapsed && "hidden lg:block lg:p-2")}>
+        <div className="crm-inbox-folder-list space-y-1" role="list" aria-label="תיקיות">
           {folders.map(({ key, label, icon: Icon, count, expandable }) => {
             const active = activeFolder === key;
             return (
@@ -98,13 +98,13 @@ export function CrmInboxFolders({
                 aria-label={collapsed ? `${label}${count !== undefined ? `, ${count}` : ""}` : undefined}
                 title={collapsed ? label : undefined}
                 className={cn(
-                  "relative flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-right text-[13px] font-bold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162]",
+                  "crm-inbox-folder-item relative flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-right text-[13px] font-bold transition focus:outline-none focus:ring-2 focus:ring-[#F2D162]",
                   active ? "bg-[#1A1A3E] text-white shadow-sm" : "text-[#1A1A3E]/[0.72] hover:bg-[#F7F8FA] hover:text-[#1A1A3E]",
                   collapsed && "lg:justify-center lg:px-2",
                 )}
               >
                 <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-[#F2D162]" : "text-slate-400")} aria-hidden="true" />
-                <span className={cn("min-w-0 flex-1 truncate", collapsed && "lg:hidden")}>{label}</span>
+                <span className={cn("crm-inbox-folder-name min-w-0 flex-1 truncate", collapsed && "lg:hidden")}>{label}</span>
                 {count !== undefined && (
                   <span className={cn(
                     "min-w-5 rounded-full px-1.5 text-center text-[10px] font-black leading-5",
@@ -121,7 +121,7 @@ export function CrmInboxFolders({
         </div>
 
         {marketingExpanded && !collapsed && (
-          <p className="mt-2 px-3 text-[10px] font-semibold leading-4 text-slate-400">אין ערוצי שיווק מחוברים כרגע</p>
+          <p className="crm-inbox-marketing-note mt-2 px-3 text-[10px] font-semibold leading-4 text-slate-400">אין ערוצי שיווק מחוברים כרגע</p>
         )}
       </div>
     </aside>

@@ -87,10 +87,77 @@
   display: block;
 }
 
+.crm-dashboard-mobile-home {
+  display: none;
+}
+
 @media (max-width: 767px) {
   #crm-root {
     min-height: 100dvh;
     overflow-x: hidden;
+  }
+
+  #crm-root.crm-bento-inbox .crm-topbar-shell,
+  #crm-root.crm-bento-inbox .crm-mobile-navigation {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-inbox .crm-main-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #crm-root .crm-dashboard-mobile-home {
+    display: block;
+  }
+
+  #crm-root .crm-dashboard-desktop {
+    display: none;
+  }
+
+  #crm-root.crm-bento-home .crm-topbar-shell,
+  #crm-root.crm-bento-home .crm-mobile-navigation {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-home .crm-main-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #crm-root.crm-bento-calendar .crm-topbar-shell,
+  #crm-root.crm-bento-calendar .crm-mobile-navigation {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-calendar .crm-main-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #crm-root.crm-bento-clients .crm-topbar-shell,
+  #crm-root.crm-bento-clients .crm-mobile-navigation {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-clients .crm-main-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #crm-root.crm-bento-client-details .crm-topbar-shell,
+  #crm-root.crm-bento-client-details .crm-mobile-navigation {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-client-details .crm-main-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
   }
 
   #crm-root .crm-main-content {
@@ -99,9 +166,9 @@
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 1.25rem);
   }
 
-  #crm-root .crm-phone-hamburger,
-  #crm-root .crm-mobile-sidebar-drawer,
-  #crm-root .crm-mobile-hidden-nav-entry {
+  #crm-root.crm-bento-home .crm-phone-hamburger,
+  #crm-root.crm-bento-home .crm-mobile-sidebar-drawer,
+  #crm-root.crm-bento-home .crm-mobile-hidden-nav-entry {
     display: none !important;
   }
 
@@ -266,6 +333,18 @@
   }
 
   #crm-root .crm-calendar-sync-in-calendar {
+    display: none;
+  }
+
+  #crm-root.crm-bento-calendar .crm-calendar-fab {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-calendar .crm-calendar-agenda-view .crm-calendar-sync-in-calendar {
+    display: block !important;
+  }
+
+  #crm-root.crm-bento-calendar .crm-calendar-agenda-view .crm-calendar-mobile-heading h1 {
     display: none;
   }
 

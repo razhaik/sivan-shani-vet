@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isValid, parse } from "date-fns";
 import { he } from "date-fns/locale";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Settings2, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Mail, MessageCircle, RefreshCw, Search, Settings2, ShieldAlert, X, XCircle } from "lucide-react";
 import { Appointment, AppointmentRescheduleRequest, ContactInquiry } from "@/entities";
 import { useCrmContext, type CrmRecord } from "@/components/business-crm/CrmContext";
 import { SEO } from "@/components/SEO";
+import { BentoDock, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import { CrmInboxFolders, type InboxFolderKey } from "@/components/business-crm/CrmInboxFolders";
 import { CrmInboxMessageList, MobileAttentionTray, type AppointmentAction, type AppointmentActionState, type InboxActionFeedback, type InboxBulkAction, type InboxBulkActionFeedback, type InboxMessage, type RescheduleAction, type RescheduleActionState } from "@/components/business-crm/CrmInboxMessageList";
 import InboxReplyComposer, { type InboxReplyResult } from "@/components/business-crm/InboxReplyComposer";
@@ -14,6 +15,15 @@ import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
 type RecordValue = CrmRecord;
 
 type InboxMarkerAction = "archive" | "delete";
+
+const INBOX_SOURCE_FILTERS = [
+  { value: "all", label: "הכל", icon: Mail },
+  { value: "appointment", label: "בקשות תור", icon: CalendarDays },
+  { value: "reschedule_request", label: "שינוי מועד", icon: RefreshCw },
+  { value: "inquiry", label: "פניות", icon: MessageCircle },
+] as const;
+type InboxSourceFilter = typeof INBOX_SOURCE_FILTERS[number]["value"];
+type InboxSourceFilterCounts = Record<InboxSourceFilter, number>;
 
 function text(value: unknown) { return typeof value === "string" || typeof value === "number" ? String(value).trim() : ""; }
 function storedDate(value: unknown) { const valueText = text(value); if (!valueText) return null; const date = new Date(valueText); return isValid(date) ? date : null; }
@@ -170,8 +180,8 @@ async function updateInboxSource(message: InboxMessage, payload: Record<string, 
   return AppointmentRescheduleRequest.update(message.sourceRecordId, payload);
 }
 
-function ContentLoading() { return <div dir="rtl" className="flex min-h-[260px] items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white px-6 text-center"><div><Loader2 className="mx-auto h-8 w-8 animate-spin text-[#5267A8]" /><p className="mt-4 text-sm font-extrabold text-[#1A1A3E]">טוען את תיבת הדואר...</p><p className="mt-1 text-xs font-medium text-slate-500">המסך נשאר זמין בזמן טעינת הרשומות.</p></div></div>; }
-function ContentError({ onRetry }: { onRetry: () => void }) { return <div dir="rtl" className="flex min-h-[260px] items-center justify-center rounded-2xl border border-red-100 bg-white px-5 text-center"><div className="max-w-md"><ShieldAlert className="mx-auto h-9 w-9 text-red-500" /><h1 className="mt-4 text-lg font-extrabold text-[#1A1A3E]">לא הצלחנו לטעון את תיבת הדואר</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">אפשר לנסות שוב. אם הבעיה נמשכת, חזרי למערכת התורים הקיימת.</p><button type="button" onClick={onRetry} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1A1A3E] px-5 text-sm font-extrabold text-white transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><RefreshCw className="h-4 w-4" />נסי שוב</button></div></div>; }
+function ContentLoading() { return <div dir="rtl" className="crm-inbox-loading-state flex min-h-[260px] items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white px-6 text-center"><div><Loader2 className="mx-auto h-8 w-8 animate-spin text-[#5267A8]" /><p className="mt-4 text-sm font-extrabold text-[#1A1A3E]">טוען את תיבת הדואר...</p><p className="mt-1 text-xs font-medium text-slate-500">המסך נשאר זמין בזמן טעינת הרשומות.</p></div></div>; }
+function ContentError({ onRetry }: { onRetry: () => void }) { return <div dir="rtl" className="crm-inbox-error-state flex min-h-[260px] items-center justify-center rounded-2xl border border-red-100 bg-white px-5 text-center"><div className="max-w-md"><ShieldAlert className="mx-auto h-9 w-9 text-red-500" /><h1 className="mt-4 text-lg font-extrabold text-[#1A1A3E]">לא הצלחנו לטעון את תיבת הדואר</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">אפשר לנסות שוב. אם הבעיה נמשכת, חזרי למערכת התורים הקיימת.</p><button type="button" onClick={onRetry} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1A1A3E] px-5 text-sm font-extrabold text-white transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><RefreshCw className="h-4 w-4" />נסי שוב</button></div></div>; }
 
 function AppointmentFeedbackBanner({ feedback }: { feedback: InboxActionFeedback }) {
   const tone = feedback.tone === "success" ? "border-green-200 bg-green-50 text-green-900" : feedback.tone === "partial" ? "border-amber-200 bg-amber-50 text-amber-950" : "border-red-200 bg-red-50 text-red-900";
@@ -179,10 +189,25 @@ function AppointmentFeedbackBanner({ feedback }: { feedback: InboxActionFeedback
   return <div role={feedback.tone === "success" ? "status" : "alert"} aria-live="polite" className={`mt-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-bold leading-6 ${tone}`}><Icon className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" /><span>{feedback.message}</span></div>;
 }
 
+function MobileInboxSourceFilters({ selected, counts, onChange }: { selected: InboxSourceFilter; counts: InboxSourceFilterCounts; onChange: (filter: InboxSourceFilter) => void }) {
+  return <div className="crm-inbox-source-filters" role="group" aria-label="סינון לפי מקור ההודעה">
+    {INBOX_SOURCE_FILTERS.map(({ value, label, icon: Icon }) => {
+      const count = counts[value];
+      return <button key={value} type="button" className={`crm-inbox-source-filter${selected === value ? " is-active" : ""}`} aria-pressed={selected === value} aria-label={`${label}, ${count} הודעות לא טופלו`} onClick={() => onChange(value)}>
+        <Icon className="crm-inbox-source-icon" aria-hidden="true" />
+        <span className="crm-inbox-source-label">{label}</span>
+        <span className="crm-inbox-source-count" aria-hidden="true">{count > 99 ? "99+" : count}</span>
+      </button>;
+    })}
+  </div>;
+}
+
 export default function BusinessCrmInbox() {
-  const { appointments, inquiries, rescheduleRequests, search, isDataLoading, dataError, refreshData, isDataFetching } = useCrmContext();
+  const { appointments, inquiries, rescheduleRequests, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, openView, openNewAppointment, notificationCount } = useCrmContext();
   const [activeFolder, setActiveFolder] = useState<InboxFolderKey>("inbox");
   const [foldersCollapsed, setFoldersCollapsed] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<InboxSourceFilter>("all");
+  const [isPhoneWidth, setIsPhoneWidth] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [optimisticallyHandledIds, setOptimisticallyHandledIds] = useState<Set<string>>(new Set());
@@ -199,6 +224,14 @@ export default function BusinessCrmInbox() {
   const attentionIdsRef = useRef<string[]>([]);
   const handlingIdsRef = useRef<Set<string>>(new Set());
 
+  useEffect(() => {
+    const phoneWidth = window.matchMedia("(max-width: 767px)");
+    const updatePhoneWidth = () => setIsPhoneWidth(phoneWidth.matches);
+    updatePhoneWidth();
+    phoneWidth.addEventListener("change", updatePhoneWidth);
+    return () => phoneWidth.removeEventListener("change", updatePhoneWidth);
+  }, []);
+
   const messages = useMemo(() => { const baseMessages = toInboxMessages(inquiries, appointments, rescheduleRequests); return baseMessages.map((message) => optimisticallyHandledIds.has(message.id) ? { ...message, isHandled: true, isUnread: false } : message); }, [appointments, inquiries, optimisticallyHandledIds, rescheduleRequests]);
   const inboxMessages = useMemo(() => messages.filter((message) => message.inboxLocation === "inbox"), [messages]);
   const unreadCount = useMemo(() => inboxMessages.filter((message) => message.isUnread).length, [inboxMessages]);
@@ -214,7 +247,18 @@ export default function BusinessCrmInbox() {
     return [];
   }, [activeFolder, inboxMessages, messages]);
   const normalizedSearch = search.trim().toLocaleLowerCase("he");
-  const visibleMessages = useMemo(() => !normalizedSearch ? folderMessages : folderMessages.filter((message) => `${message.senderName} ${message.subject} ${message.preview} ${message.sourceLabel}`.toLocaleLowerCase("he").includes(normalizedSearch)), [folderMessages, normalizedSearch]);
+  const searchedMessages = useMemo(() => !normalizedSearch ? folderMessages : folderMessages.filter((message) => `${message.senderName} ${message.subject} ${message.preview} ${message.sourceLabel}`.toLocaleLowerCase("he").includes(normalizedSearch)), [folderMessages, normalizedSearch]);
+  const currentFolderUnreadCount = useMemo(() => folderMessages.filter((message) => message.isUnread).length, [folderMessages]);
+  const sourceFilterCounts = useMemo<InboxSourceFilterCounts>(() => ({
+    all: currentFolderUnreadCount,
+    appointment: folderMessages.filter((message) => message.kind === "appointment" && message.isUnread).length,
+    reschedule_request: folderMessages.filter((message) => message.kind === "reschedule_request" && message.isUnread).length,
+    inquiry: folderMessages.filter((message) => message.kind === "inquiry" && message.isUnread).length,
+  }), [currentFolderUnreadCount, folderMessages]);
+  const visibleMessages = useMemo(() => {
+    if (!isPhoneWidth || sourceFilter === "all") return searchedMessages;
+    return searchedMessages.filter((message) => message.kind === sourceFilter);
+  }, [isPhoneWidth, searchedMessages, sourceFilter]);
   const visibleUnreadCount = useMemo(() => visibleMessages.filter((message) => message.isUnread).length, [visibleMessages]);
   const selectedMessages = useMemo(() => visibleMessages.filter((message) => selectedIds.has(message.id)), [selectedIds, visibleMessages]);
 
@@ -239,12 +283,26 @@ export default function BusinessCrmInbox() {
   };
   const emptyState = useMemo(() => {
     if (activeFolder === "follow-up" || activeFolder === "marketing") return { title: "אין הודעות בתיקייה זו", body: "התיקייה הזו אינה מחוברת כרגע למקור נתונים במערכת." };
-    if (normalizedSearch && folderMessages.length === 0) return { title: "לא נמצאו הודעות תואמות", body: "נסי מונח אחר או נקי את שדה החיפוש כדי לראות את ההודעות בתיקייה." };
+    if (normalizedSearch && searchedMessages.length === 0) return { title: "לא נמצאו הודעות תואמות", body: "נסי מונח אחר או נקי את שדה החיפוש כדי לראות את ההודעות בתיקייה." };
+    if (isPhoneWidth && sourceFilter !== "all" && searchedMessages.length > 0 && visibleMessages.length === 0) return { title: "אין הודעות מהמקור הזה", body: "לא נמצאו הודעות מהסוג הזה בחיפוש ובתיקייה שבחרת. בחרי מקור אחר כדי לראות פריטים נוספים." };
     if (activeFolder === "archive") return { title: "הארכיון ריק", body: "הודעות שתעבירי לארכיון יישמרו כאן בלי להופיע בתיבת הדואר הראשית." };
     if (activeFolder === "trash") return { title: "האשפה ריקה", body: "מחיקה מעבירה הודעות לכאן. הרשומות המקוריות והיסטוריית התורים נשמרות במערכת." };
     if (activeFolder === "inbox" && folderMessages.length === 0) return messages.length === 0 ? { title: "תיבת הדואר ריקה", body: "פניות מהאתר ובקשות תור יופיעו כאן לאחר שיישלחו." } : { title: "אין הודעות בתיבת הדואר", body: "הודעות שהועברו לארכיון או לאשפה יופיעו בתיקייה המתאימה שלהן." };
     return { title: "אין הודעות שדורשות טיפול", body: "בקשות תור ופניות שיגיעו למערכת יופיעו כאן לפי הצורך." };
-  }, [activeFolder, folderMessages.length, messages.length, normalizedSearch]);
+  }, [activeFolder, folderMessages.length, isPhoneWidth, messages.length, normalizedSearch, searchedMessages.length, sourceFilter, visibleMessages.length]);
+  const mobileFolderSummary = activeFolder === "follow-up" || activeFolder === "marketing"
+    ? "התיקייה עדיין לא מחוברת למקור נתונים"
+    : currentFolderUnreadCount > 0
+      ? `${currentFolderUnreadCount} הודעות לא טופלו בתיקייה`
+      : (activeFolder === "inbox" || activeFolder === "attention") && attentionCount > 0
+        ? `${attentionCount} בקשות עדיין ממתינות להחלטה`
+        : "אין הודעות חדשות בתיקייה";
+  const navigateBentoTab = (tab: BentoDockTab) => {
+    if (tab === "dashboard") openView({ kind: "overview" });
+    else if (tab === "calendar") openView({ kind: "calendar" });
+    else if (tab === "clients") openView({ kind: "clients" });
+    else openView({ kind: "inbox" });
+  };
   const toggleMessage = (id: string) => setSelectedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   const markMessageHandled = async (message: InboxMessage) => {
@@ -401,9 +459,53 @@ export default function BusinessCrmInbox() {
     }
   };
 
-  return <>
-    <SEO title={`תיבת דואר | ${VETERINARY_CLINIC_PROFILE.businessName}`} description="תיבת דואר פנימית לפניות מהאתר ולבקשות תור במרפאה הווטרינרית." url={`${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}/inbox`} noindex siteName={VETERINARY_CLINIC_PROFILE.businessName} />
-    {isDataLoading ? <ContentLoading /> : dataError ? <ContentError onRetry={refreshData} /> : <div dir="rtl">{activeFolder === "inbox" && pendingAttentionMessages.length > 0 && <MobileAttentionTray messages={pendingAttentionMessages} selectedMessage={selectedAttentionMessage} isMenuOpen={attentionMenuOpen} onToggleMenu={() => setAttentionMenuOpen((current) => !current)} onCloseMenu={() => setAttentionMenuOpen(false)} onSelectMessage={selectAttentionMessage} appointmentActionState={appointmentActionState} appointmentFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} />}<div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="mb-2 text-xs font-extrabold tracking-wide text-slate-500">{VETERINARY_CLINIC_PROFILE.businessName}</p><h1 className="text-3xl font-black tracking-tight text-[#1A1A3E] sm:text-4xl">תיבת דואר</h1><p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-500">פניות מהאתר ובקשות תור מרוכזות כאן, לפי הרשומות שנשמרו במערכת.</p></div><button type="button" disabled title="הגדרות תצוגה אינן זמינות עדיין" aria-label="הגדרות תצוגה" className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E1E4E8] bg-white text-slate-400 opacity-80 shadow-sm"><Settings2 className="h-4 w-4" /></button></div>{handledError && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">{handledError}</div>}{appointmentFeedback && <AppointmentFeedbackBanner feedback={appointmentFeedback} />}{rescheduleFeedback && <AppointmentFeedbackBanner feedback={rescheduleFeedback} />}<div className={`mt-6 grid min-w-0 gap-4 lg:items-start ${foldersCollapsed ? "lg:grid-cols-[72px_minmax(0,1fr)]" : "lg:grid-cols-[280px_minmax(0,1fr)]"}`}><CrmInboxFolders activeFolder={activeFolder} onFolderChange={setActiveFolder} inboxCount={unreadCount} attentionCount={attentionCount} collapsed={foldersCollapsed} onToggleCollapsed={() => setFoldersCollapsed((current) => !current)} /><CrmInboxMessageList messages={visibleMessages} unreadCount={visibleUnreadCount} selectedIds={selectedIds} selectedMessageId={selectedMessageId} onToggleMessage={toggleMessage} onMarkHandled={markMessageHandled} onSelectMessage={toggleExpandedMessage} onSelectAll={() => setSelectedIds(new Set(visibleMessages.map((message) => message.id)))} onClearSelection={() => setSelectedIds(new Set())} onRefresh={refreshData} isRefreshing={isDataFetching} emptyStateTitle={emptyState.title} emptyStateBody={emptyState.body} inboxActionState={inboxActionState} inboxActionFeedback={inboxActionFeedback} onInboxAction={handleInboxAction} appointmentActionState={appointmentActionState} actionFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} /></div></div>}
-    {replyMessages && <InboxReplyComposer selectedMessages={replyMessages} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setReplyMessages(null)} onSuccess={handleReplySuccess} />}
-  </>;
+  return (
+    <>
+      <SEO title={`תיבת דואר | ${VETERINARY_CLINIC_PROFILE.businessName}`} description="תיבת דואר פנימית לפניות מהאתר ולבקשות תור במרפאה הווטרינרית." url={`${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}/inbox`} noindex siteName={VETERINARY_CLINIC_PROFILE.businessName} />
+      <div dir="rtl" className="crm-inbox-page">
+        <div className="crm-inbox-mobile-gate">
+          <header className="crm-inbox-mobile-header">
+            <div className="crm-inbox-mobile-heading-row">
+              <div className="crm-inbox-mobile-title-copy">
+                <p className="crm-inbox-mobile-clinic">{VETERINARY_CLINIC_PROFILE.businessName}</p>
+                <h1>תיבת דואר</h1>
+              </div>
+              <div className="crm-inbox-mobile-count" aria-label={`${currentFolderUnreadCount} הודעות לא טופלו בתיקייה`}>
+                <strong>{currentFolderUnreadCount > 99 ? "99+" : currentFolderUnreadCount}</strong>
+                <span>לא טופלו</span>
+              </div>
+            </div>
+            <p className="crm-inbox-mobile-summary" aria-live="polite">{mobileFolderSummary}</p>
+            <div className="crm-inbox-mobile-search">
+              <Search aria-hidden="true" />
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש בשם, בנושא או בהודעה" aria-label="חיפוש בתיבת הדואר לפי שם, נושא או תוכן" autoComplete="off" />
+              {search.length > 0 && <button type="button" onClick={() => setSearch("")} aria-label="ניקוי החיפוש"><X aria-hidden="true" /></button>}
+            </div>
+          </header>
+          {!isDataLoading && !dataError && activeFolder === "inbox" && pendingAttentionMessages.length > 0 && <MobileAttentionTray messages={pendingAttentionMessages} selectedMessage={selectedAttentionMessage} isMenuOpen={attentionMenuOpen} onToggleMenu={() => setAttentionMenuOpen((current) => !current)} onCloseMenu={() => setAttentionMenuOpen(false)} onSelectMessage={selectAttentionMessage} appointmentActionState={appointmentActionState} appointmentFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} />}
+          <div className="crm-inbox-mobile-controls">
+            <CrmInboxFolders activeFolder={activeFolder} onFolderChange={setActiveFolder} inboxCount={unreadCount} attentionCount={attentionCount} collapsed={false} onToggleCollapsed={() => setFoldersCollapsed(false)} />
+            <MobileInboxSourceFilters selected={sourceFilter} counts={sourceFilterCounts} onChange={setSourceFilter} />
+          </div>
+        </div>
+        {isDataLoading ? <ContentLoading /> : dataError ? <ContentError onRetry={refreshData} /> : <div dir="rtl">
+          <div className="crm-inbox-desktop-header flex items-start justify-between gap-4">
+            <div className="min-w-0"><p className="mb-2 text-xs font-extrabold tracking-wide text-slate-500">{VETERINARY_CLINIC_PROFILE.businessName}</p><h1 className="text-3xl font-black tracking-tight text-[#1A1A3E] sm:text-4xl">תיבת דואר</h1><p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-500">פניות מהאתר ובקשות תור מרוכזות כאן, לפי הרשומות שנשמרו במערכת.</p></div>
+            <button type="button" disabled title="הגדרות תצוגה אינן זמינות עדיין" aria-label="הגדרות תצוגה" className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E1E4E8] bg-white text-slate-400 opacity-80 shadow-sm"><Settings2 className="h-4 w-4" /></button>
+          </div>
+          {handledError && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">{handledError}</div>}
+          {appointmentFeedback && <AppointmentFeedbackBanner feedback={appointmentFeedback} />}
+          {rescheduleFeedback && <AppointmentFeedbackBanner feedback={rescheduleFeedback} />}
+          <div className={`crm-inbox-content-grid mt-6 grid min-w-0 gap-4 lg:items-start ${foldersCollapsed ? "lg:grid-cols-[72px_minmax(0,1fr)]" : "lg:grid-cols-[280px_minmax(0,1fr)]"}`}>
+            <CrmInboxFolders activeFolder={activeFolder} onFolderChange={setActiveFolder} inboxCount={unreadCount} attentionCount={attentionCount} collapsed={foldersCollapsed} onToggleCollapsed={() => setFoldersCollapsed((current) => !current)} />
+            <CrmInboxMessageList messages={visibleMessages} unreadCount={visibleUnreadCount} selectedIds={selectedIds} selectedMessageId={selectedMessageId} onToggleMessage={toggleMessage} onMarkHandled={markMessageHandled} onSelectMessage={toggleExpandedMessage} onSelectAll={() => setSelectedIds(new Set(visibleMessages.map((message) => message.id)))} onClearSelection={() => setSelectedIds(new Set())} onRefresh={refreshData} isRefreshing={isDataFetching} emptyStateTitle={emptyState.title} emptyStateBody={emptyState.body} inboxActionState={inboxActionState} inboxActionFeedback={inboxActionFeedback} onInboxAction={handleInboxAction} appointmentActionState={appointmentActionState} actionFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} />
+          </div>
+        </div>}
+      </div>
+      <div className="bn crm-inbox-mobile-dock md:hidden" dir="rtl">
+        <BentoDock active="inbox" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
+      </div>
+      {replyMessages && <InboxReplyComposer selectedMessages={replyMessages} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setReplyMessages(null)} onSuccess={handleReplySuccess} />}
+    </>
+  );
 }
