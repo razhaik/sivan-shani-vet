@@ -5,7 +5,7 @@ import {
   ChevronLeft,
   Ellipsis,
   Grid2X2,
-  Home,
+  LayoutDashboard,
   Mail,
   Megaphone,
   ReceiptText,
@@ -34,7 +34,8 @@ interface CrmMobileNavigationProps {
   view: CrmView;
   onNavigate: (view: CrmView) => void;
   onOpenAppMarketplace: (trigger?: HTMLButtonElement) => void;
-  onAddToHomeScreen: (trigger: HTMLButtonElement) => void;
+  moreOpenRequest: number;
+  moreReturnFocusTarget: HTMLButtonElement | null;
 }
 
 function isMoreSection(view: CrmView) {
@@ -78,11 +79,13 @@ function MoreAction({
   );
 }
 
-export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketplace, onAddToHomeScreen }: CrmMobileNavigationProps) {
+export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketplace, moreOpenRequest, moreReturnFocusTarget }: CrmMobileNavigationProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const moreDragControls = useDragControls();
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusTargetRef = useRef<HTMLButtonElement | null>(null);
+  const lastMoreRequestRef = useRef(0);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const sheetRef = useRef<HTMLElement | null>(null);
   const restoreFocusRef = useRef(true);
@@ -130,9 +133,19 @@ export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketp
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
-      if (restoreFocusRef.current) window.requestAnimationFrame(() => moreButtonRef.current?.focus());
+      const returnTarget = returnFocusTargetRef.current || moreButtonRef.current;
+      returnFocusTargetRef.current = null;
+      if (restoreFocusRef.current) window.requestAnimationFrame(() => { if (returnTarget?.isConnected) returnTarget.focus(); });
     };
   }, [moreOpen]);
+
+  useEffect(() => {
+    if (moreOpenRequest <= 0 || moreOpenRequest === lastMoreRequestRef.current) return;
+    lastMoreRequestRef.current = moreOpenRequest;
+    returnFocusTargetRef.current = moreReturnFocusTarget;
+    restoreFocusRef.current = Boolean(moreReturnFocusTarget);
+    setMoreOpen(true);
+  }, [moreOpenRequest, moreReturnFocusTarget]);
 
   const navigateTo = (nextView: CrmView) => {
     closeMore(false);
@@ -140,16 +153,9 @@ export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketp
   };
 
   const openMarketplace = (trigger: HTMLButtonElement) => {
-    const returnFocusTarget = moreButtonRef.current || trigger;
+    const returnFocusTarget = returnFocusTargetRef.current?.isConnected ? returnFocusTargetRef.current : moreButtonRef.current || trigger;
     closeMore(false);
     onOpenAppMarketplace(returnFocusTarget);
-  };
-
-  const requestInstall = (trigger: HTMLButtonElement) => {
-    const returnFocusTarget = moreButtonRef.current || trigger;
-    // Start the browser prompt within this tap before the sheet begins closing.
-    onAddToHomeScreen(returnFocusTarget);
-    closeMore(false);
   };
 
   return (
@@ -172,7 +178,15 @@ export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketp
                 key={tab.label}
                 ref={moreButtonRef}
                 type="button"
-                onClick={() => moreOpen ? closeMore(true) : (restoreFocusRef.current = true, setMoreOpen(true))}
+                onClick={() => {
+                  if (moreOpen) {
+                    closeMore(true);
+                    return;
+                  }
+                  returnFocusTargetRef.current = moreButtonRef.current;
+                  restoreFocusRef.current = true;
+                  setMoreOpen(true);
+                }}
                 aria-label="עוד פעולות"
                 aria-haspopup="dialog"
                 aria-expanded={moreOpen}
@@ -259,12 +273,12 @@ export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketp
               </header>
 
               <nav aria-label="אזורים נוספים" className="space-y-2">
+                <MoreAction label="מסך ניהול" icon={LayoutDashboard} active={view.kind === "overview"} onClick={() => navigateTo({ kind: "overview" })} />
+                <MoreAction label="מכירות ונתונים" icon={ReceiptText} active={view.kind === "sales"} onClick={() => navigateTo({ kind: "sales" })} />
                 <MoreAction label="שיווק" icon={Megaphone} active={view.kind === "marketing"} onClick={() => navigateTo({ kind: "marketing", subview: "automatic" })} />
                 <MoreAction label="הגדרות" icon={Settings} active={view.kind === "settings"} onClick={() => navigateTo({ kind: "settings" })} />
                 <MoreAction label="חנות אפליקציות" icon={Grid2X2} onClick={() => openMarketplace(moreButtonRef.current || closeButtonRef.current!)} />
-                <MoreAction label="הוספה למסך הבית" icon={Home} onClick={() => requestInstall(moreButtonRef.current || closeButtonRef.current!)} />
               </nav>
-              <p className="mt-4 px-1 text-[11px] font-semibold leading-5 text-slate-500">אם הדפדפן מאפשר התקנה, ייפתח חלון אישור. אחרת יוצגו שלבים להוספה ידנית.</p>
             </motion.section>
           </motion.div>
         )}

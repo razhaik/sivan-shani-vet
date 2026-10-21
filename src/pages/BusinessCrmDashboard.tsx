@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, LayoutGrid, RefreshCw, ShieldAlert } from "lucide-react";
-import { DashboardLayout, DashboardLayoutPreference } from "@/entities";
+import { Appointment, DashboardLayout, DashboardLayoutPreference } from "@/entities";
 import { useCrmContext, type CrmRecord } from "@/components/business-crm/CrmContext";
+import { DashboardPage, type DashboardHomeActions, type DashboardHomeData, type DashboardHomeRequestState } from "@/components/business-crm/bento-pages";
 import { CrmDashboardCards, type DashboardWidgetRequestState } from "@/components/business-crm/CrmDashboardCards";
 import { SEO } from "@/components/SEO";
 import {
@@ -64,7 +65,21 @@ function DashboardLayoutLoadingPlaceholder() {
 }
 
 export default function BusinessCrmDashboard() {
-  const { user, search, openView } = useCrmContext();
+  const {
+    user,
+    search,
+    openView,
+    inquiries,
+    inquiriesIsLoading,
+    inquiriesError,
+    refreshData,
+    notificationCount,
+    openNewAppointment,
+    openAppointmentInCalendar,
+    openMobileMoreMenu,
+    mobileAppointmentDecision,
+    scheduleMobileAppointmentDecision,
+  } = useCrmContext();
   const queryClient = useQueryClient();
   const userIdentity = String(user?.id || user?.email || "");
   const range = useMemo(() => getDashboardAppointmentRange(), []);
@@ -249,6 +264,25 @@ export default function BusinessCrmDashboard() {
     return result;
   }, [appointmentsKey, clientOverviewKey, pendingKey, queryClient, userIdentity]);
 
+  const onCheckIn = useCallback(async (record: CrmRecord) => {
+    const appointmentId = String(record.id ?? "").trim();
+    if (!appointmentId) throw new Error("לתור חסר מזהה, ולכן לא ניתן לשמור את סימון ההגעה.");
+    if (String(record.arrived_at ?? "").trim()) return;
+
+    const arrivedAt = new Date().toISOString();
+    try {
+      await Appointment.update(appointmentId, { arrived_at: arrivedAt });
+    } catch (error) {
+      console.error("Failed to save the appointment arrival marker:", error);
+      throw new Error("לא הצלחנו לשמור את סימון ההגעה. נסי שוב.");
+    }
+
+    const updatedRecord: CrmRecord = { ...record, arrived_at: arrivedAt };
+    queryClient.setQueryData<CrmRecord[]>(appointmentsKey, (current) => current?.map((item) => mergeAppointmentRecord(item, updatedRecord)));
+    queryClient.setQueryData<CrmRecord[]>(["business-crm", "appointments", userIdentity], (current) => current?.map((item) => mergeAppointmentRecord(item, updatedRecord)));
+    void queryClient.invalidateQueries({ queryKey: appointmentsKey });
+  }, [appointmentsKey, queryClient, userIdentity]);
+
   const appointments = Array.isArray(appointmentsQuery.data) ? appointmentsQuery.data : [];
   const pendingAppointments = Array.isArray(pendingQuery.data) ? pendingQuery.data : [];
   const clients = Array.isArray(clientOverviewQuery.data) ? clientOverviewQuery.data : [];
@@ -258,9 +292,53 @@ export default function BusinessCrmDashboard() {
   const clientsState: DashboardWidgetRequestState = { isLoading: clientOverviewQuery.isLoading, error: clientOverviewQuery.error, onRetry: () => { void clientOverviewQuery.refetch(); } };
   const leadsState: DashboardWidgetRequestState = { isLoading: leadsQuery.isLoading, error: leadsQuery.error, onRetry: () => { void leadsQuery.refetch(); } };
 
+  const mobileAppointmentsState: DashboardHomeRequestState = { isLoading: appointmentsQuery.isLoading, error: appointmentsQuery.error, onRetry: () => { void appointmentsQuery.refetch(); } };
+  const mobilePendingState: DashboardHomeRequestState = { isLoading: pendingQuery.isLoading, error: pendingQuery.error, onRetry: () => { void pendingQuery.refetch(); } };
+  const mobileClientsState: DashboardHomeRequestState = { isLoading: clientOverviewQuery.isLoading, error: clientOverviewQuery.error, onRetry: () => { void clientOverviewQuery.refetch(); } };
+  const mobileInquiriesState: DashboardHomeRequestState = { isLoading: inquiriesIsLoading, error: inquiriesError, onRetry: () => { void refreshData(); } };
+  const mobileHomeData: DashboardHomeData = {
+    appointments,
+    pendingAppointments,
+    clients,
+    inquiries,
+    today: range.today,
+    profile: {
+      name: VETERINARY_CLINIC_PROFILE.shortName,
+      shortName: "ד״ר סיון",
+      subtitle: "מרפאה וטרינרית · נס ציונה",
+    },
+  };
+  const mobileHomeActions: DashboardHomeActions = {
+    onNavigate: (tab) => {
+      if (tab === "dashboard") openView({ kind: "overview" });
+      else if (tab === "calendar") openView({ kind: "calendar" });
+      else if (tab === "clients") openView({ kind: "clients" });
+      else openView({ kind: "inbox" });
+    },
+    onOpenInbox: () => openView({ kind: "inbox" }),
+    onOpenSales: () => openView({ kind: "sales" }),
+    onOpenMore: openMobileMoreMenu,
+    onNewAppointment: openNewAppointment,
+    onOpenAppointment: openAppointmentInCalendar,
+    onCheckIn,
+    onScheduleDecision: (record, action) => scheduleMobileAppointmentDecision(record, action, () => onAppointmentDecision(record, action)),
+  };
+
   return <>
     <SEO title={`מסך ניהול | ${VETERINARY_CLINIC_PROFILE.businessName}`} description={`מסך ניהול עסקי פרטי ל${VETERINARY_CLINIC_PROFILE.categoryLabel} של ${VETERINARY_CLINIC_PROFILE.shortName}.`} url={`${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}`} noindex siteName={VETERINARY_CLINIC_PROFILE.businessName} />
-    <div id="crm-overview" dir="rtl">
+    <div className="crm-dashboard-mobile-home">
+      <DashboardPage
+        data={mobileHomeData}
+        actions={mobileHomeActions}
+        appointmentState={mobileAppointmentsState}
+        pendingState={mobilePendingState}
+        clientsState={mobileClientsState}
+        inquiriesState={mobileInquiriesState}
+        notificationCount={notificationCount}
+        decisionNotice={mobileAppointmentDecision}
+      />
+    </div>
+    <div id="crm-overview" className="crm-dashboard-desktop" dir="rtl">
       <div className="crm-dashboard-title-desktop mb-5 flex max-w-5xl flex-col gap-4 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl"><p className="mb-2 text-xs font-extrabold tracking-wide text-slate-500">{VETERINARY_CLINIC_PROFILE.businessName}</p><h1 className="text-3xl font-black tracking-tight text-[#1A1A3E] sm:text-4xl">מסך ניהול</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">{isEditing ? "סדרי את הווידג׳טים כפי שנוח לך. השינויים נשמרים אוטומטית." : "תמונת מצב יומית של הלקוחות, התורים והפניות במרפאה."}</p></div>
         <button type="button" onClick={() => setIsEditing((current) => !current)} disabled={isLayoutPending || layoutError} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-[#1A1A3E] px-4 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#2A2A5A] focus:outline-none focus:ring-2 focus:ring-[#F2D162] disabled:cursor-not-allowed disabled:opacity-60">{isEditing ? <Check className="h-4 w-4" aria-hidden="true" /> : <LayoutGrid className="h-4 w-4" aria-hidden="true" />}{isEditing ? "סיום" : "התאמה אישית"}</button>

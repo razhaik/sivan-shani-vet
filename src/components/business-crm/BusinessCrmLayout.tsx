@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Appointment, AppointmentRescheduleRequest, BusinessClient, ClientArchive, ContactInquiry, User } from "@/entities";
-import { CrmSidebar, type CrmActiveKey, type CrmInstallAction } from "@/components/business-crm/CrmSidebar";
+import { CrmSidebar, type CrmActiveKey } from "@/components/business-crm/CrmSidebar";
 import CrmMobileNavigation from "@/components/business-crm/CrmMobileNavigation";
 import AppMarketplaceModal from "@/components/business-crm/AppMarketplaceModal";
 import CrmAssistantPanel from "@/components/business-crm/CrmAssistantPanel";
@@ -11,7 +11,9 @@ import { CrmTopbar, type CrmOpenItem } from "@/components/business-crm/CrmTopbar
 import type { CrmProfileUpdate } from "@/components/business-crm/CrmProfileMenu";
 import BusinessCrmContent from "@/components/business-crm/BusinessCrmContent";
 import { CrmContentBoundary } from "@/components/business-crm/CrmContentBoundary";
-import { CrmProvider, crmViewIdentity, type CrmContextValue, type CrmRecord, type CrmView } from "@/components/business-crm/CrmContext";
+import { CrmProvider, crmViewIdentity, type CrmCalendarLaunchRequest, type CrmContextValue, type CrmMobileAppointmentDecisionNotice, type CrmRecord, type CrmView } from "@/components/business-crm/CrmContext";
+import { BentoToastLayer } from "@/components/business-crm/bento-ui";
+import type { AppointmentDecisionAction, AppointmentDecisionResult } from "@/lib/crmAppointmentDecision";
 import type { MarketingView } from "@/components/business-crm/MarketingLayout";
 import { clearCrmAsHomeScreenStart, markCrmAsHomeScreenStart } from "@/lib/crmHomeScreen";
 
@@ -96,6 +98,15 @@ function openItemId(kind: CrmOpenItem["kind"], record: CrmRecord, index: number)
 }
 
 type SortedOpenItem = CrmOpenItem & { order: number };
+
+type PendingMobileAppointmentDecision = {
+  requestId: number;
+  id: string;
+  clientName: string;
+  action: AppointmentDecisionAction;
+  commit: () => Promise<AppointmentDecisionResult>;
+  phase: "undo" | "committing";
+};
 
 function deriveOpenItems(inquiries: CrmRecord[], appointments: CrmRecord[], rescheduleRequests: CrmRecord[]): CrmOpenItem[] {
   const inquiryItems: SortedOpenItem[] = inquiries.filter((record) => inboxLocation(record) === "inbox" && !isHandledRecord(record)).map((record, index) => {
@@ -191,7 +202,7 @@ function viewFromPathname(pathname: string, mobileBaseEntry = false): CrmView {
     if (["automatic", "broadcasts", "sent", "reports"].includes(subview || "")) return { kind: "marketing", subview: subview! };
     return { kind: "marketing", subview: "automatic" };
   }
-  return mobileBaseEntry && segments.length === 0 ? { kind: "sales" } : { kind: "inbox" };
+  return mobileBaseEntry && segments.length === 0 ? { kind: "overview" } : { kind: "inbox" };
 }
 
 function activeKeyForView(view: CrmView): CrmActiveKey {
@@ -219,17 +230,25 @@ function AuthGate() {
 
 export default function BusinessCrmLayout() {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [view, setView] = useState<CrmView>(() => viewFromPathname(location.pathname, typeof window !== "undefined" && window.innerWidth < 768));
   const [user, setUser] = useState<CrmRecord | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileInstallAction, setMobileInstallAction] = useState<CrmInstallAction | null>(null);
-  const registerMobileInstallAction = useCallback((action: CrmInstallAction | null) => setMobileInstallAction(() => action), []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const marketplaceTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [search, setSearch] = useState("");
+  const [calendarLaunchRequest, setCalendarLaunchRequest] = useState<CrmCalendarLaunchRequest | null>(null);
+  const calendarLaunchSequenceRef = useRef(0);
+  const [mobileMoreRequest, setMobileMoreRequest] = useState(0);
+  const [mobileMoreReturnFocusTarget, setMobileMoreReturnFocusTarget] = useState<HTMLButtonElement | null>(null);
+  const [mobileAppointmentDecision, setMobileAppointmentDecision] = useState<CrmMobileAppointmentDecisionNotice | null>(null);
+  const pendingMobileDecisionRef = useRef<PendingMobileAppointmentDecision | null>(null);
+  const mobileDecisionSequenceRef = useRef(0);
+  const mobileDecisionTimerRef = useRef<number | null>(null);
+  const mobileDecisionNoticeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -297,10 +316,115 @@ export default function BusinessCrmLayout() {
     setView(next);
     setSearch("");
     setSidebarOpen(false);
+    if (next.kind !== "calendar") setCalendarLaunchRequest(null);
     if (optionalTargetId && typeof window !== "undefined") {
       const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.getElementById(optionalTargetId)?.scrollIntoView({ behavior, block: "start" })));
     }
+  }, []);
+  const openNewAppointment = useCallback(() => {
+    const requestId = ++calendarLaunchSequenceRef.current;
+    setCalendarLaunchRequest({ requestId, kind: "new" });
+    openView({ kind: "calendar" });
+  }, [openView]);
+  const openAppointmentInCalendar = useCallback((record: CrmRecord) => {
+    const appointmentId = text(record.id);
+    if (!appointmentId) return;
+    const requestId = ++calendarLaunchSequenceRef.current;
+    setCalendarLaunchRequest({ requestId, kind: "appointment", appointmentId, record });
+    openView({ kind: "calendar" });
+  }, [openView]);
+  const consumeCalendarLaunchRequest = useCallback((requestId: number) => {
+    setCalendarLaunchRequest((current) => current?.requestId === requestId ? null : current);
+  }, []);
+  const openMobileMoreMenu = useCallback((trigger?: HTMLButtonElement) => {
+    setMobileMoreReturnFocusTarget(trigger || null);
+    setMobileMoreRequest((current) => current + 1);
+  }, []);
+  const resetMobileDecisionNoticeTimer = useCallback((requestId: number, delay: number) => {
+    if (mobileDecisionNoticeTimerRef.current !== null) window.clearTimeout(mobileDecisionNoticeTimerRef.current);
+    mobileDecisionNoticeTimerRef.current = window.setTimeout(() => {
+      mobileDecisionNoticeTimerRef.current = null;
+      setMobileAppointmentDecision((current) => current?.requestId === requestId ? null : current);
+    }, delay);
+  }, []);
+  const commitMobileAppointmentDecision = useCallback(async (requestId: number) => {
+    const pending = pendingMobileDecisionRef.current;
+    if (!pending || pending.requestId !== requestId || pending.phase !== "undo") return;
+    pending.phase = "committing";
+    mobileDecisionTimerRef.current = null;
+    setMobileAppointmentDecision((current) => current?.requestId === requestId
+      ? { ...current, phase: "committing", message: "שומרת את ההחלטה ומעדכנת את התור..." }
+      : current);
+    try {
+      const result = await pending.commit();
+      if (pendingMobileDecisionRef.current?.requestId !== requestId) return;
+      pendingMobileDecisionRef.current = null;
+      const phase = result.isPartial ? "partial" : "success";
+      setMobileAppointmentDecision({ requestId, id: pending.id, clientName: pending.clientName, action: pending.action, phase, message: result.summary });
+      resetMobileDecisionNoticeTimer(requestId, result.isPartial ? 12000 : 7000);
+    } catch (error) {
+      console.error("Mobile appointment decision failed:", error);
+      if (pendingMobileDecisionRef.current?.requestId !== requestId) return;
+      pendingMobileDecisionRef.current = null;
+      const actionLabel = pending.action === "approve" ? "אישור" : "דחיית";
+      setMobileAppointmentDecision({
+        requestId,
+        id: pending.id,
+        clientName: pending.clientName,
+        action: pending.action,
+        phase: "error",
+        message: `לא הצלחנו לשמור את ${actionLabel} הבקשה. בדקי בתיבת הדואר אם הסטטוס השתנה לפני ניסיון נוסף.`,
+      });
+      void Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["business-crm", "appointments", userCacheKey] }),
+        queryClient.invalidateQueries({ queryKey: ["crm-dashboard-widgets", "appointments", userCacheKey] }),
+        queryClient.invalidateQueries({ queryKey: ["crm-dashboard-widgets", "pending-approvals", userCacheKey] }),
+      ]);
+      resetMobileDecisionNoticeTimer(requestId, 12000);
+    }
+  }, [queryClient, resetMobileDecisionNoticeTimer, userCacheKey]);
+  const scheduleMobileAppointmentDecision = useCallback((record: CrmRecord, action: AppointmentDecisionAction, commit: () => Promise<AppointmentDecisionResult>) => {
+    const id = text(record.id);
+    if (!id || text(record.status).toLowerCase() !== "requested" || text(record.inbox_handled_at) || pendingMobileDecisionRef.current) return false;
+    if (mobileDecisionTimerRef.current !== null) window.clearTimeout(mobileDecisionTimerRef.current);
+    if (mobileDecisionNoticeTimerRef.current !== null) window.clearTimeout(mobileDecisionNoticeTimerRef.current);
+    const requestId = ++mobileDecisionSequenceRef.current;
+    const clientName = text(record.client_name) || "הלקוח/ה";
+    pendingMobileDecisionRef.current = { requestId, id, clientName, action, commit, phase: "undo" };
+    setMobileAppointmentDecision({
+      requestId,
+      id,
+      clientName,
+      action,
+      phase: "undo",
+      message: `הפעולה (${action === "approve" ? "אישור" : "דחייה"}) על התור של ${clientName} תבוצע בעוד 4 שניות.`,
+    });
+    mobileDecisionTimerRef.current = window.setTimeout(() => { void commitMobileAppointmentDecision(requestId); }, 4000);
+    return true;
+  }, [commitMobileAppointmentDecision]);
+  const undoMobileAppointmentDecision = useCallback(() => {
+    const pending = pendingMobileDecisionRef.current;
+    if (!pending || pending.phase !== "undo") return false;
+    pendingMobileDecisionRef.current = null;
+    if (mobileDecisionTimerRef.current !== null) window.clearTimeout(mobileDecisionTimerRef.current);
+    mobileDecisionTimerRef.current = null;
+    if (mobileDecisionNoticeTimerRef.current !== null) window.clearTimeout(mobileDecisionNoticeTimerRef.current);
+    setMobileAppointmentDecision({
+      requestId: pending.requestId,
+      id: pending.id,
+      clientName: pending.clientName,
+      action: pending.action,
+      phase: "undone",
+      message: "הפעולה בוטלה לפני השמירה.",
+    });
+    resetMobileDecisionNoticeTimer(pending.requestId, 2600);
+    return true;
+  }, [resetMobileDecisionNoticeTimer]);
+  useEffect(() => () => {
+    if (mobileDecisionTimerRef.current !== null) window.clearTimeout(mobileDecisionTimerRef.current);
+    if (mobileDecisionNoticeTimerRef.current !== null) window.clearTimeout(mobileDecisionNoticeTimerRef.current);
+    pendingMobileDecisionRef.current = null;
   }, []);
   const openAppMarketplace = useCallback((trigger?: HTMLButtonElement) => {
     marketplaceTriggerRef.current = trigger || null;
@@ -326,14 +450,43 @@ export default function BusinessCrmLayout() {
     isDataLoading: appointmentsQuery.isLoading || inquiriesQuery.isLoading || rescheduleRequestsQuery.isLoading || businessClientsQuery.isLoading || archivedClientsQuery.isLoading,
     isDataFetching: appointmentsQuery.isFetching || inquiriesQuery.isFetching || rescheduleRequestsQuery.isFetching || businessClientsQuery.isFetching || archivedClientsQuery.isFetching,
     dataError: appointmentsQuery.error || inquiriesQuery.error || rescheduleRequestsQuery.error || businessClientsQuery.error || archivedClientsQuery.error || null,
+    inquiriesIsLoading: inquiriesQuery.isLoading,
+    inquiriesError: inquiriesQuery.error || null,
     refreshData,
     notificationCount,
     search,
     setSearch,
     view,
     openView,
-  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, inquiriesQuery.isLoading, notificationCount, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, search, user, userLabel, view]);
+    openNewAppointment,
+    openAppointmentInCalendar,
+    calendarLaunchRequest,
+    consumeCalendarLaunchRequest,
+    openMobileMoreMenu,
+    mobileMoreRequest,
+    mobileAppointmentDecision,
+    scheduleMobileAppointmentDecision,
+    undoMobileAppointmentDecision,
+  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
 
   if (!authReady || !user) return <AuthGate />;
-  return <div id="crm-root" dir="rtl" className="crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]" style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}><CrmSidebar isOpen={sidebarOpen} userName={userLabel} onClose={closeSidebar} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} onRegisterInstallAction={registerMobileInstallAction} activeKey={activeKey} inboxCount={notificationCount} /><div className="min-h-screen lg:mr-[248px]"><CrmTopbar userLabel={userLabel} profileName={text(user?.full_name)} profileEmail={text(user?.email)} profileImageUrl={text(user?.profile_image_url)} onProfileUpdated={handleProfileUpdated} notificationCount={notificationCount} openItems={openItems} search={search} onSearch={setSearch} onOpenSidebar={() => setSidebarOpen(true)} onOpenAssistant={toggleAssistant} assistantOpen={isAssistantOpen} searchPlaceholder={searchCopy.placeholder} searchAriaLabel={searchCopy.ariaLabel} /><main className="crm-main-content mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8"><CrmProvider value={crmContextValue}><CrmContentBoundary viewKey={viewKey}><BusinessCrmContent /></CrmContentBoundary></CrmProvider></main></div><CrmMobileNavigation view={view} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} onAddToHomeScreen={(trigger) => { if (mobileInstallAction) void mobileInstallAction(trigger); }} /><CrmAssistantPanel isOpen={isAssistantOpen} onClose={closeAssistant} />{isMarketplaceOpen && <AppMarketplaceModal onClose={closeAppMarketplace} returnFocusRef={marketplaceTriggerRef} />}</div>;
+  return (
+    <div id="crm-root" dir="rtl" className={`crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]${view.kind === "inbox" ? " crm-bento-inbox" : ""}${view.kind === "overview" ? " crm-bento-home" : ""}${view.kind === "calendar" ? " crm-bento-calendar" : ""}${view.kind === "clients" ? " crm-bento-clients" : ""}${view.kind === "client-details" ? " crm-bento-client-details" : ""}`} style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}>
+      <CrmSidebar isOpen={sidebarOpen} userName={userLabel} onClose={closeSidebar} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} activeKey={activeKey} inboxCount={notificationCount} />
+      <div className="min-h-screen lg:mr-[248px]">
+        <div className="crm-topbar-shell">
+          <CrmTopbar userLabel={userLabel} profileName={text(user?.full_name)} profileEmail={text(user?.email)} profileImageUrl={text(user?.profile_image_url)} onProfileUpdated={handleProfileUpdated} notificationCount={notificationCount} openItems={openItems} search={search} onSearch={setSearch} onOpenSidebar={() => setSidebarOpen(true)} onOpenAssistant={toggleAssistant} assistantOpen={isAssistantOpen} searchPlaceholder={searchCopy.placeholder} searchAriaLabel={searchCopy.ariaLabel} />
+        </div>
+        <main className="crm-main-content mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+          <CrmProvider value={crmContextValue}>
+            <CrmContentBoundary viewKey={viewKey}><BusinessCrmContent /></CrmContentBoundary>
+          </CrmProvider>
+        </main>
+      </div>
+      <CrmMobileNavigation view={view} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} moreOpenRequest={mobileMoreRequest} moreReturnFocusTarget={mobileMoreReturnFocusTarget} />
+      <BentoToastLayer notice={mobileAppointmentDecision} onUndo={undoMobileAppointmentDecision} />
+      <CrmAssistantPanel isOpen={isAssistantOpen} onClose={closeAssistant} />
+      {isMarketplaceOpen && <AppMarketplaceModal onClose={closeAppMarketplace} returnFocusRef={marketplaceTriggerRef} />}
+    </div>
+  );
 }
