@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, CalendarClock, Cat, Check, CheckCircle2, ChevronLeft, Clipboard, Clock3, CreditCard, Dog, Loader2, Mail, MoreHorizontal, PawPrint, Pencil, Phone, Plus, Send, StickyNote } from "lucide-react";
+import { AlertCircle, CalendarClock, Cat, Check, CheckCircle2, ChevronLeft, Clipboard, Clock3, CreditCard, Dog, Loader2, Mail, MessageCircle, MoreHorizontal, PawPrint, Pencil, Phone, Plus, Send, StickyNote } from "lucide-react";
+import { initials as bentoInitials } from "@/components/business-crm/bento-ui";
+import { isValidClientPhone, normalizeClientPhone } from "@/lib/clientAggregation";
 import { ClientReminder } from "@/entities";
 import { ClientEmailComposer } from "@/components/business-crm/ClientEmailComposer";
 import { ClientProfileEditor } from "@/components/business-crm/ClientProfileEditor";
@@ -119,6 +121,69 @@ function PetProfileCard({ pet }: { pet: ClientPet }) {
   </article>;
 }
 
+function shortAppointmentDate(record: CrmRecord | undefined): string {
+  if (!record) return "—";
+  const date = fieldText(record.date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "—";
+  const today = new Date();
+  const key = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (date === key(today)) return "היום";
+  if (date === key(tomorrow)) return "מחר";
+  const [, month, day] = date.split("-");
+  return `${day}.${month}`;
+}
+
+/** Phone-only summary at the top of the client card: who, how many, how to reach. */
+function ClientPhoneHero({ row, canEdit, onEdit, onAddReminder, onAddNote, onMessage }: {
+  row: ClientRow;
+  canEdit: boolean;
+  onEdit: () => void;
+  onAddReminder: () => void;
+  onAddNote: () => void;
+  onMessage: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rawPhone = fieldText(row.mobilePhone) || fieldText(row.phone) || fieldText(row.homePhone);
+  const canonical = normalizeClientPhone(rawPhone)?.replace(/[\s().-]+/g, "") || "";
+  const phone = isValidClientPhone(canonical) ? canonical : "";
+  const next = row.futureAppointments[0];
+  const subtitle = [fieldText(row.city), statusLabel(row.status)].filter(Boolean).join(" · ");
+  const menuAction = (action: () => void) => () => { setMenuOpen(false); action(); };
+
+  return <section className="client-phone-hero" dir="rtl" aria-label={`תקציר ${row.name}`}>
+    <div className="client-phone-hero-top">
+      <span className="client-phone-hero-avatar" aria-hidden="true">{bentoInitials(row.name)}</span>
+      <div className="client-phone-hero-name">
+        <h1 dir="auto">{row.name}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      <div className="client-phone-hero-menu">
+        <button type="button" className="client-phone-hero-more" aria-label="פעולות נוספות" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
+          <MoreHorizontal aria-hidden="true" />
+        </button>
+        {menuOpen && <div className="client-phone-hero-popover" role="menu">
+          <button type="button" role="menuitem" disabled={!canEdit} onClick={menuAction(onEdit)}><Pencil aria-hidden="true" />עריכת תיק הלקוח</button>
+          <button type="button" role="menuitem" onClick={menuAction(onAddReminder)}><Plus aria-hidden="true" />הוספת תזכורת</button>
+          <button type="button" role="menuitem" disabled={!canEdit} onClick={menuAction(onAddNote)}><StickyNote aria-hidden="true" />הוספת הערה</button>
+          <button type="button" role="menuitem" onClick={menuAction(onMessage)}><Send aria-hidden="true" />שליחת אימייל</button>
+        </div>}
+      </div>
+    </div>
+    <div className="client-phone-hero-kpis">
+      <div><b>{row.appointmentCount}</b><span>{row.appointmentCount === 1 ? "תור" : "תורים"}</span></div>
+      <div><b>{row.pets.length}</b><span>{row.pets.length === 1 ? "חיה" : "חיות"}</span></div>
+      <div><b>{shortAppointmentDate(next)}</b><span>תור הבא</span></div>
+    </div>
+    <div className="client-phone-hero-actions">
+      <a className={`is-primary${phone ? "" : " is-disabled"}`} href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone} tabIndex={phone ? 0 : -1}><Phone aria-hidden="true" />חיוג</a>
+      <a className={phone ? "" : "is-disabled"} href={phone ? `https://wa.me/${phone.replace(/^\+/, "")}` : undefined} target="_blank" rel="noopener noreferrer" aria-disabled={!phone} tabIndex={phone ? 0 : -1}><MessageCircle aria-hidden="true" />וואטסאפ</a>
+      <button type="button" onClick={onMessage}><Mail aria-hidden="true" />אימייל</button>
+    </div>
+  </section>;
+}
+
 function IdentityPanel({ row, onEdit, canEdit }: { row: ClientRow; onEdit: () => void; canEdit: boolean }) {
   const mobilePhone = fieldText(row.mobilePhone);
   const primaryPhone = fieldText(row.phone);
@@ -141,12 +206,21 @@ function IdentityPanel({ row, onEdit, canEdit }: { row: ClientRow; onEdit: () =>
         {homePhone && <CopyField label="טלפון בבית" value={homePhone} icon={Phone} href={`tel:${homePhone}`} />}
         {email && <CopyField label="אימייל" value={email} icon={Mail} href={`mailto:${email}`} />}
       </div>
-      {(nationalId || address || city || postalCode) && <div className="mt-4 grid gap-2 border-t border-[#E8EFF0] pt-4 sm:grid-cols-2">
+      {(nationalId || address || city || postalCode) && <div className="client-details-extra-fields mt-4 hidden gap-2 border-t border-[#E8EFF0] pt-4 sm:grid-cols-2 md:grid">
         {nationalId && <ReadOnlyValue label="תעודת זהות" value={nationalId} dir="ltr" />}
         {postalCode && <ReadOnlyValue label="מיקוד" value={postalCode} dir="ltr" />}
         {address && <div className="sm:col-span-2"><ReadOnlyValue label="כתובת" value={address} /></div>}
         {city && <ReadOnlyValue label="עיר" value={city} />}
       </div>}
+      {(nationalId || address || city || postalCode) && <details className="client-details-more md:hidden">
+        <summary>פרטים נוספים</summary>
+        <div className="client-details-more-grid">
+          {nationalId && <ReadOnlyValue label="תעודת זהות" value={nationalId} dir="ltr" />}
+          {postalCode && <ReadOnlyValue label="מיקוד" value={postalCode} dir="ltr" />}
+          {address && <ReadOnlyValue label="כתובת" value={address} />}
+          {city && <ReadOnlyValue label="עיר" value={city} />}
+        </div>
+      </details>}
       {additionalFields.length > 0 && <section className="mt-4 rounded-2xl border border-[#D9E5F4] bg-[#F7F9FF] p-3.5" aria-labelledby="client-imported-fields-heading"><div><h3 id="client-imported-fields-heading" className="text-xs font-black text-[#152E4D]">פרטים נוספים מהייבוא</h3><p className="mt-1 text-[10px] font-medium leading-5 text-[#33447A]">עמודות נוספות שנשמרו בתיק הלקוח.</p></div><dl className="mt-3 space-y-2">{additionalFields.map((field, index) => <div key={`${field.key || field.label}-${index}`} className="rounded-xl border border-[#E8EFF0] bg-white px-3 py-2.5"><dt className="text-[10px] font-extrabold text-slate-400">{fieldText(field.label) || "עמודה נוספת"}</dt><dd dir="auto" className="mt-1 break-words text-xs font-bold leading-5 text-[#152E4D]">{fieldText(field.value)}</dd></div>)}</dl></section>}
       <dl className="mt-4 space-y-3 border-t border-[#E8EFF0] pt-4 text-xs"><div className="flex items-center justify-between gap-3"><dt className="font-bold text-slate-400">מקור הרשומה</dt><dd className="max-w-[65%] truncate text-left font-extrabold text-slate-500">{row.importSource || "תורים שנשמרו"}</dd></div><div className="flex items-center justify-between gap-3"><dt className="font-bold text-slate-400">הסכמת SMS</dt><dd className="font-extrabold text-slate-500">{row.smsConsent ? "נשמרה עם נוסח" : "לא נשמרה"}</dd></div></dl>
     </section>
@@ -385,6 +459,7 @@ export function ClientDetailsView({ row, businessClients, staffName, onBack, onS
   };
 
   return <div className="client-details-view" dir="rtl">
+    <ClientPhoneHero row={row} canEdit={canEdit} onEdit={() => openEditor()} onAddReminder={() => { setFeedback(null); setReminderComposerOpen(true); }} onAddNote={() => openEditor("notes")} onMessage={() => { setFeedback(null); setEmailComposerOpen(true); }} />
     <div className="client-details-breadcrumb mb-5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500"><button type="button" onClick={onBack} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[#5267A8] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#F2D162]"><ChevronLeft className="h-4 w-4 rotate-180" />לקוחות</button><span>/</span><span className="truncate text-[#152E4D]">{row.name}</span></div>
     <div className="client-details-actions mb-5 flex flex-wrap items-center gap-2"><EditButton onEdit={openEditor} disabled={!canEdit} /><ActionButton onClick={() => { setFeedback(null); setReminderComposerOpen(true); }}><Plus className="h-4 w-4" />הוספת תזכורת</ActionButton><ActionButton onClick={() => openEditor("notes")} disabled={!canEdit} title={!canEdit ? "הערה לתיק זמינה לאחר יצירת רשומת לקוח" : "פתיחת הערה קבועה לתיק"}><StickyNote className="h-4 w-4" />הוספת הערה</ActionButton><SoonButton><CreditCard className="h-4 w-4" />חיוב לקוח</SoonButton><ActionButton onClick={() => { setFeedback(null); setEmailComposerOpen(true); }}><Send className="h-4 w-4" />שליחת הודעה</ActionButton><SoonButton><MoreHorizontal className="h-4 w-4" />אפשרויות נוספות</SoonButton><SoonButton primary><StickyNote className="h-4 w-4" />בחירת פעולה</SoonButton></div>
     {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} aria-live="polite" className={`client-details-feedback mb-5 flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm font-bold ${profileFeedbackTone(feedback.kind)}`}><span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-current" /><p>{feedback.text}</p></div>}

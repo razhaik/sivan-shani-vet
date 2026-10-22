@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Bell, CalendarDays, Check, Clock3, List, MessageCircle, PawPrint, Plus, Search, X, Phone, Users } from "lucide-react";
+import { ArrowLeft, BarChart3, Bell, CalendarDays, Check, Clock3, List, MessageCircle, PawPrint, Plus, Search, X, Phone, Users } from "lucide-react";
 import type { CrmRecord, CrmMobileAppointmentDecisionNotice } from "@/components/business-crm/CrmContext";
 import type { AppointmentDecisionAction } from "@/lib/crmAppointmentDecision";
 import type { DashboardClientSummary } from "@/lib/crmDashboardData";
@@ -189,8 +189,9 @@ export function DashboardPage({
     () => summarizeDashboardAppointments(data.appointments, today),
     [data.appointments, today],
   );
-  const monthDelta = monthSummary.previousCount > 0
-    ? Math.round(((monthSummary.currentCount - monthSummary.previousCount) / monthSummary.previousCount) * 100)
+  // Compare like with like: this month so far vs. the same days last month.
+  const monthDelta = monthSummary.previousToDateCount > 0
+    ? Math.round(((monthSummary.currentToDateCount - monthSummary.previousToDateCount) / monthSummary.previousToDateCount) * 100)
     : null;
   const decisionBusy = Boolean(decisionNotice && ["undo", "committing"].includes(decisionNotice.phase));
   const minutesUntilNext = nextAppointment ? (timeMinutes(nextAppointment.start_time) ?? clock.minutes) - clock.minutes : null;
@@ -340,14 +341,14 @@ export function DashboardPage({
             <span>לקוחות פעילים</span>
           </button>
           <button type="button" className="tile lav press" onClick={actions.onOpenSales}>
-            <span className="ico"><CalendarDays aria-hidden="true" /></span>
+            <span className="ico"><BarChart3 aria-hidden="true" /></span>
             <b>{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(monthSummary.currentCount)}</b>
-            <span>החודש{monthDelta !== null && <span className="trend"> · {monthDelta >= 0 ? "↑" : "↓"} {Math.abs(monthDelta)}%</span>}</span>
+            <span>החודש{monthDelta !== null && <span className="trend" aria-label={`${monthDelta >= 0 ? "עלייה" : "ירידה"} של ${Math.abs(monthDelta)}% מול אותם ימים בחודש הקודם`}> · <span className="ltr" dir="ltr">{monthDelta >= 0 ? "↑" : "↓"}{Math.abs(monthDelta)}%</span></span>}</span>
           </button>
-          <button type="button" className="tile sun press" onClick={actions.onOpenInbox}>
+          <button type="button" className={`tile ${newInquiries.length > 0 || inquiriesState.isLoading || inquiriesState.error ? "sun" : "idle"} press`} onClick={actions.onOpenInbox}>
             <span className="ico"><MessageCircle aria-hidden="true" /></span>
             <b>{inquiriesState.isLoading || inquiriesState.error ? "—" : formatCount(newInquiries.length)}</b>
-            <span>{newInquiries.length === 1 ? "פנייה חדשה" : "פניות חדשות"}</span>
+            <span>{newInquiries.length === 0 && !inquiriesState.isLoading && !inquiriesState.error ? "אין פניות חדשות" : newInquiries.length === 1 ? "פנייה חדשה" : "פניות חדשות"}</span>
           </button>
         </div>
 
@@ -385,8 +386,9 @@ export function DashboardPage({
   );
 }
 
-const CALENDAR_HOUR_HEIGHT = 74;
-const CALENDAR_EVENT_MIN_HEIGHT = 56;
+// 96px per hour: a 20-minute visit is 32px tall, so back-to-back visits sit in one column.
+const CALENDAR_HOUR_HEIGHT = 96;
+const CALENDAR_EVENT_MIN_HEIGHT = 44;
 
 function calendarClockLabel(minutes: number): string {
   const normalized = ((Math.round(minutes) % 1440) + 1440) % 1440;
@@ -518,25 +520,27 @@ export function CalendarPage({
   const durationHours = Math.floor(totalMinutes / 60);
   const durationRemainder = totalMinutes % 60;
   const durationLabel = durationHours > 0
-    ? `${formatCount(durationHours)} שע׳${durationRemainder > 0 ? ` ${formatCount(durationRemainder)} דק׳` : ""}`
+    ? `${durationHours}:${String(durationRemainder).padStart(2, "0")} שע׳`
     : `${formatCount(durationRemainder)} דק׳`;
 
+  // The timeline hugs the day's appointments: one hour of air before the first and after the last,
+  // never less than four hours tall. "Now" is drawn only when it falls inside that window.
   const timelineBounds = useMemo(() => {
-    const eventStarts = timedAppointments.map((event) => event.startMinutes);
-    const eventEnds = timedAppointments.map((event) => event.endMinutes);
-    if (isSelectedDayToday) eventStarts.push(clock.minutes);
-    if (isSelectedDayToday) eventEnds.push(clock.minutes);
-    const firstMinute = eventStarts.length > 0 ? Math.min(...eventStarts) : 8 * 60;
-    const lastMinute = eventEnds.length > 0 ? Math.max(...eventEnds) : 20 * 60;
-    const startHour = Math.max(0, Math.min(8, Math.floor(firstMinute / 60)));
-    const suggestedEndHour = Math.ceil(lastMinute / 60) + (lastMinute > 20 * 60 ? 1 : 0);
-    const endHour = Math.min(24, Math.max(20, suggestedEndHour));
-    return { startHour, endHour: Math.max(startHour + 1, endHour) };
-  }, [clock.minutes, isSelectedDayToday, timedAppointments]);
+    if (timedAppointments.length === 0) return { startHour: 8, endHour: 20 };
+    const firstMinute = Math.min(...timedAppointments.map((event) => event.startMinutes));
+    const lastMinute = Math.max(...timedAppointments.map((event) => event.visualEndMinutes));
+    let startHour = Math.max(0, Math.floor(firstMinute / 60) - 1);
+    let endHour = Math.min(24, Math.ceil(lastMinute / 60) + 1);
+    if (endHour - startHour < 4) {
+      endHour = Math.min(24, startHour + 4);
+      startHour = Math.max(0, endHour - 4);
+    }
+    return { startHour, endHour };
+  }, [timedAppointments]);
 
   const hourCount = timelineBounds.endHour - timelineBounds.startHour;
   const timelineHeight = hourCount * CALENDAR_HOUR_HEIGHT;
-  const hours = Array.from({ length: hourCount }, (_, index) => timelineBounds.startHour + index);
+  const hours = Array.from({ length: hourCount + 1 }, (_, index) => timelineBounds.startHour + index);
   const nowOffset = (clock.minutes - timelineBounds.startHour * 60) * (CALENDAR_HOUR_HEIGHT / 60);
   const showNowLine = isSelectedDayToday && nowOffset >= 0 && nowOffset <= timelineHeight;
   const noVisibleAppointments = dayAppointments.length === 0;
@@ -653,8 +657,9 @@ export function CalendarPage({
                   <>
                     <div className="calendar-timeline-scroll" aria-label="ציר שעות היום">
                       <div className="calendar-timeline-layout" style={{ "--calendar-hour-height": `${CALENDAR_HOUR_HEIGHT}px` } as CSSProperties}>
-                        <div className="calendar-time-rail" aria-hidden="true">
-                          {hours.map((hour) => <div className="hour-label" key={hour} style={{ height: `${CALENDAR_HOUR_HEIGHT}px` }}><span className="ltr" dir="ltr">{String(hour).padStart(2, "0")}:00</span></div>)}
+                        <div className="calendar-time-rail" aria-hidden="true" style={{ height: `${timelineHeight}px` }}>
+                          {hours.map((hour, index) => <span className="hour-label ltr" dir="ltr" key={hour} style={{ top: `${index * CALENDAR_HOUR_HEIGHT}px` }}>{String(hour).padStart(2, "0")}:00</span>)}
+                          {showNowLine && <time className="now-label ltr" dir="ltr" style={{ top: `${nowOffset}px` }}>{clock.label}</time>}
                         </div>
                         <div className="tl" style={{ height: `${timelineHeight}px` }} role="list" aria-label="תורים לפי שעה">
                           {hours.map((hour, index) => <div className="hr" key={hour} style={{ top: `${index * CALENDAR_HOUR_HEIGHT}px` }} aria-hidden="true" />)}
@@ -671,7 +676,7 @@ export function CalendarPage({
                                 type="button"
                                 role="listitem"
                                 key={String(event.record.id ?? `${event.record.date}-${event.record.start_time}-${clientName}`)}
-                                className={`ev ${kindClass}`}
+                                className={`ev ${kindClass}${height < 64 ? " is-compact" : ""}`}
                                 style={{
                                   top: `${top}px`,
                                   height: `${height}px`,
@@ -691,9 +696,7 @@ export function CalendarPage({
                             );
                           })}
                           {showNowLine && (
-                            <div className="now" style={{ top: `${nowOffset}px` }} role="note" aria-label={`השעה עכשיו ${clock.label}`}>
-                              <span className="now-label"><time className="ltr" dir="ltr">{clock.label}</time><span>עכשיו</span></span>
-                            </div>
+                            <div className="now" style={{ top: `${nowOffset}px` }} role="note" aria-label={`השעה עכשיו ${clock.label}`} />
                           )}
                         </div>
                       </div>
