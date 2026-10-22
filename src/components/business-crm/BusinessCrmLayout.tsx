@@ -439,6 +439,7 @@ export default function BusinessCrmLayout() {
   const viewKey = crmViewIdentity(view);
   const crmContextValue = useMemo<CrmContextValue>(() => ({
     user: user as CrmRecord,
+    updateUserProfile: handleProfileUpdated,
     userLabel,
     appointments,
     inquiries,
@@ -467,7 +468,7 @@ export default function BusinessCrmLayout() {
     mobileAppointmentDecision,
     scheduleMobileAppointmentDecision,
     undoMobileAppointmentDecision,
-  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
+  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, handleProfileUpdated, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
 
   if (!authReady || !user) return <AuthGate />;
   return (

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, BarChart3, Bell, CalendarDays, Check, Clock3, List, MessageCircle, PawPrint, Plus, Search, X, Phone, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Clock3, List, PawPrint, Plus, Search, Settings, X, Phone } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ProfileAvatar } from "@/components/business-crm/CrmProfileAvatar";
+import { CrmProfileMenu, type CrmProfileUpdate } from "@/components/business-crm/CrmProfileMenu";
 import type { CrmRecord, CrmMobileAppointmentDecisionNotice } from "@/components/business-crm/CrmContext";
 import type { AppointmentDecisionAction } from "@/lib/crmAppointmentDecision";
 import type { DashboardClientSummary } from "@/lib/crmDashboardData";
@@ -41,6 +44,9 @@ export interface DashboardHomeData {
     name: string;
     shortName: string;
     subtitle: string;
+    fullName?: string;
+    email?: string;
+    imageUrl?: string;
   };
 }
 
@@ -49,6 +55,7 @@ export interface DashboardHomeActions {
   onOpenInbox: () => void;
   onOpenSales: () => void;
   onOpenMore: (trigger?: HTMLButtonElement) => void;
+  onProfileUpdated?: (updates: CrmProfileUpdate) => void;
   onNewAppointment: () => void;
   onOpenAppointment: (record: CrmRecord) => void;
   onCheckIn: (record: CrmRecord) => Promise<void>;
@@ -123,7 +130,6 @@ export function DashboardPage({
   actions,
   appointmentState,
   pendingState,
-  clientsState,
   inquiriesState,
   notificationCount,
   decisionNotice,
@@ -135,6 +141,8 @@ export function DashboardPage({
   const [arrivalFeedback, setArrivalFeedback] = useState<{ id: string; tone: "success" | "error"; message: string } | null>(null);
   const [arrivalSaving, setArrivalSaving] = useState(false);
   const arrivalLockRef = useRef<string | null>(null);
+  const profileButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const clock = clinicNowTime(now);
 
   useEffect(() => {
@@ -238,28 +246,54 @@ export function DashboardPage({
 
   return (
     <motion.div
-      className="bn"
+      className="bn bn-home"
       dir="rtl"
       initial={reducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={reducedMotion ? { duration: 0 } : { duration: 0.34, ease: [0.2, 0.7, 0.2, 1] }}
     >
       <div className="wrap">
-        <header className="hdr">
-          <button type="button" className="av press" aria-label="פתיחת אזורי ניהול נוספים" onClick={(event) => actions.onOpenMore(event.currentTarget)}>{initials(data.profile.name)}</button>
-          <div className="t">
-            <small>{formatDashboardDate(today, { weekday: "long", day: "numeric", month: "long" })}</small>
-            <b>שלום, {data.profile.shortName}</b>
+        <header className="hero-band">
+          <div className="hdr">
+            <button
+              ref={profileButtonRef}
+              type="button"
+              className="av press"
+              aria-label="האזור האישי שלי"
+              aria-haspopup="dialog"
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((open) => !open)}
+            >
+              <ProfileAvatar name={data.profile.fullName || data.profile.name} imageUrl={data.profile.imageUrl} className="h-full w-full" fallbackClassName="text-[14px]" imageWidth={96} />
+            </button>
+            <div className="t">
+              <small>{formatDashboardDate(today, { weekday: "long", day: "numeric", month: "long" })}</small>
+              <b>שלום, {data.profile.shortName}</b>
+            </div>
+            <button
+              type="button"
+              className="round settings press"
+              aria-label="הגדרות וסביבת הניהול"
+              onClick={(event) => actions.onOpenMore(event.currentTarget)}
+            >
+              <Settings aria-hidden="true" />
+            </button>
           </div>
-          <button
-            type="button"
-            className="round press"
-            aria-label={notificationCount > 0 ? `פתיחת תיבת הדואר, ${notificationCount} פריטים פתוחים` : "פתיחת תיבת הדואר"}
-            onClick={actions.onOpenInbox}
-          >
-            <Bell aria-hidden="true" />
-            {newInquiries.length > 0 && <i aria-hidden="true" />}
-          </button>
+
+          <div className="hero-stats" aria-label="סיכום המרפאה">
+            <button type="button" className="press" onClick={() => actions.onNavigate("calendar")}>
+              <b className="ltr" dir="ltr">{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(todaysAppointments.length)}</b>
+              <span>תורים היום</span>
+            </button>
+            <button type="button" className="press" onClick={actions.onOpenSales}>
+              <b className="ltr" dir="ltr">{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(monthSummary.currentCount)}</b>
+              <span>החודש{monthDelta !== null && <span className="trend" aria-label={`${monthDelta >= 0 ? "עלייה" : "ירידה"} של ${Math.abs(monthDelta)}% מול אותם ימים בחודש הקודם`}> · <em className={`ltr${monthDelta < 0 ? " down" : ""}`} dir="ltr">{monthDelta >= 0 ? "+" : "−"}{Math.abs(monthDelta)}%</em></span>}</span>
+            </button>
+            <button type="button" className="press" onClick={actions.onOpenInbox}>
+              <b className="ltr" dir="ltr">{inquiriesState.isLoading || inquiriesState.error ? "—" : formatCount(newInquiries.length)}</b>
+              <span>{newInquiries.length === 1 ? "פנייה חדשה" : "פניות חדשות"}</span>
+            </button>
+          </div>
         </header>
 
         {appointmentState.isLoading
@@ -269,22 +303,22 @@ export function DashboardPage({
             : nextAppointment
               ? (
                 <section className="next" aria-label={nextAppointmentInProgress ? "התור הנוכחי" : "התור הבא"}>
-                  <span className="lbl">{nextAppointmentInProgress ? "התור הנוכחי" : "התור הבא"}</span>
+                  <span className="lbl">{nextAppointmentInProgress ? "התור הנוכחי" : "התור הבא"} · <span className="ltr" dir="ltr">{String(nextAppointment.start_time ?? "").slice(0, 5)}</span></span>
                   <span className="who" dir="auto">{String(nextAppointment.client_name ?? "שם הלקוח לא צוין")}{nextAppointment.pet_name ? ` · ${String(nextAppointment.pet_name)}` : ""}</span>
-                  <span className="what">{String(nextAppointment.appointment_type ?? "סוג טיפול לא צוין")} · <TimeRange start={nextAppointment.start_time} end={nextAppointment.end_time} /></span>
+                  <span className="what">{String(nextAppointment.appointment_type ?? "סוג טיפול לא צוין")}<span className="what-time"> · <TimeRange start={nextAppointment.start_time} end={nextAppointment.end_time} /></span></span>
                   <div className="cd" aria-label={nextAppointmentInProgress ? "התור הנוכחי מתנהל כעת" : minutesUntilNext !== null && minutesUntilNext < 60 ? `עוד ${Math.max(0, minutesUntilNext)} דקות` : `בשעה ${String(nextAppointment.start_time ?? "").slice(0, 5)}`}>
                     {nextAppointmentInProgress
-                      ? <><b className="time">כעת</b><span>בתור</span></>
+                      ? <span>מתנהל כעת</span>
                       : minutesUntilNext !== null && minutesUntilNext < 60
-                        ? <><b>{Math.max(0, minutesUntilNext)}</b><span>דקות</span></>
-                        : <><b className="time ltr" dir="ltr">{String(nextAppointment.start_time ?? "").slice(0, 5)}</b><span>היום</span></>}
+                        ? <span>בעוד {Math.max(0, minutesUntilNext)} דק׳</span>
+                        : <span>היום</span>}
                   </div>
                   <div className="bar">
                     <a href={nextAppointment.phone ? `tel:${String(nextAppointment.phone).trim()}` : undefined} aria-disabled={!nextAppointment.phone} tabIndex={nextAppointment.phone ? 0 : -1}>
-                      <Phone aria-hidden="true" />התקשר
+                      <Phone aria-hidden="true" />התקשרות
                     </a>
                     <button type="button" className="gold" onClick={() => void handleCheckIn()} disabled={arrived || arrivalSaving} aria-label={arrived ? "ההגעה כבר סומנה" : nextAppointmentInProgress ? "סימון שהלקוח הגיע במהלך התור" : "סימון שהלקוח הגיע לתור"}>
-                      {arrived ? <Check aria-hidden="true" /> : <Check aria-hidden="true" />}
+                      <Check aria-hidden="true" />
                       {arrived ? "הגיע/ה ✓" : arrivalSaving ? "שומרת..." : "הגיע/ה"}
                     </button>
                   </div>
@@ -329,29 +363,6 @@ export function DashboardPage({
           </section>
         )}
 
-        <div className="bento" aria-label="סיכום המרפאה">
-          <button type="button" className="tile blue press" onClick={() => actions.onNavigate("calendar")}>
-            <span className="ico"><CalendarDays aria-hidden="true" /></span>
-            <b>{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(todaysAppointments.length)}</b>
-            <span>תורים היום</span>
-          </button>
-          <button type="button" className="tile mint press" onClick={() => actions.onNavigate("clients")}>
-            <span className="ico"><Users aria-hidden="true" /></span>
-            <b>{clientsState.isLoading || clientsState.error ? "—" : formatCount(data.clients.length)}</b>
-            <span>לקוחות פעילים</span>
-          </button>
-          <button type="button" className="tile lav press" onClick={actions.onOpenSales}>
-            <span className="ico"><BarChart3 aria-hidden="true" /></span>
-            <b>{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(monthSummary.currentCount)}</b>
-            <span>החודש{monthDelta !== null && <span className="trend" aria-label={`${monthDelta >= 0 ? "עלייה" : "ירידה"} של ${Math.abs(monthDelta)}% מול אותם ימים בחודש הקודם`}> · <span className="ltr" dir="ltr">{monthDelta >= 0 ? "↑" : "↓"}{Math.abs(monthDelta)}%</span></span>}</span>
-          </button>
-          <button type="button" className={`tile ${newInquiries.length > 0 || inquiriesState.isLoading || inquiriesState.error ? "sun" : "idle"} press`} onClick={actions.onOpenInbox}>
-            <span className="ico"><MessageCircle aria-hidden="true" /></span>
-            <b>{inquiriesState.isLoading || inquiriesState.error ? "—" : formatCount(newInquiries.length)}</b>
-            <span>{newInquiries.length === 0 && !inquiriesState.isLoading && !inquiriesState.error ? "אין פניות חדשות" : newInquiries.length === 1 ? "פנייה חדשה" : "פניות חדשות"}</span>
-          </button>
-        </div>
-
         <div className="sec">
           <h2>השבוע</h2>
           <button type="button" onClick={() => actions.onNavigate("calendar")}>ליומן <ArrowLeft aria-hidden="true" /></button>
@@ -375,6 +386,20 @@ export function DashboardPage({
                 ))}
               </div>}
       </div>
+
+      {profileOpen && typeof document !== "undefined" && createPortal(
+        <CrmProfileMenu
+          isOpen
+          anchorRef={profileButtonRef}
+          profile={{ fullName: data.profile.fullName || "", email: data.profile.email || "", imageUrl: data.profile.imageUrl }}
+          onClose={(restoreFocus = true) => {
+            setProfileOpen(false);
+            if (restoreFocus) window.requestAnimationFrame(() => profileButtonRef.current?.focus());
+          }}
+          onProfileUpdated={(updates) => actions.onProfileUpdated?.(updates)}
+        />,
+        document.body,
+      )}
 
       <BentoDock
         active="dashboard"

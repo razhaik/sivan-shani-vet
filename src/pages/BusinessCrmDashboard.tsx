@@ -77,6 +77,7 @@ export default function BusinessCrmDashboard() {
     openNewAppointment,
     openAppointmentInCalendar,
     openMobileMoreMenu,
+    updateUserProfile,
     mobileAppointmentDecision,
     scheduleMobileAppointmentDecision,
   } = useCrmContext();
@@ -306,6 +307,9 @@ export default function BusinessCrmDashboard() {
       name: VETERINARY_CLINIC_PROFILE.shortName,
       shortName: "ד״ר סיון",
       subtitle: "מרפאה וטרינרית · נס ציונה",
+      fullName: String(user?.full_name ?? "").trim(),
+      email: String(user?.email ?? "").trim(),
+      imageUrl: String(user?.profile_image_url ?? "").trim() || undefined,
     },
   };
   const mobileHomeActions: DashboardHomeActions = {
@@ -318,6 +322,7 @@ export default function BusinessCrmDashboard() {
     onOpenInbox: () => openView({ kind: "inbox" }),
     onOpenSales: () => openView({ kind: "sales" }),
     onOpenMore: openMobileMoreMenu,
+    onProfileUpdated: updateUserProfile,
     onNewAppointment: openNewAppointment,
     onOpenAppointment: openAppointmentInCalendar,
     onCheckIn,

@@ -5110,3 +5110,690 @@
     color: #a7aac4 !important;
   }
 }
+
+/* ===================================================================
+   Management home 2026-10 — yellow hero band, calm white content.
+   Scoped to .bn-home so the calendar / clients pages keep their look.
+   =================================================================== */
+.bn.bn-home {
+  --home-band-1: #f7d97a;
+  --home-band-2: #efc85a;
+  --home-band-ink: #1c1f45;
+  --home-band-muted: rgba(28, 31, 69, 0.64);
+  --home-surface: #ffffff;
+  --home-line: #eeede8;
+  --home-soft: #f3f2ee;
+  --home-chip: #fbefc6;
+  --home-chip-ink: #7a5a00;
+  background: #f6f5f1;
+}
+
+.bn.bn-home .wrap {
+  gap: 0;
+  padding-top: 0;
+}
+
+/* --- band ---------------------------------------------------------- */
+.bn.bn-home .hero-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 -16px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 72px;
+  border-radius: 0 0 32px 32px;
+  background: linear-gradient(160deg, var(--home-band-1) 0%, var(--home-band-2) 100%);
+  color: var(--home-band-ink);
+}
+
+.bn.bn-home .hero-band::before,
+.bn.bn-home .hero-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.bn.bn-home .hero-band::after {
+  inset-inline-end: -90px;
+  top: -110px;
+  width: 260px;
+  height: 260px;
+}
+
+.bn.bn-home .hero-band::before {
+  inset-inline-end: 40px;
+  top: 120px;
+  width: 140px;
+  height: 140px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bn.bn-home .hero-band .hdr {
+  padding: 4px 0 0;
+}
+
+.bn.bn-home .hero-band .hdr .av {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--home-band-ink);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.bn.bn-home .hero-band .hdr .t small {
+  color: var(--home-band-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.bn.bn-home .hero-band .hdr .t b {
+  color: var(--home-band-ink);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.bn.bn-home .hero-band .round.settings {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--home-band-ink);
+  font-size: 20px;
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.bn.bn-home .hero-band .round.settings:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.bn.bn-home .hero-band button:focus-visible {
+  outline-color: var(--home-band-ink);
+}
+
+.bn.bn-home .hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 22px;
+}
+
+.bn.bn-home .hero-stats button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 0;
+  color: var(--home-band-ink);
+  text-align: start;
+}
+
+.bn.bn-home .hero-stats button + button {
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid rgba(28, 31, 69, 0.13);
+}
+
+.bn.bn-home .hero-stats b {
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+}
+
+.bn.bn-home .hero-stats span {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--home-band-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn.bn-home .hero-stats em {
+  color: #1f6b45;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.bn.bn-home .hero-stats em.down {
+  color: #a3302b;
+}
+
+/* --- next appointment: white card lifted onto the band ------------- */
+.bn.bn-home .next,
+.bn.bn-home .wrap > .empty:nth-child(2) {
+  position: relative;
+  z-index: 1;
+  margin-top: -52px;
+}
+
+.bn.bn-home .next {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 16px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--home-surface);
+  color: var(--ink);
+  box-shadow: 0 18px 36px -22px rgba(60, 45, 0, 0.45);
+}
+
+.bn.bn-home .next .lbl {
+  grid-row: 1;
+  grid-column: 1;
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bn.bn-home .next .who {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 19px;
+}
+
+.bn.bn-home .next .what {
+  grid-column: 1 / -1;
+  color: var(--ink2);
+}
+
+.bn.bn-home .next .what .what-time {
+  display: none;
+}
+
+.bn.bn-home .next .cd {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: center;
+  min-width: 0;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--home-chip);
+}
+
+.bn.bn-home .next .cd span {
+  margin: 0;
+  color: var(--home-chip-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bn.bn-home .next .bar {
+  margin-top: 12px;
+}
+
+.bn.bn-home .next .bar a,
+.bn.bn-home .next .bar button {
+  min-height: 44px;
+  border-radius: 13px;
+  background: var(--home-soft);
+  color: var(--ink);
+}
+
+.bn.bn-home .next .bar a:hover,
+.bn.bn-home .next .bar button:hover:not(:disabled) {
+  background: #ebe9e3;
+}
+
+.bn.bn-home .next .bar .gold,
+.bn.bn-home .next .bar .gold:hover:not(:disabled) {
+  background: var(--home-band-ink);
+  color: #ffffff;
+}
+
+.bn.bn-home .next .arrival-feedback {
+  grid-column: 1 / -1;
+}
+
+.bn.bn-home .wrap > .empty:nth-child(2) {
+  background: var(--home-surface);
+  border-radius: 22px;
+  box-shadow: 0 18px 36px -22px rgba(60, 45, 0, 0.45);
+}
+
+/* --- pending approvals: quiet list --------------------------------- */
+.bn.bn-home .reqs {
+  margin-top: 24px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+}
+
+.bn.bn-home .reqs h3 {
+  margin: 0 6px 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bn.bn-home .reqs h3 em {
+  border-radius: 999px;
+  background: var(--home-chip);
+  color: var(--home-chip-ink);
+}
+
+.bn.bn-home .reqs .rq {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--home-line);
+  border-radius: 0;
+  background: var(--home-surface);
+}
+
+.bn.bn-home .reqs .rq:first-of-type {
+  border-radius: 20px 20px 0 0;
+}
+
+.bn.bn-home .reqs .rq:last-of-type {
+  border-radius: 0 0 20px 20px;
+}
+
+.bn.bn-home .reqs .rq:only-of-type {
+  border-radius: 20px;
+}
+
+.bn.bn-home .reqs .rq + .rq {
+  border-top: 0;
+}
+
+.bn.bn-home .reqs .rq .n {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.bn.bn-home .reqs .no {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 10px;
+  background: var(--home-soft);
+}
+
+.bn.bn-home .reqs .yes {
+  min-height: 36px;
+  border-radius: 10px;
+  background: var(--home-band-ink);
+}
+
+.bn.bn-home .reqs .more-requests {
+  margin-top: 8px;
+}
+
+/* --- section headings & lists below -------------------------------- */
+.bn.bn-home .sec {
+  margin-top: 24px;
+  margin-bottom: 10px;
+  padding-inline: 6px;
+}
+
+.bn.bn-home .sec h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bn.bn-home .sec button {
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bn.bn-home .home-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bn.bn-home {
+    --home-band-1: #e8c766;
+    --home-band-2: #d9b14a;
+    --home-surface: var(--card);
+    --home-line: var(--line);
+    --home-soft: rgba(255, 255, 255, 0.07);
+    --home-chip: rgba(242, 203, 115, 0.16);
+    --home-chip-ink: #f2cb73;
+    background: var(--bg);
+  }
+
+  .bn.bn-home .next {
+    box-shadow: 0 18px 36px -22px rgba(0, 0, 0, 0.8);
+  }
+
+  .bn.bn-home .next .bar a:hover,
+  .bn.bn-home .next .bar button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .bn.bn-home .next .bar .gold,
+  .bn.bn-home .reqs .yes {
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+}
+
+@media (max-width: 360px) {
+  .bn.bn-home .hero-band {
+    margin-inline: -12px;
+    padding-inline: 16px;
+  }
+
+  .bn.bn-home .hero-stats b {
+    font-size: 26px;
+  }
+}
+
+/* ===================================================================
+   Inbox "needs attention" as a card deck (phone only — the section is
+   hidden on desktop by the .crm-inbox-attention-tray gate above).
+   =================================================================== */
+.crm-attention-deck-section {
+  --deck-ink: #1c1f45;
+  --deck-ink2: #3a3d46;
+  --deck-muted: #7b7f8a;
+  --deck-line: #e9e8e4;
+  --deck-soft: #f1f0ec;
+  --deck-card: #ffffff;
+  font-family: Heebo, Assistant, sans-serif;
+}
+
+.crm-attention-deck-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.crm-attention-deck-head h2 {
+  margin: 0;
+  color: var(--deck-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.crm-attention-deck-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #e5484d;
+}
+
+.crm-attention-deck-count {
+  min-width: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fbefc6;
+  color: #7a5a00;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.crm-attention-deck-position {
+  margin-inline-start: auto;
+  color: var(--deck-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-attention-deck {
+  margin-top: 12px;
+}
+
+.crm-attention-deck-stack {
+  position: relative;
+}
+
+.crm-attention-card {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--deck-line);
+  border-radius: 18px;
+  background: var(--deck-card);
+  color: var(--deck-ink);
+  text-align: right;
+  box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.35);
+}
+
+.crm-attention-card-front {
+  position: relative;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.crm-attention-card-front:active {
+  cursor: grabbing;
+}
+
+.crm-attention-card-behind {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  overflow: hidden;
+  transform-origin: 50% 0;
+  cursor: pointer;
+}
+
+.crm-attention-card-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.crm-attention-card-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--deck-soft);
+  color: var(--deck-ink2);
+}
+
+.crm-attention-card-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.crm-attention-card-kind {
+  margin: 0;
+  color: var(--deck-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crm-attention-card-name {
+  overflow: hidden;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-attention-card-time {
+  flex-shrink: 0;
+  color: var(--deck-ink2);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-attention-card-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--deck-line);
+  border-radius: 12px;
+}
+
+.crm-attention-card-details > div {
+  min-width: 0;
+  padding: 9px 12px;
+  border-top: 1px solid var(--deck-line);
+}
+
+.crm-attention-card-details > div:nth-child(-n + 2) {
+  border-top: 0;
+}
+
+.crm-attention-card-details > div:nth-child(odd) {
+  border-left: 1px solid var(--deck-line);
+}
+
+.crm-attention-card-details > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  border-left: 0;
+}
+
+.crm-attention-card-details dt {
+  color: var(--deck-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.crm-attention-card-details dd {
+  margin: 1px 0 0;
+  color: var(--deck-ink);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.crm-attention-card-details .is-proposed dd {
+  color: #1f6b45;
+}
+
+.crm-attention-card-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.crm-attention-card-actions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 140ms ease, opacity 140ms ease;
+}
+
+.crm-attention-card-actions button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.crm-attention-card-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.crm-attention-card-actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+.crm-attention-card-actions .is-reject {
+  border: 1px solid var(--deck-line);
+  background: var(--deck-card);
+  color: var(--deck-ink2);
+}
+
+.crm-attention-card-actions .is-approve {
+  border: 1px solid var(--deck-ink);
+  background: var(--deck-ink);
+  color: #ffffff;
+}
+
+.crm-attention-card-actions button:focus-visible,
+.crm-attention-deck-dots button:focus-visible,
+.crm-attention-card-behind:focus-visible {
+  outline: 2px solid #e9c46a;
+  outline-offset: 2px;
+}
+
+.crm-attention-card-feedback {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crm-attention-card-feedback.is-success { background: #eef8f2; color: #1f6b45; }
+.crm-attention-card-feedback.is-partial { background: #fff8e1; color: #7a5a00; }
+.crm-attention-card-feedback.is-error { background: #fff1f1; color: #a3302b; }
+
+.crm-attention-deck-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.crm-attention-deck-dots button {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #d6d5cf;
+  transition: width 200ms ease, background-color 200ms ease;
+}
+
+.crm-attention-deck-dots button.is-active {
+  width: 18px;
+  background: var(--deck-ink);
+}
+
+.crm-attention-deck-hint {
+  margin: 6px 0 0;
+  color: var(--deck-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .crm-attention-deck-section {
+    --deck-ink: #f1f2f8;
+    --deck-ink2: #c9cbe0;
+    --deck-muted: #9095ad;
+    --deck-line: #2a2e4c;
+    --deck-soft: rgba(255, 255, 255, 0.07);
+    --deck-card: #181b33;
+  }
+
+  .crm-attention-card-actions .is-approve {
+    border-color: #f2cb73;
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+
+  .crm-attention-deck-dots button { background: #3a3e5c; }
+  .crm-attention-card-details .is-proposed dd { color: #78ddb0; }
+}
