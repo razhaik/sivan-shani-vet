@@ -16,6 +16,7 @@ import {
 import { isValidClientPhone, normalizeClientPhone } from "@/lib/clientAggregation";
 import { formatDateTime, speciesLabel, statusLabel, type ClientRow } from "@/lib/crmClientData";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
+import { initials as bentoInitials } from "@/components/business-crm/bento-ui";
 
 export type ClientColumnKey = "client" | "lastActivity" | "email" | "phone" | "status" | "tags" | "team" | "pets" | "appointments" | "lastAppointment";
 export type ClientSortKey = "name" | "lastActivity" | "appointments";
@@ -157,48 +158,61 @@ function MobileContactDetails({ row, onOpenClient }: { row: ClientRow; onOpenCli
   </div>;
 }
 
-function MobileContactRow({ row, selected, selectionMode, hasNewRequest, isExpanded, onToggle, onExpand, onOpenClient }: {
+const PET_TONES = ["sun", "blue", "mint", "lav"] as const;
+
+/** Pet names (without the display-only placeholder) for the phone list. */
+function savedPetNames(row: ClientRow): string[] {
+  return row.pets.map((pet) => pet.name.trim()).filter((name) => name && name !== "חיית מחמד ללא שם");
+}
+
+function MobileContactRow({ row, selected, selectionMode, hasNewRequest, onToggle, onOpenClient }: {
   row: ClientRow;
   selected: boolean;
   selectionMode: boolean;
   hasNewRequest: boolean;
-  isExpanded: boolean;
+  isExpanded?: boolean;
   onToggle: () => void;
-  onExpand: () => void;
+  onExpand?: () => void;
   onOpenClient: (id: string) => void;
 }) {
-  const handleRowPress = () => {
-    if (selectionMode) onToggle();
-    else onExpand();
-  };
   const activityDate = compactActivityDate(row.lastActivityTimestamp);
+  const shownPets = row.pets.filter((pet) => pet.name.trim() && pet.name.trim() !== "חיית מחמד ללא שם").slice(0, 2);
+  const petNames = savedPetNames(row);
+  const phone = primaryPhone(row).trim();
 
-  return <article className="client-mobile-row min-w-0">
-    <div className="client-mobile-row-head flex h-[70px] min-w-0 items-center" dir="rtl">
-      {selectionMode && <label className="client-mobile-select-label flex h-full w-10 shrink-0 cursor-pointer items-center justify-center" aria-label={`בחירת ${row.name}`}>
-        <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`בחירת ${row.name}`} className="h-4 w-4 rounded border-slate-300 accent-[#1A1A3E] focus:ring-[#F2D162]" />
-      </label>}
-      <button type="button" onClick={handleRowPress} aria-label={selectionMode ? `בחירת ${row.name}` : `${isExpanded ? "סגירת" : "פתיחת"} פרטי ${row.name}`} aria-expanded={selectionMode ? undefined : isExpanded} aria-pressed={selectionMode ? selected : undefined} className="client-mobile-row-toggle group flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-right transition-colors hover:bg-[#FBFCFD] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F2D162]">
-        <span className="client-mobile-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1A1A3E] text-[10px] font-black text-[#F2D162]" aria-hidden="true">{initials(row.name)}</span>
-        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="client-mobile-name min-w-[3rem] flex-1 truncate text-[15px] font-extrabold leading-5 text-[#1A1A3E]">{row.name}</span>
-            <MobilePetChips row={row} />
-          </span>
-          <span className="client-mobile-activity block truncate text-xs font-medium leading-4 text-slate-500">{row.lastActivityTimestamp ? row.lastActivityLabel : "אין פעילות מתועדת"}</span>
+  return <article className={`client-mobile-row client-row${selected ? " is-selected" : ""}`}>
+    {selectionMode && <label className="client-row-check" aria-label={`בחירת ${row.name}`}>
+      <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`בחירת ${row.name}`} />
+    </label>}
+    <button
+      type="button"
+      onClick={selectionMode ? onToggle : () => onOpenClient(row.id)}
+      aria-label={selectionMode ? `בחירת ${row.name}` : `פתיחת כרטיס הלקוח ${row.name}`}
+      aria-pressed={selectionMode ? selected : undefined}
+      className="client-row-button press"
+    >
+      <span className="client-row-pets" aria-hidden="true">
+        {shownPets.length === 0
+          ? <span className="client-row-pet tone-blue is-initials">{bentoInitials(row.name)}</span>
+          : shownPets.map((pet, index) => {
+            const PetIcon = pet.species === "dog" ? Dog : pet.species === "cat" ? Cat : PawPrint;
+            return <span key={pet.key} className={`client-row-pet tone-${PET_TONES[index % PET_TONES.length]}`}><PetIcon /></span>;
+          })}
+      </span>
+      <span className="client-row-body">
+        <span className="client-row-name" dir="auto">{row.name}</span>
+        <span className="client-row-meta">
+          {petNames.length > 0 && <span className="client-row-petnames">{petNames.slice(0, 3).join(", ")}{petNames.length > 3 ? ` +${petNames.length - 3}` : ""}</span>}
+          {petNames.length > 0 && phone && <span aria-hidden="true"> · </span>}
+          {phone && <span className="client-row-phone" dir="ltr">{phone}</span>}
+          {petNames.length === 0 && !phone && <span>{row.lastActivityTimestamp ? row.lastActivityLabel : "אין פרטים נוספים"}</span>}
         </span>
-        <span className="client-mobile-row-meta flex shrink-0 items-center gap-1">
-          {hasNewRequest && <><span className="client-mobile-request-dot h-1.5 w-1.5 rounded-full bg-[#3B82F6]" aria-hidden="true" /><span className="sr-only">בקשה חדשה בתיבת הדואר</span></>}
-          <span dir="ltr" className="client-mobile-date min-w-[30px] text-[11px] font-semibold text-slate-400">{activityDate || "—"}</span>
-        </span>
-        <ChevronDown className={`client-mobile-row-chevron h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${isExpanded && !selectionMode ? "rotate-180" : ""}`} aria-hidden="true" />
-      </button>
-    </div>
-    <AnimatePresence initial={false}>
-      {isExpanded && !selectionMode && <motion.div key={row.id} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="client-mobile-expansion overflow-hidden border-t border-[#EEF0F3]">
-        <MobileContactDetails row={row} onOpenClient={onOpenClient} />
-      </motion.div>}
-    </AnimatePresence>
+      </span>
+      <span className="client-row-side">
+        <span className="client-row-date" dir="ltr">{activityDate || "—"}</span>
+        {hasNewRequest && <em className="client-row-flag">בקשה<span className="sr-only"> חדשה בתיבת הדואר</span></em>}
+      </span>
+    </button>
   </article>;
 }
 

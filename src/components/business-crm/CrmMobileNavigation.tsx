@@ -258,7 +258,7 @@ export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketp
               </div>
               <header className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[#5267A8]">סביבת הניהול</p>
+                  <p className="text-xs font-bold text-[#5267A8]">סביבת הניהול</p>
                   <h2 id={titleId} className="mt-1 text-xl font-black text-[#1A1A3E]">עוד אזורי ניהול</h2>
                 </div>
                 <button
@@ -273,10 +273,11 @@ export default function CrmMobileNavigation({ view, onNavigate, onOpenAppMarketp
               </header>
 
               <nav aria-label="אזורים נוספים" className="space-y-2">
-                <MoreAction label="מסך ניהול" icon={LayoutDashboard} active={view.kind === "overview"} onClick={() => navigateTo({ kind: "overview" })} />
-                <MoreAction label="מכירות ונתונים" icon={ReceiptText} active={view.kind === "sales"} onClick={() => navigateTo({ kind: "sales" })} />
-                <MoreAction label="שיווק" icon={Megaphone} active={view.kind === "marketing"} onClick={() => navigateTo({ kind: "marketing", subview: "automatic" })} />
-                <MoreAction label="הגדרות" icon={Settings} active={view.kind === "settings"} onClick={() => navigateTo({ kind: "settings" })} />
+                {/* The page you're already on isn't offered as a destination. */}
+                {view.kind !== "overview" && <MoreAction label="מסך ניהול" icon={LayoutDashboard} onClick={() => navigateTo({ kind: "overview" })} />}
+                {view.kind !== "sales" && <MoreAction label="מכירות ונתונים" icon={ReceiptText} onClick={() => navigateTo({ kind: "sales" })} />}
+                {view.kind !== "marketing" && <MoreAction label="שיווק" icon={Megaphone} onClick={() => navigateTo({ kind: "marketing", subview: "automatic" })} />}
+                {view.kind !== "settings" && <MoreAction label="הגדרות" icon={Settings} onClick={() => navigateTo({ kind: "settings" })} />}
                 <MoreAction label="חנות אפליקציות" icon={Grid2X2} onClick={() => openMarketplace(moreButtonRef.current || closeButtonRef.current!)} />
               </nav>
             </motion.section>
