@@ -160,6 +160,17 @@
     padding: 0;
   }
 
+  #crm-root.crm-bento-settings .crm-topbar-shell,
+  #crm-root.crm-bento-settings .crm-mobile-navigation {
+    display: none !important;
+  }
+
+  #crm-root.crm-bento-settings .crm-main-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
   #crm-root .crm-main-content {
     min-width: 0;
     padding-top: 1.25rem;

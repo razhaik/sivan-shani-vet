@@ -56,6 +56,7 @@ export interface DashboardHomeActions {
   onOpenSales: () => void;
   onOpenMore: (trigger?: HTMLButtonElement) => void;
   onProfileUpdated?: (updates: CrmProfileUpdate) => void;
+  onOpenSettings?: () => void;
   onNewAppointment: () => void;
   onOpenAppointment: (record: CrmRecord) => void;
   onCheckIn: (record: CrmRecord) => Promise<void>;
@@ -273,8 +274,8 @@ export function DashboardPage({
             <button
               type="button"
               className="round settings press"
-              aria-label="הגדרות וסביבת הניהול"
-              onClick={(event) => actions.onOpenMore(event.currentTarget)}
+              aria-label="הגדרות"
+              onClick={(event) => (actions.onOpenSettings ? actions.onOpenSettings() : actions.onOpenMore(event.currentTarget))}
             >
               <Settings aria-hidden="true" />
             </button>

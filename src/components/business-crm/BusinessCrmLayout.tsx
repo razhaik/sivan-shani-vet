@@ -440,6 +440,7 @@ export default function BusinessCrmLayout() {
   const crmContextValue = useMemo<CrmContextValue>(() => ({
     user: user as CrmRecord,
     updateUserProfile: handleProfileUpdated,
+    openAppMarketplace,
     userLabel,
     appointments,
     inquiries,
@@ -468,11 +469,11 @@ export default function BusinessCrmLayout() {
     mobileAppointmentDecision,
     scheduleMobileAppointmentDecision,
     undoMobileAppointmentDecision,
-  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, handleProfileUpdated, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
+  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, handleProfileUpdated, openAppMarketplace, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
 
   if (!authReady || !user) return <AuthGate />;
   return (
-    <div id="crm-root" dir="rtl" className={`crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]${view.kind === "inbox" ? " crm-bento-inbox" : ""}${view.kind === "overview" ? " crm-bento-home" : ""}${view.kind === "calendar" ? " crm-bento-calendar" : ""}${view.kind === "clients" ? " crm-bento-clients" : ""}${view.kind === "client-details" ? " crm-bento-client-details" : ""}`} style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}>
+    <div id="crm-root" dir="rtl" className={`crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]${view.kind === "inbox" ? " crm-bento-inbox" : ""}${view.kind === "overview" ? " crm-bento-home" : ""}${view.kind === "calendar" ? " crm-bento-calendar" : ""}${view.kind === "clients" ? " crm-bento-clients" : ""}${view.kind === "client-details" ? " crm-bento-client-details" : ""}${view.kind === "settings" ? " crm-bento-settings" : ""}`} style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}>
       <CrmSidebar isOpen={sidebarOpen} userName={userLabel} onClose={closeSidebar} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} activeKey={activeKey} inboxCount={notificationCount} />
       <div className="min-h-screen lg:mr-[248px]">
         <div className="crm-topbar-shell">

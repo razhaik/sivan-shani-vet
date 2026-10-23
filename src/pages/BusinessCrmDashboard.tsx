@@ -322,6 +322,7 @@ export default function BusinessCrmDashboard() {
     onOpenInbox: () => openView({ kind: "inbox" }),
     onOpenSales: () => openView({ kind: "sales" }),
     onOpenMore: openMobileMoreMenu,
+    onOpenSettings: () => openView({ kind: "settings" }),
     onProfileUpdated: updateUserProfile,
     onNewAppointment: openNewAppointment,
     onOpenAppointment: openAppointmentInCalendar,

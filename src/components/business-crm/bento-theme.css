@@ -5797,3 +5797,269 @@
   .crm-attention-deck-dots button { background: #3a3e5c; }
   .crm-attention-card-details .is-proposed dd { color: #78ddb0; }
 }
+
+/* ===================================================================
+   Phone settings home (2026-10) — calm light page, grouped lists.
+   =================================================================== */
+.bn.bn-settings {
+  --ms-surface: #ffffff;
+  --ms-line: #eeede8;
+  --ms-soft: #f3f2ee;
+  --ms-navy: #1c1f45;
+  background: #f6f5f1;
+}
+
+.bn.bn-settings .ms-wrap {
+  max-width: 580px;
+  margin-inline: auto;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(128px + env(safe-area-inset-bottom, 0px));
+}
+
+.bn.bn-settings .ms-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bn.bn-settings .ms-top h1 {
+  margin: 0;
+  color: var(--ms-navy);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.bn.bn-settings .ms-back {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #e9e8e4;
+  border-radius: 13px;
+  background: var(--ms-surface);
+  color: var(--ms-navy);
+  font-size: 20px;
+}
+
+.bn.bn-settings .ms-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.bn.bn-settings .ms-avatar {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #ffffff, 0 6px 16px -8px rgba(0, 0, 0, 0.35);
+}
+
+.bn.bn-settings .ms-profile-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.bn.bn-settings .ms-profile-text b {
+  display: block;
+  overflow: hidden;
+  color: var(--ms-navy);
+  font-size: 20px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn.bn-settings .ms-profile-text small {
+  color: var(--ink2);
+  font-size: 13px;
+}
+
+.bn.bn-settings .ms-edit {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--ms-navy);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bn.bn-settings .ms-group {
+  margin-top: 24px;
+}
+
+.bn.bn-settings .ms-group h2 {
+  margin: 0 8px 8px;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bn.bn-settings .ms-list {
+  overflow: hidden;
+  border: 1px solid var(--ms-line);
+  border-radius: 20px;
+  background: var(--ms-surface);
+}
+
+.bn.bn-settings .ms-row {
+  display: flex;
+  width: 100%;
+  min-height: 60px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  color: var(--ink);
+  text-align: start;
+  text-decoration: none;
+}
+
+.bn.bn-settings .ms-row + .ms-row {
+  border-top: 1px solid #f0efea;
+}
+
+.bn.bn-settings button.ms-row:active,
+.bn.bn-settings a.ms-row:active {
+  background: #faf9f6;
+}
+
+.bn.bn-settings .ms-ic {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--ms-soft);
+  color: var(--ms-navy);
+  font-size: 18px;
+}
+
+.bn.bn-settings .ms-tx {
+  min-width: 0;
+  flex: 1;
+}
+
+.bn.bn-settings .ms-tx b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.bn.bn-settings .ms-tx small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn.bn-settings .ms-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink3);
+  font-size: 16px;
+}
+
+.bn.bn-settings .ms-end em {
+  color: var(--ink2);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.bn.bn-settings .ms-toggle {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
+  border-radius: 999px;
+  background: #e2e1dc;
+  transition: background-color 180ms ease;
+}
+
+.bn.bn-settings .ms-toggle i {
+  position: absolute;
+  top: 3px;
+  inset-inline-start: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: inset-inline-start 180ms ease;
+}
+
+.bn.bn-settings .ms-toggle.is-on {
+  background: var(--ms-navy);
+}
+
+.bn.bn-settings .ms-toggle.is-on i {
+  inset-inline-start: 23px;
+}
+
+.bn.bn-settings .ms-toggle:disabled {
+  opacity: 0.6;
+}
+
+.bn.bn-settings .ms-error {
+  margin: 8px 6px 0;
+  color: #a3302b;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn.bn-settings .ms-toggle,
+  .bn.bn-settings .ms-toggle i {
+    transition: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .bn.bn-settings {
+    --ms-surface: var(--card);
+    --ms-line: var(--line);
+    --ms-soft: rgba(255, 255, 255, 0.07);
+    --ms-navy: #f1f2f8;
+    background: var(--bg);
+  }
+
+  .bn.bn-settings .ms-edit,
+  .bn.bn-settings .ms-toggle.is-on {
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+
+  .bn.bn-settings .ms-row + .ms-row { border-top-color: var(--line); }
+  .bn.bn-settings .ms-toggle { background: #3a3e5c; }
+  .bn.bn-settings .ms-avatar { box-shadow: 0 0 0 3px var(--card); }
+}
+
+/* Settings detail screens on the phone: keep the old forms, give them room under the bento chrome. */
+#crm-root.crm-bento-settings .bn.crm-settings-mobile-dock {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+@media (max-width: 767px) {
+  #crm-root.crm-bento-settings .crm-settings-page {
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 12px calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #crm-root.crm-bento-settings .crm-settings-desktop-heading {
+    display: none;
+  }
+}
