@@ -6063,3 +6063,256 @@
     display: none;
   }
 }
+
+/* ===================================================================
+   Week strip paging + month picker sheet (phone).
+   =================================================================== */
+.bn .week-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.bn .week-viewport .week {
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.bn .week-viewport .week:active {
+  cursor: grabbing;
+}
+
+.bn .wd.past:not(.on) b {
+  color: var(--ink3);
+}
+
+.bn .week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 0 2px;
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bn .week-nav button {
+  display: grid;
+  width: 32px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--ink2);
+  font-size: 16px;
+}
+
+.bn .week-nav button:hover {
+  background: rgba(17, 22, 51, 0.05);
+}
+
+.bn .month-picker-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bn .month-picker-button svg:first-child {
+  font-size: 16px;
+}
+
+.bn .month-picker-button svg:last-child {
+  color: var(--ink3);
+  font-size: 14px;
+}
+
+.bn.month-picker-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  min-height: 0;
+  background: transparent;
+}
+
+.bn.month-picker-layer .mp-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: rgba(20, 22, 40, 0.38);
+}
+
+.bn.month-picker-layer .mp-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-width: 580px;
+  margin-inline: auto;
+  padding: 10px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+  border-radius: 28px 28px 0 0;
+  background: var(--card);
+  box-shadow: 0 -20px 40px -20px rgba(0, 0, 0, 0.3);
+}
+
+.bn.month-picker-layer .mp-grab {
+  width: 40px;
+  height: 5px;
+  margin: 0 auto 12px;
+  border-radius: 9px;
+  background: var(--line);
+}
+
+.bn.month-picker-layer .mp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.bn.month-picker-layer .mp-head h2 {
+  flex: 1;
+  margin: 0;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.bn.month-picker-layer .mp-head h2 em {
+  color: var(--ink2);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.bn.month-picker-layer .mp-nav {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink2);
+  font-size: 18px;
+}
+
+.bn.month-picker-layer .mp-today {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #fbefc6;
+  color: #7a5a00;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bn.month-picker-layer .mp-weekdays,
+.bn.month-picker-layer .mp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.bn.month-picker-layer .mp-weekdays {
+  margin-top: 16px;
+  color: var(--ink3);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.bn.month-picker-layer .mp-grid-viewport {
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.bn.month-picker-layer .mp-grid {
+  row-gap: 4px;
+  touch-action: pan-y;
+}
+
+.bn.month-picker-layer .mp-day,
+.bn.month-picker-layer .mp-blank {
+  position: relative;
+  display: flex;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 2px;
+  border-radius: 14px;
+}
+
+.bn.month-picker-layer .mp-day {
+  color: var(--ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.bn.month-picker-layer .mp-day:active {
+  transform: scale(0.94);
+}
+
+.bn.month-picker-layer .mp-day.is-past,
+.bn.month-picker-layer .mp-day.is-sat {
+  color: var(--ink3);
+}
+
+.bn.month-picker-layer .mp-day.is-today {
+  box-shadow: inset 0 0 0 2px #e9b949;
+}
+
+.bn.month-picker-layer .mp-day.is-selected {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.bn.month-picker-layer .mp-dots {
+  position: absolute;
+  bottom: 6px;
+  display: flex;
+  gap: 2px;
+}
+
+.bn.month-picker-layer .mp-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink2);
+}
+
+.bn.month-picker-layer .mp-day.is-past .mp-dots i {
+  opacity: 0.45;
+}
+
+.bn.month-picker-layer .mp-day.is-selected .mp-dots i {
+  background: var(--gold);
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bn.month-picker-layer .mp-today {
+    background: rgba(242, 203, 115, 0.16);
+    color: #f2cb73;
+  }
+
+  .bn.month-picker-layer .mp-day.is-selected {
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+
+  .bn.month-picker-layer .mp-day.is-selected .mp-dots i {
+    background: #1c1f45;
+  }
+}
+
+.bn.month-picker-layer .mp-sheet:focus {
+  outline: none;
+}
