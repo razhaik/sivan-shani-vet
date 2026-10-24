@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Bell, CalendarDays, Check, Clock3, List, MessageCircle, PawPrint, Plus, Search, X, Phone, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Clock3, List, PawPrint, Plus, Search, Settings, X, Phone, XCircle } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ProfileAvatar } from "@/components/business-crm/CrmProfileAvatar";
+import { CrmProfileMenu, type CrmProfileUpdate } from "@/components/business-crm/CrmProfileMenu";
 import type { CrmRecord, CrmMobileAppointmentDecisionNotice } from "@/components/business-crm/CrmContext";
 import type { AppointmentDecisionAction } from "@/lib/crmAppointmentDecision";
 import type { DashboardClientSummary } from "@/lib/crmDashboardData";
 import {
   AppointmentCard,
-  BentoDock,
   clinicShortDate,
   formatCount,
-  initials,
   isActiveAppointment,
   plural,
   timeMinutes,
@@ -41,6 +42,9 @@ export interface DashboardHomeData {
     name: string;
     shortName: string;
     subtitle: string;
+    fullName?: string;
+    email?: string;
+    imageUrl?: string;
   };
 }
 
@@ -49,9 +53,10 @@ export interface DashboardHomeActions {
   onOpenInbox: () => void;
   onOpenSales: () => void;
   onOpenMore: (trigger?: HTMLButtonElement) => void;
-  onNewAppointment: () => void;
+  onProfileUpdated?: (updates: CrmProfileUpdate) => void;
+  onOpenSettings?: () => void;
   onOpenAppointment: (record: CrmRecord) => void;
-  onCheckIn: (record: CrmRecord) => Promise<void>;
+  onMarkNoShow: (record: CrmRecord) => Promise<void>;
   onScheduleDecision: (record: CrmRecord, action: AppointmentDecisionAction) => boolean;
 }
 
@@ -123,18 +128,19 @@ export function DashboardPage({
   actions,
   appointmentState,
   pendingState,
-  clientsState,
   inquiriesState,
-  notificationCount,
   decisionNotice,
 }: DashboardPageProps) {
   const reducedMotion = useReducedMotion() ?? false;
   const [now, setNow] = useState(() => new Date());
   const today = getClinicDateKey(now);
   const [selectedDay, setSelectedDay] = useState(data.today);
-  const [arrivalFeedback, setArrivalFeedback] = useState<{ id: string; tone: "success" | "error"; message: string } | null>(null);
-  const [arrivalSaving, setArrivalSaving] = useState(false);
-  const arrivalLockRef = useRef<string | null>(null);
+  const [noShowFeedback, setNoShowFeedback] = useState<{ id: string; tone: "success" | "error"; message: string } | null>(null);
+  const [noShowSaving, setNoShowSaving] = useState(false);
+  const [noShowConfirmOpen, setNoShowConfirmOpen] = useState(false);
+  const noShowLockRef = useRef<string | null>(null);
+  const profileButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const clock = clinicNowTime(now);
 
   useEffect(() => {
@@ -189,36 +195,40 @@ export function DashboardPage({
     () => summarizeDashboardAppointments(data.appointments, today),
     [data.appointments, today],
   );
-  const monthDelta = monthSummary.previousCount > 0
-    ? Math.round(((monthSummary.currentCount - monthSummary.previousCount) / monthSummary.previousCount) * 100)
+  // Compare like with like: this month so far vs. the same days last month.
+  const monthDelta = monthSummary.previousToDateCount > 0
+    ? Math.round(((monthSummary.currentToDateCount - monthSummary.previousToDateCount) / monthSummary.previousToDateCount) * 100)
     : null;
   const decisionBusy = Boolean(decisionNotice && ["undo", "committing"].includes(decisionNotice.phase));
   const minutesUntilNext = nextAppointment ? (timeMinutes(nextAppointment.start_time) ?? clock.minutes) - clock.minutes : null;
+  const nextAppointmentStartReached = minutesUntilNext !== null && minutesUntilNext <= 0;
   const nextAppointmentInProgress = nextAppointment ? isAppointmentInProgress(nextAppointment, clock.minutes) : false;
   const arrived = Boolean(String(nextAppointment?.arrived_at ?? "").trim());
 
   useEffect(() => {
-    setArrivalFeedback(null);
+    setNoShowConfirmOpen(false);
+    setNoShowFeedback((current) => current?.tone === "error" && current.id !== nextAppointmentId ? null : current);
   }, [nextAppointmentId]);
 
-  const handleCheckIn = async () => {
-    if (!nextAppointment || !nextAppointmentId || arrived || arrivalLockRef.current === nextAppointmentId) return;
+  const handleMarkNoShow = async () => {
+    if (!nextAppointment || !nextAppointmentId || !nextAppointmentStartReached || arrived || noShowLockRef.current === nextAppointmentId) return;
     const appointmentId = nextAppointmentId;
-    arrivalLockRef.current = appointmentId;
-    setArrivalSaving(true);
-    setArrivalFeedback(null);
+    noShowLockRef.current = appointmentId;
+    setNoShowSaving(true);
+    setNoShowFeedback(null);
     try {
-      await actions.onCheckIn(nextAppointment);
-      setArrivalFeedback({ id: appointmentId, tone: "success", message: "ההגעה נשמרה בנפרד מסטטוס התור." });
+      await actions.onMarkNoShow(nextAppointment);
+      setNoShowConfirmOpen(false);
+      setNoShowFeedback({ id: appointmentId, tone: "success", message: "התור סומן כ״לא הגיע/ה״ ונשאר ביומן." });
     } catch (error) {
-      setArrivalFeedback({
+      setNoShowFeedback({
         id: appointmentId,
         tone: "error",
-        message: error instanceof Error ? error.message : "לא הצלחנו לשמור את סימון ההגעה. נסי שוב.",
+        message: error instanceof Error ? error.message : "לא הצלחנו לשמור את סימון אי-ההגעה. נסי שוב.",
       });
     } finally {
-      if (arrivalLockRef.current === appointmentId) arrivalLockRef.current = null;
-      setArrivalSaving(false);
+      if (noShowLockRef.current === appointmentId) noShowLockRef.current = null;
+      setNoShowSaving(false);
     }
   };
 
@@ -237,28 +247,54 @@ export function DashboardPage({
 
   return (
     <motion.div
-      className="bn"
+      className="bn bn-home"
       dir="rtl"
-      initial={reducedMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reducedMotion ? { duration: 0 } : { duration: 0.34, ease: [0.2, 0.7, 0.2, 1] }}
+      initial={reducedMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: 0.15, ease: [0.2, 0.7, 0.2, 1] }}
     >
       <div className="wrap">
-        <header className="hdr">
-          <button type="button" className="av press" aria-label="פתיחת אזורי ניהול נוספים" onClick={(event) => actions.onOpenMore(event.currentTarget)}>{initials(data.profile.name)}</button>
-          <div className="t">
-            <small>{formatDashboardDate(today, { weekday: "long", day: "numeric", month: "long" })}</small>
-            <b>שלום, {data.profile.shortName}</b>
+        <header className="hero-band">
+          <div className="hdr">
+            <button
+              ref={profileButtonRef}
+              type="button"
+              className="av press"
+              aria-label="האזור האישי שלי"
+              aria-haspopup="dialog"
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((open) => !open)}
+            >
+              <ProfileAvatar name={data.profile.fullName || data.profile.name} imageUrl={data.profile.imageUrl} className="h-full w-full" fallbackClassName="text-[14px]" imageWidth={96} />
+            </button>
+            <div className="t">
+              <small>{formatDashboardDate(today, { weekday: "long", day: "numeric", month: "long" })}</small>
+              <b>שלום, {data.profile.shortName}</b>
+            </div>
+            <button
+              type="button"
+              className="round settings press"
+              aria-label="הגדרות"
+              onClick={(event) => (actions.onOpenSettings ? actions.onOpenSettings() : actions.onOpenMore(event.currentTarget))}
+            >
+              <Settings aria-hidden="true" />
+            </button>
           </div>
-          <button
-            type="button"
-            className="round press"
-            aria-label={notificationCount > 0 ? `פתיחת תיבת הדואר, ${notificationCount} פריטים פתוחים` : "פתיחת תיבת הדואר"}
-            onClick={actions.onOpenInbox}
-          >
-            <Bell aria-hidden="true" />
-            {newInquiries.length > 0 && <i aria-hidden="true" />}
-          </button>
+
+          <div className="hero-stats" aria-label="סיכום המרפאה">
+            <button type="button" className="press" onClick={() => actions.onNavigate("calendar")}>
+              <b className="ltr" dir="ltr">{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(todaysAppointments.length)}</b>
+              <span>תורים היום</span>
+            </button>
+            <button type="button" className="press" onClick={actions.onOpenSales}>
+              <b className="ltr" dir="ltr">{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(monthSummary.currentCount)}</b>
+              <span>החודש{monthDelta !== null && <span className="trend" aria-label={`${monthDelta >= 0 ? "עלייה" : "ירידה"} של ${Math.abs(monthDelta)}% מול אותם ימים בחודש הקודם`}> · <em className={`ltr${monthDelta < 0 ? " down" : ""}`} dir="ltr">{monthDelta >= 0 ? "+" : "−"}{Math.abs(monthDelta)}%</em></span>}</span>
+            </button>
+            <button type="button" className="press" onClick={actions.onOpenInbox}>
+              <b className="ltr" dir="ltr">{inquiriesState.isLoading || inquiriesState.error ? "—" : formatCount(newInquiries.length)}</b>
+              <span>{newInquiries.length === 1 ? "פנייה חדשה" : "פניות חדשות"}</span>
+            </button>
+          </div>
         </header>
 
         {appointmentState.isLoading
@@ -268,29 +304,59 @@ export function DashboardPage({
             : nextAppointment
               ? (
                 <section className="next" aria-label={nextAppointmentInProgress ? "התור הנוכחי" : "התור הבא"}>
-                  <span className="lbl">{nextAppointmentInProgress ? "התור הנוכחי" : "התור הבא"}</span>
+                  <span className="lbl">{nextAppointmentInProgress ? "התור הנוכחי" : "התור הבא"} · <span className="ltr" dir="ltr">{String(nextAppointment.start_time ?? "").slice(0, 5)}</span></span>
                   <span className="who" dir="auto">{String(nextAppointment.client_name ?? "שם הלקוח לא צוין")}{nextAppointment.pet_name ? ` · ${String(nextAppointment.pet_name)}` : ""}</span>
-                  <span className="what">{String(nextAppointment.appointment_type ?? "סוג טיפול לא צוין")} · <TimeRange start={nextAppointment.start_time} end={nextAppointment.end_time} /></span>
+                  <span className="what">{String(nextAppointment.appointment_type ?? "סוג טיפול לא צוין")}<span className="what-time"> · <TimeRange start={nextAppointment.start_time} end={nextAppointment.end_time} /></span></span>
                   <div className="cd" aria-label={nextAppointmentInProgress ? "התור הנוכחי מתנהל כעת" : minutesUntilNext !== null && minutesUntilNext < 60 ? `עוד ${Math.max(0, minutesUntilNext)} דקות` : `בשעה ${String(nextAppointment.start_time ?? "").slice(0, 5)}`}>
                     {nextAppointmentInProgress
-                      ? <><b className="time">כעת</b><span>בתור</span></>
+                      ? <span>מתנהל כעת</span>
                       : minutesUntilNext !== null && minutesUntilNext < 60
-                        ? <><b>{Math.max(0, minutesUntilNext)}</b><span>דקות</span></>
-                        : <><b className="time ltr" dir="ltr">{String(nextAppointment.start_time ?? "").slice(0, 5)}</b><span>היום</span></>}
+                        ? <span>בעוד {Math.max(0, minutesUntilNext)} דק׳</span>
+                        : <span>היום</span>}
                   </div>
                   <div className="bar">
                     <a href={nextAppointment.phone ? `tel:${String(nextAppointment.phone).trim()}` : undefined} aria-disabled={!nextAppointment.phone} tabIndex={nextAppointment.phone ? 0 : -1}>
-                      <Phone aria-hidden="true" />התקשר
+                      <Phone aria-hidden="true" />התקשרות
                     </a>
-                    <button type="button" className="gold" onClick={() => void handleCheckIn()} disabled={arrived || arrivalSaving} aria-label={arrived ? "ההגעה כבר סומנה" : nextAppointmentInProgress ? "סימון שהלקוח הגיע במהלך התור" : "סימון שהלקוח הגיע לתור"}>
-                      {arrived ? <Check aria-hidden="true" /> : <Check aria-hidden="true" />}
-                      {arrived ? "הגיע/ה ✓" : arrivalSaving ? "שומרת..." : "הגיע/ה"}
-                    </button>
+                    {arrived
+                      ? <button type="button" className="gold" disabled aria-label="ההגעה כבר סומנה">
+                        <Check aria-hidden="true" />הגיע/ה ✓
+                      </button>
+                      : <button
+                        type="button"
+                        className="gold"
+                        onClick={() => {
+                          if (!nextAppointmentStartReached) return;
+                          setNoShowConfirmOpen(true);
+                          setNoShowFeedback(null);
+                        }}
+                        disabled={!nextAppointmentStartReached || noShowSaving}
+                        aria-label={nextAppointmentStartReached ? (nextAppointmentInProgress ? "פתיחת אישור לסימון אי-הגעה לתור הנוכחי" : "פתיחת אישור לסימון אי-הגעה לתור הבא") : `סימון אי-הגעה יהיה זמין החל משעה ${String(nextAppointment.start_time ?? "").slice(0, 5)}`}
+                        aria-describedby={!nextAppointmentStartReached ? "no-show-availability-note" : undefined}
+                        style={!nextAppointmentStartReached ? { opacity: 0.52, cursor: "not-allowed" } : undefined}
+                      >
+                        <XCircle aria-hidden="true" />
+                        {noShowSaving ? "שומרת..." : "לא הגיע/ה"}
+                      </button>}
                   </div>
-                  {arrivalFeedback?.id === nextAppointmentId && <p className={`arrival-feedback ${arrivalFeedback.tone}`} role={arrivalFeedback.tone === "error" ? "alert" : "status"}>{arrivalFeedback.message}</p>}
+                  {!nextAppointmentStartReached && !arrived && <p id="no-show-availability-note" className="col-span-full mt-1 px-1 text-xs font-semibold leading-5 text-[#686B73]" role="status">
+                    אפשר לסמן ״לא הגיע/ה״ החל משעה <span className="ltr" dir="ltr">{String(nextAppointment.start_time ?? "").slice(0, 5)}</span>.
+                  </p>}
+                  {noShowConfirmOpen && !arrived && nextAppointmentStartReached && <div role="group" aria-labelledby="mobile-no-show-confirm-title" className="mt-3 rounded-2xl border border-[#E7B68E] bg-[#FFF8F3] p-3 text-xs font-bold leading-5 text-[#934D1E]">
+                    <p id="mobile-no-show-confirm-title">לסמן את התור כ״לא הגיע/ה״? התור יישאר ביומן, ואפשר לתקן את הסימון מפרטי התור.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void handleMarkNoShow()} disabled={noShowSaving} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#934D1E] px-3 text-xs font-black text-white transition hover:bg-[#7E3D16] focus:outline-none focus:ring-2 focus:ring-[#934D1E]/30 disabled:cursor-wait disabled:opacity-60">
+                        {noShowSaving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <XCircle className="h-4 w-4" />}
+                        {noShowSaving ? "שומרת..." : "אישור, לא הגיע/ה"}
+                      </button>
+                      <button type="button" onClick={() => setNoShowConfirmOpen(false)} disabled={noShowSaving} className="min-h-10 rounded-xl border border-[#E7B68E] bg-white px-3 text-xs font-extrabold text-[#934D1E] transition hover:bg-[#FFF1E6] focus:outline-none focus:ring-2 focus:ring-[#934D1E]/30 disabled:cursor-not-allowed disabled:opacity-60">חזרה</button>
+                    </div>
+                  </div>}
                 </section>
               )
               : <div className="empty"><strong>{emptyNextMessage}</strong></div>}
+
+        {noShowFeedback && <p className={`arrival-feedback ${noShowFeedback.tone}`} role={noShowFeedback.tone === "error" ? "alert" : "status"}>{noShowFeedback.message}</p>}
 
         {renderPendingSection && (
           <section className="reqs" aria-label="תורים שממתינים לאישור">
@@ -328,29 +394,6 @@ export function DashboardPage({
           </section>
         )}
 
-        <div className="bento" aria-label="סיכום המרפאה">
-          <button type="button" className="tile blue press" onClick={() => actions.onNavigate("calendar")}>
-            <span className="ico"><CalendarDays aria-hidden="true" /></span>
-            <b>{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(todaysAppointments.length)}</b>
-            <span>תורים היום</span>
-          </button>
-          <button type="button" className="tile mint press" onClick={() => actions.onNavigate("clients")}>
-            <span className="ico"><Users aria-hidden="true" /></span>
-            <b>{clientsState.isLoading || clientsState.error ? "—" : formatCount(data.clients.length)}</b>
-            <span>לקוחות פעילים</span>
-          </button>
-          <button type="button" className="tile lav press" onClick={actions.onOpenSales}>
-            <span className="ico"><CalendarDays aria-hidden="true" /></span>
-            <b>{appointmentState.isLoading || appointmentState.error ? "—" : formatCount(monthSummary.currentCount)}</b>
-            <span>החודש{monthDelta !== null && <span className="trend"> · {monthDelta >= 0 ? "↑" : "↓"} {Math.abs(monthDelta)}%</span>}</span>
-          </button>
-          <button type="button" className="tile sun press" onClick={actions.onOpenInbox}>
-            <span className="ico"><MessageCircle aria-hidden="true" /></span>
-            <b>{inquiriesState.isLoading || inquiriesState.error ? "—" : formatCount(newInquiries.length)}</b>
-            <span>{newInquiries.length === 1 ? "פנייה חדשה" : "פניות חדשות"}</span>
-          </button>
-        </div>
-
         <div className="sec">
           <h2>השבוע</h2>
           <button type="button" onClick={() => actions.onNavigate("calendar")}>ליומן <ArrowLeft aria-hidden="true" /></button>
@@ -375,18 +418,26 @@ export function DashboardPage({
               </div>}
       </div>
 
-      <BentoDock
-        active="dashboard"
-        onChange={actions.onNavigate}
-        onAdd={actions.onNewAppointment}
-        badgeCount={notificationCount}
-      />
+      {profileOpen && typeof document !== "undefined" && createPortal(
+        <CrmProfileMenu
+          isOpen
+          anchorRef={profileButtonRef}
+          profile={{ fullName: data.profile.fullName || "", email: data.profile.email || "", imageUrl: data.profile.imageUrl }}
+          onClose={(restoreFocus = true) => {
+            setProfileOpen(false);
+            if (restoreFocus) window.requestAnimationFrame(() => profileButtonRef.current?.focus());
+          }}
+          onProfileUpdated={(updates) => actions.onProfileUpdated?.(updates)}
+        />,
+        document.body,
+      )}
     </motion.div>
   );
 }
 
-const CALENDAR_HOUR_HEIGHT = 74;
-const CALENDAR_EVENT_MIN_HEIGHT = 56;
+// 96px per hour: a 20-minute visit is 32px tall, so back-to-back visits sit in one column.
+const CALENDAR_HOUR_HEIGHT = 96;
+const CALENDAR_EVENT_MIN_HEIGHT = 44;
 
 function calendarClockLabel(minutes: number): string {
   const normalized = ((Math.round(minutes) % 1440) + 1440) % 1440;
@@ -456,13 +507,11 @@ export interface CalendarPageData {
   selectedDate: Date;
   now: Date;
   search: string;
-  notificationCount: number;
   visibleServiceCount: number;
   visibleServiceIds: Set<string>;
 }
 
 export interface CalendarPageActions {
-  onNavigate: (tab: BentoDockTab) => void;
   onNewAppointment: () => void;
   onOpenAppointment: (record: CrmRecord) => void;
   onSelectDate: (date: Date) => void;
@@ -518,25 +567,27 @@ export function CalendarPage({
   const durationHours = Math.floor(totalMinutes / 60);
   const durationRemainder = totalMinutes % 60;
   const durationLabel = durationHours > 0
-    ? `${formatCount(durationHours)} שע׳${durationRemainder > 0 ? ` ${formatCount(durationRemainder)} דק׳` : ""}`
+    ? `${durationHours}:${String(durationRemainder).padStart(2, "0")} שע׳`
     : `${formatCount(durationRemainder)} דק׳`;
 
+  // The timeline hugs the day's appointments: one hour of air before the first and after the last,
+  // never less than four hours tall. "Now" is drawn only when it falls inside that window.
   const timelineBounds = useMemo(() => {
-    const eventStarts = timedAppointments.map((event) => event.startMinutes);
-    const eventEnds = timedAppointments.map((event) => event.endMinutes);
-    if (isSelectedDayToday) eventStarts.push(clock.minutes);
-    if (isSelectedDayToday) eventEnds.push(clock.minutes);
-    const firstMinute = eventStarts.length > 0 ? Math.min(...eventStarts) : 8 * 60;
-    const lastMinute = eventEnds.length > 0 ? Math.max(...eventEnds) : 20 * 60;
-    const startHour = Math.max(0, Math.min(8, Math.floor(firstMinute / 60)));
-    const suggestedEndHour = Math.ceil(lastMinute / 60) + (lastMinute > 20 * 60 ? 1 : 0);
-    const endHour = Math.min(24, Math.max(20, suggestedEndHour));
-    return { startHour, endHour: Math.max(startHour + 1, endHour) };
-  }, [clock.minutes, isSelectedDayToday, timedAppointments]);
+    if (timedAppointments.length === 0) return { startHour: 8, endHour: 20 };
+    const firstMinute = Math.min(...timedAppointments.map((event) => event.startMinutes));
+    const lastMinute = Math.max(...timedAppointments.map((event) => event.visualEndMinutes));
+    let startHour = Math.max(0, Math.floor(firstMinute / 60) - 1);
+    let endHour = Math.min(24, Math.ceil(lastMinute / 60) + 1);
+    if (endHour - startHour < 4) {
+      endHour = Math.min(24, startHour + 4);
+      startHour = Math.max(0, endHour - 4);
+    }
+    return { startHour, endHour };
+  }, [timedAppointments]);
 
   const hourCount = timelineBounds.endHour - timelineBounds.startHour;
   const timelineHeight = hourCount * CALENDAR_HOUR_HEIGHT;
-  const hours = Array.from({ length: hourCount }, (_, index) => timelineBounds.startHour + index);
+  const hours = Array.from({ length: hourCount + 1 }, (_, index) => timelineBounds.startHour + index);
   const nowOffset = (clock.minutes - timelineBounds.startHour * 60) * (CALENDAR_HOUR_HEIGHT / 60);
   const showNowLine = isSelectedDayToday && nowOffset >= 0 && nowOffset <= timelineHeight;
   const noVisibleAppointments = dayAppointments.length === 0;
@@ -552,9 +603,9 @@ export function CalendarPage({
     <motion.div
       className="bn bn-calendar"
       dir="rtl"
-      initial={reducedMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reducedMotion ? { duration: 0 } : { duration: 0.34, ease: [0.2, 0.7, 0.2, 1] }}
+      initial={reducedMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: 0.15, ease: [0.2, 0.7, 0.2, 1] }}
     >
       <div className="wrap">
         <header className="calendar-header">
@@ -653,8 +704,9 @@ export function CalendarPage({
                   <>
                     <div className="calendar-timeline-scroll" aria-label="ציר שעות היום">
                       <div className="calendar-timeline-layout" style={{ "--calendar-hour-height": `${CALENDAR_HOUR_HEIGHT}px` } as CSSProperties}>
-                        <div className="calendar-time-rail" aria-hidden="true">
-                          {hours.map((hour) => <div className="hour-label" key={hour} style={{ height: `${CALENDAR_HOUR_HEIGHT}px` }}><span className="ltr" dir="ltr">{String(hour).padStart(2, "0")}:00</span></div>)}
+                        <div className="calendar-time-rail" aria-hidden="true" style={{ height: `${timelineHeight}px` }}>
+                          {hours.map((hour, index) => <span className="hour-label ltr" dir="ltr" key={hour} style={{ top: `${index * CALENDAR_HOUR_HEIGHT}px` }}>{String(hour).padStart(2, "0")}:00</span>)}
+                          {showNowLine && <time className="now-label ltr" dir="ltr" style={{ top: `${nowOffset}px` }}>{clock.label}</time>}
                         </div>
                         <div className="tl" style={{ height: `${timelineHeight}px` }} role="list" aria-label="תורים לפי שעה">
                           {hours.map((hour, index) => <div className="hr" key={hour} style={{ top: `${index * CALENDAR_HOUR_HEIGHT}px` }} aria-hidden="true" />)}
@@ -671,7 +723,7 @@ export function CalendarPage({
                                 type="button"
                                 role="listitem"
                                 key={String(event.record.id ?? `${event.record.date}-${event.record.start_time}-${clientName}`)}
-                                className={`ev ${kindClass}`}
+                                className={`ev ${kindClass}${height < 64 ? " is-compact" : ""}`}
                                 style={{
                                   top: `${top}px`,
                                   height: `${height}px`,
@@ -691,9 +743,7 @@ export function CalendarPage({
                             );
                           })}
                           {showNowLine && (
-                            <div className="now" style={{ top: `${nowOffset}px` }} role="note" aria-label={`השעה עכשיו ${clock.label}`}>
-                              <span className="now-label"><time className="ltr" dir="ltr">{clock.label}</time><span>עכשיו</span></span>
-                            </div>
+                            <div className="now" style={{ top: `${nowOffset}px` }} role="note" aria-label={`השעה עכשיו ${clock.label}`} />
                           )}
                         </div>
                       </div>
@@ -728,12 +778,6 @@ export function CalendarPage({
         )}
       </div>
 
-      <BentoDock
-        active="calendar"
-        onChange={actions.onNavigate}
-        onAdd={actions.onNewAppointment}
-        badgeCount={data.notificationCount}
-      />
     </motion.div>
   );
 }

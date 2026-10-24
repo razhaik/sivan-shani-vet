@@ -21,9 +21,10 @@ import {
   UserPlus,
   Users,
   X,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useCrmContext, type CrmDataLoadProgress } from "@/components/business-crm/CrmContext";
-import { BentoDock, formatCount, type BentoDockTab } from "@/components/business-crm/bento-ui";
+import { formatCount } from "@/components/business-crm/bento-ui";
 import { BusinessClient, ClientListPreference } from "@/entities";
 import { SEO } from "@/components/SEO";
 import { ClientsTable, clientColumns, type ClientColumnKey, type ClientSortKey } from "@/components/business-crm/ClientsTable";
@@ -456,7 +457,7 @@ function validatedManualClientPayload(payload: CreateClientPayload, existingRows
 }
 
 export default function BusinessCrmClients() {
-  const { user, appointments, inquiries, rescheduleRequests, businessClients, archivedClientKeys, hasDataSnapshot, dataLoadProgress, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, notificationCount, openView, openNewAppointment } = useCrmContext();
+  const { user, appointments, inquiries, rescheduleRequests, businessClients, archivedClientKeys, hasDataSnapshot, dataLoadProgress, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, openView } = useCrmContext();
   const userIdentity = String(user?.id || user?.email || "");
   const isMobileViewport = useIsMobile();
   const prefersReducedMotion = useReducedMotion() ?? false;
@@ -870,12 +871,6 @@ export default function BusinessCrmClients() {
   const mobileEmptyBody = mobileQuickFilter !== "all" && filteredRows.length > 0 && mobileFilteredRows.length === 0
     ? mobileQuickFilter === "new" ? "לקוחות עם בקשות שעדיין ממתינות בתיבת הדואר יופיעו כאן." : "לקוחות עם תור מבוקש או מאושר לתאריך של היום יופיעו כאן."
     : emptyBody;
-  const navigateBentoTab = (tab: BentoDockTab) => {
-    if (tab === "dashboard") openView({ kind: "overview" });
-    else if (tab === "calendar") openView({ kind: "calendar" });
-    else if (tab === "clients") openView({ kind: "clients" });
-    else openView({ kind: "inbox" });
-  };
   const mobileSegmentLabel = segment === "leads" ? "פניות" : "לקוחות";
   const isMobileFilterActive = activeFilterCount > 0 || mobileQuickFilter !== "all";
   const mobileActiveFilterCount = activeFilterCount + (mobileQuickFilter === "all" ? 0 : 1);
@@ -886,14 +881,13 @@ export default function BusinessCrmClients() {
 
   const mobileClientScreen = (
     <div className="bn bn-client-list md:hidden" dir="rtl">
-      <motion.div className="wrap" initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.24, ease: "easeOut" }}>
+      <motion.div className="wrap" initial={prefersReducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: prefersReducedMotion ? 0 : 0.15, ease: "easeOut" }}>
         <header className="client-list-header">
           <div className="client-list-heading-copy">
-            <span className="client-list-eyebrow">{VETERINARY_CLINIC_PROFILE.businessName}</span>
             <div className="client-list-heading-line">
               <div className="client-list-title-block">
                 <h1 id="client-list-title">לקוחות</h1>
-                <p className="client-list-count" aria-live="polite"><strong>{mobileListCountLabel}</strong><span>ברשימה הנוכחית</span></p>
+                <p className="client-list-count" aria-live="polite"><strong>{mobileListCountLabel}</strong></p>
               </div>
               <div className="client-list-header-actions">
                 <button
@@ -903,9 +897,9 @@ export default function BusinessCrmClients() {
                   aria-expanded={createClientOpen}
                   aria-controls="create-client-dialog"
                   className="client-list-add-button press"
+                  aria-label="לקוח חדש"
                 >
                   <UserPlus aria-hidden="true" />
-                  <span>לקוח חדש</span>
                 </button>
                 <button
                   type="button"
@@ -935,6 +929,17 @@ export default function BusinessCrmClients() {
             autoComplete="off"
           />
           {search && <button type="button" onClick={() => setSearch("")} aria-label="ניקוי החיפוש"><X aria-hidden="true" /></button>}
+          <button
+            type="button"
+            className={`client-search-options${filtersOpen || mobileActiveFilterCount > 0 || segment !== "all" ? " is-active" : ""}`}
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            aria-controls="client-mobile-filter-panel"
+            aria-label={mobileActiveFilterCount > 0 ? `סינון וכלים, ${mobileActiveFilterCount} מסננים פעילים` : "סינון וכלים"}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            {mobileActiveFilterCount > 0 && <b>{formatCount(mobileActiveFilterCount)}</b>}
+          </button>
         </div>
 
         <div className="client-quick-filters" role="tablist" aria-label="סינון מהיר של לקוחות">
@@ -950,54 +955,22 @@ export default function BusinessCrmClients() {
                 className={`client-quick-filter${active ? " is-active" : ""}`}
               >
                 <span>{option.label}</span>
-                <b>{formatCount(option.count)}</b>
+                {option.key !== "all" && option.count > 0 && <b>{formatCount(option.count)}</b>}
               </button>
             );
           })}
         </div>
 
-        <div className="client-list-controls">
-          <label className="client-segment-control">
-            <span className="sr-only">בחירת פלח לקוחות</span>
-            <select
-              value={segment}
-              onChange={(event) => { setSegment(event.target.value as SegmentKey); setMobileToolsOpen(false); }}
-              aria-label="בחירת פלח לקוחות"
-            >
-              {segments.map((item) => (
-                <option key={item.key} value={item.key} disabled={item.count === null}>
-                  {item.label}{item.count === null ? " · אין מקור נתונים" : ` · ${formatCount(item.count)}`}
-                </option>
-              ))}
-            </select>
-            <ChevronDown aria-hidden="true" />
-          </label>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
-            aria-expanded={filtersOpen}
-            aria-controls="client-mobile-filter-panel"
-            className={`client-list-control-button${filtersOpen || isMobileFilterActive ? " is-active" : ""}`}
-          >
-            <Filter aria-hidden="true" />
-            <span>סינון</span>
-            {mobileActiveFilterCount > 0 && <b>{formatCount(mobileActiveFilterCount)}</b>}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobileToolsOpen((open) => !open)}
-            aria-expanded={mobileToolsOpen}
-            aria-controls="client-list-tools-mobile"
-            className={`client-list-control-button${mobileToolsOpen ? " is-active" : ""}`}
-          >
-            <MoreHorizontal aria-hidden="true" />
-            <span>כלים</span>
-          </button>
-        </div>
-
         {filtersOpen && (
-          <section id="client-mobile-filter-panel" className="client-filter-panel" aria-label="אפשרויות סינון">
+          <section id="client-mobile-filter-panel" className="client-filter-panel" aria-label="סינון וכלים">
             <div className="client-filter-grid">
+              <SelectField value={segment} onChange={(value) => setSegment(value as SegmentKey)} label="רשימה">
+                {segments.map((item) => (
+                  <option key={item.key} value={item.key} disabled={item.count === null}>
+                    {item.label}{item.count === null ? " · אין מקור נתונים" : ` · ${formatCount(item.count)}`}
+                  </option>
+                ))}
+              </SelectField>
               <SelectField value={status} onChange={(value) => setStatus(value as StatusFilter)} label="סטטוס איש קשר">
                 <option value="all">כל הסטטוסים</option>
                 <option value="new">לקוח חדש</option>
@@ -1029,21 +1002,21 @@ export default function BusinessCrmClients() {
           </section>
         )}
 
-        {mobileToolsOpen && (
+        {filtersOpen && (
           <div id="client-list-tools-mobile" className="client-tools-panel" role="group" aria-label="כלי ניהול לקוחות">
-            <button type="button" onClick={() => { void refreshData(); setMobileToolsOpen(false); }}>
+            <button type="button" onClick={() => { void refreshData(); setFiltersOpen(false); }}>
               <RefreshCw className={isDataFetching ? "animate-spin" : ""} aria-hidden="true" />
               <span>רענון הרשימה</span>
             </button>
-            <button type="button" onClick={() => { setImportExportMode("import"); setMobileToolsOpen(false); }}>
+            <button type="button" onClick={() => { setImportExportMode("import"); setFiltersOpen(false); }}>
               <Upload aria-hidden="true" />
               <span>ייבוא לקוחות</span>
             </button>
-            <button type="button" onClick={() => { setImportExportMode("export"); setMobileToolsOpen(false); }}>
+            <button type="button" onClick={() => { setImportExportMode("export"); setFiltersOpen(false); }}>
               <Download aria-hidden="true" />
               <span>ייצוא לקוחות</span>
             </button>
-            <button type="button" onClick={() => { setDisplaySettingsOpen(true); setMobileToolsOpen(false); }} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog">
+            <button type="button" onClick={() => { setDisplaySettingsOpen(true); setFiltersOpen(false); }} aria-haspopup="dialog" aria-expanded={displaySettingsOpen} aria-controls="display-settings-dialog">
               <Settings2 aria-hidden="true" />
               <span>הגדרות תצוגה</span>
             </button>
@@ -1084,11 +1057,7 @@ export default function BusinessCrmClients() {
 
         <section className="client-list-results" aria-labelledby="client-results-heading-mobile">
           <div className="client-list-results-heading">
-            <div>
-              <h2 id="client-results-heading-mobile">פעילות אחרונה</h2>
-              <p>{mobileQuickFilterOptions.find((option) => option.key === mobileQuickFilter)?.label} · {mobileListCountLabel}</p>
-            </div>
-            <span className="client-list-sort-mark">העדכניים תחילה</span>
+            <h2 id="client-results-heading-mobile">פעילות אחרונה</h2>
           </div>
 
           {!hasDataSnapshot ? (
@@ -1119,18 +1088,17 @@ export default function BusinessCrmClients() {
                 emptyTitle={emptyTitle}
                 emptyBody={emptyBody}
               />
-              <div className="client-list-pagination" aria-label="עמודי רשימת הלקוחות">
+              {mobileTotalPages > 1 && <div className="client-list-pagination" aria-label="עמודי רשימת הלקוחות">
                 <p>עמוד {mobileCurrentPage} מתוך {mobileTotalPages}<span> · {mobileListCountLabel}</span></p>
                 <div>
                   <button type="button" disabled={mobileCurrentPage <= 1} onClick={() => setMobilePage(Math.max(1, mobileCurrentPage - 1))} aria-label="עמוד קודם"><ChevronRight aria-hidden="true" /></button>
                   <button type="button" disabled={mobileCurrentPage >= mobileTotalPages} onClick={() => setMobilePage(Math.min(mobileTotalPages, mobileCurrentPage + 1))} aria-label="עמוד הבא"><ChevronLeft aria-hidden="true" /></button>
                 </div>
-              </div>
+              </div>}
             </>
           )}
         </section>
       </motion.div>
-      <BentoDock active="clients" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
     </div>
   );
 

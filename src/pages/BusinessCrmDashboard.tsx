@@ -26,6 +26,7 @@ import {
 import { approveAppointmentRequest, rejectAppointmentRequest, type AppointmentDecisionAction, type AppointmentDecisionResult } from "@/lib/crmAppointmentDecision";
 import { appointmentSnapshotFromRecord } from "@/lib/crmAppointmentActions";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
+import { notifyBusinessNotification } from "@/lib/onesignalPush";
 
 function records(value: unknown): CrmRecord[] {
   if (Array.isArray(value)) return value.filter((entry) => entry && typeof entry === "object") as CrmRecord[];
@@ -74,9 +75,9 @@ export default function BusinessCrmDashboard() {
     inquiriesError,
     refreshData,
     notificationCount,
-    openNewAppointment,
     openAppointmentInCalendar,
     openMobileMoreMenu,
+    updateUserProfile,
     mobileAppointmentDecision,
     scheduleMobileAppointmentDecision,
   } = useCrmContext();
@@ -264,23 +265,35 @@ export default function BusinessCrmDashboard() {
     return result;
   }, [appointmentsKey, clientOverviewKey, pendingKey, queryClient, userIdentity]);
 
-  const onCheckIn = useCallback(async (record: CrmRecord) => {
+  const onMarkNoShow = useCallback(async (record: CrmRecord) => {
     const appointmentId = String(record.id ?? "").trim();
-    if (!appointmentId) throw new Error("לתור חסר מזהה, ולכן לא ניתן לשמור את סימון ההגעה.");
-    if (String(record.arrived_at ?? "").trim()) return;
-
-    const arrivedAt = new Date().toISOString();
-    try {
-      await Appointment.update(appointmentId, { arrived_at: arrivedAt });
-    } catch (error) {
-      console.error("Failed to save the appointment arrival marker:", error);
-      throw new Error("לא הצלחנו לשמור את סימון ההגעה. נסי שוב.");
+    if (!appointmentId) throw new Error("לתור חסר מזהה, ולכן לא ניתן לשמור את סימון אי-ההגעה.");
+    if (String(record.status ?? "").trim().toLowerCase() !== "confirmed") {
+      throw new Error("אפשר לסמן אי-הגעה רק לתור מאושר.");
+    }
+    if (String(record.arrived_at ?? "").trim()) {
+      throw new Error("ההגעה כבר סומנה לתור הזה, ולכן לא ניתן לסמן אי-הגעה.");
     }
 
-    const updatedRecord: CrmRecord = { ...record, arrived_at: arrivedAt };
+    let updated: unknown;
+    try {
+      updated = await Appointment.update(appointmentId, { status: "no_show" });
+    } catch (error) {
+      console.error("Failed to save the dashboard appointment no-show status:", error);
+      throw new Error("לא הצלחנו לשמור את סימון אי-ההגעה. נסי שוב.");
+    }
+
+    const updatedRecord: CrmRecord = {
+      ...record,
+      ...(updated && typeof updated === "object" ? updated : {}),
+      status: "no_show",
+    };
     queryClient.setQueryData<CrmRecord[]>(appointmentsKey, (current) => current?.map((item) => mergeAppointmentRecord(item, updatedRecord)));
     queryClient.setQueryData<CrmRecord[]>(["business-crm", "appointments", userIdentity], (current) => current?.map((item) => mergeAppointmentRecord(item, updatedRecord)));
     void queryClient.invalidateQueries({ queryKey: appointmentsKey });
+    void queryClient.invalidateQueries({ queryKey: ["business-crm", "appointments", userIdentity] });
+    void queryClient.invalidateQueries({ queryKey: ["business-crm", "sales-report-snapshot", userIdentity] });
+    void notifyBusinessNotification("appointment_no_show", appointmentId);
   }, [appointmentsKey, queryClient, userIdentity]);
 
   const appointments = Array.isArray(appointmentsQuery.data) ? appointmentsQuery.data : [];
@@ -306,6 +319,9 @@ export default function BusinessCrmDashboard() {
       name: VETERINARY_CLINIC_PROFILE.shortName,
       shortName: "ד״ר סיון",
       subtitle: "מרפאה וטרינרית · נס ציונה",
+      fullName: String(user?.full_name ?? "").trim(),
+      email: String(user?.email ?? "").trim(),
+      imageUrl: String(user?.profile_image_url ?? "").trim() || undefined,
     },
   };
   const mobileHomeActions: DashboardHomeActions = {
@@ -318,9 +334,10 @@ export default function BusinessCrmDashboard() {
     onOpenInbox: () => openView({ kind: "inbox" }),
     onOpenSales: () => openView({ kind: "sales" }),
     onOpenMore: openMobileMoreMenu,
-    onNewAppointment: openNewAppointment,
+    onOpenSettings: () => openView({ kind: "settings" }),
+    onProfileUpdated: updateUserProfile,
     onOpenAppointment: openAppointmentInCalendar,
-    onCheckIn,
+    onMarkNoShow,
     onScheduleDecision: (record, action) => scheduleMobileAppointmentDecision(record, action, () => onAppointmentDecision(record, action)),
   };
 

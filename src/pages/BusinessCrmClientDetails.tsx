@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { ChevronLeft, RefreshCw, Users } from "lucide-react";
 import { SEO } from "@/components/SEO";
-import { BentoDock, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import { ClientDetailsView } from "@/components/business-crm/ClientDetailsView";
 import { useCrmContext } from "@/components/business-crm/CrmContext";
 import { buildClientRows, type CrmRecord } from "@/lib/crmClientData";
@@ -16,16 +15,10 @@ function ContentError({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function BusinessCrmClientDetails({ clientId }: { clientId: string }) {
-  const { appointments, inquiries, businessClients, userLabel, isDataLoading, dataError, refreshData, openView, openNewAppointment, notificationCount } = useCrmContext();
+  const { appointments, inquiries, businessClients, userLabel, isDataLoading, dataError, refreshData, openView } = useCrmContext();
   const rows = useMemo(() => buildClientRows(appointments as CrmRecord[], inquiries as CrmRecord[], businessClients as CrmRecord[]), [appointments, businessClients, inquiries]);
   const row = rows.find((item) => item.id === clientId);
   const returnToClients = () => openView({ kind: "clients" });
-  const navigateBentoTab = (tab: BentoDockTab) => {
-    if (tab === "dashboard") openView({ kind: "overview" });
-    else if (tab === "calendar") openView({ kind: "calendar" });
-    else if (tab === "clients") openView({ kind: "clients" });
-    else openView({ kind: "inbox" });
-  };
 
   return (
     <>
@@ -41,9 +34,6 @@ export default function BusinessCrmClientDetails({ clientId }: { clientId: strin
         <div className="client-details-phone-content">
           {isDataLoading ? <ContentLoading /> : dataError ? <ContentError onRetry={refreshData} /> : row ? <ClientDetailsView row={row} businessClients={businessClients as CrmRecord[]} staffName={userLabel} onBack={returnToClients} onSaved={refreshData} /> : <div dir="rtl" className="client-details-state-card client-details-missing-state mx-auto max-w-lg rounded-2xl border border-[#E5E7EB] bg-white p-8 text-center shadow-sm"><Users className="mx-auto h-9 w-9 text-slate-400" /><h1 className="mt-4 text-xl font-black text-[#1A1A3E]">הלקוח לא נמצא</h1><p className="mt-2 text-sm font-medium leading-6 text-slate-500">ייתכן שהרשומה הוסרה או שאין לך גישה אליה.</p><button type="button" onClick={returnToClients} className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-[#1A1A3E] px-5 text-sm font-extrabold text-white focus:outline-none focus:ring-2 focus:ring-[#F2D162]">חזרה ללקוחות</button></div>}
         </div>
-      </div>
-      <div className="bn bn-client-details-dock md:hidden" dir="rtl">
-        <BentoDock active="clients" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
       </div>
     </>
   );

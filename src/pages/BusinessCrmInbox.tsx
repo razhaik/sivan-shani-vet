@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isValid, parse } from "date-fns";
 import { he } from "date-fns/locale";
-import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Mail, MessageCircle, RefreshCw, Search, Settings2, ShieldAlert, X, XCircle } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Loader2, Mail, MessageCircle, RefreshCw, Search, Settings2, ShieldAlert, X, XCircle } from "lucide-react";
 import { Appointment, AppointmentRescheduleRequest, ContactInquiry } from "@/entities";
 import { useCrmContext, type CrmRecord } from "@/components/business-crm/CrmContext";
 import { SEO } from "@/components/SEO";
-import { BentoDock, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import { CrmInboxFolders, type InboxFolderKey } from "@/components/business-crm/CrmInboxFolders";
 import { CrmInboxMessageList, MobileAttentionTray, type AppointmentAction, type AppointmentActionState, type InboxActionFeedback, type InboxBulkAction, type InboxBulkActionFeedback, type InboxMessage, type RescheduleAction, type RescheduleActionState } from "@/components/business-crm/CrmInboxMessageList";
 import InboxReplyComposer, { type InboxReplyResult } from "@/components/business-crm/InboxReplyComposer";
@@ -189,6 +188,15 @@ function AppointmentFeedbackBanner({ feedback }: { feedback: InboxActionFeedback
   return <div role={feedback.tone === "success" ? "status" : "alert"} aria-live="polite" className={`mt-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-bold leading-6 ${tone}`}><Icon className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" /><span>{feedback.message}</span></div>;
 }
 
+// Phone folder picker: the folders that hold messages (marketing channels live in their own area).
+const MOBILE_INBOX_FOLDERS: Array<{ key: InboxFolderKey; label: string }> = [
+  { key: "inbox", label: "תיבת דואר" },
+  { key: "attention", label: "נדרשת תשומת לבך" },
+  { key: "follow-up", label: "המשך מעקב" },
+  { key: "archive", label: "ארכיון" },
+  { key: "trash", label: "נמחקו / זבל" },
+];
+
 function MobileInboxSourceFilters({ selected, counts, onChange }: { selected: InboxSourceFilter; counts: InboxSourceFilterCounts; onChange: (filter: InboxSourceFilter) => void }) {
   return <div className="crm-inbox-source-filters" role="group" aria-label="סינון לפי מקור ההודעה">
     {INBOX_SOURCE_FILTERS.map(({ value, label, icon: Icon }) => {
@@ -196,14 +204,14 @@ function MobileInboxSourceFilters({ selected, counts, onChange }: { selected: In
       return <button key={value} type="button" className={`crm-inbox-source-filter${selected === value ? " is-active" : ""}`} aria-pressed={selected === value} aria-label={`${label}, ${count} הודעות לא טופלו`} onClick={() => onChange(value)}>
         <Icon className="crm-inbox-source-icon" aria-hidden="true" />
         <span className="crm-inbox-source-label">{label}</span>
-        <span className="crm-inbox-source-count" aria-hidden="true">{count > 99 ? "99+" : count}</span>
+        {count > 0 && <span className="crm-inbox-source-count" aria-hidden="true">{count > 99 ? "99+" : count}</span>}
       </button>;
     })}
   </div>;
 }
 
 export default function BusinessCrmInbox() {
-  const { appointments, inquiries, rescheduleRequests, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching, openView, openNewAppointment, notificationCount } = useCrmContext();
+  const { appointments, inquiries, rescheduleRequests, search, setSearch, isDataLoading, dataError, refreshData, isDataFetching } = useCrmContext();
   const [activeFolder, setActiveFolder] = useState<InboxFolderKey>("inbox");
   const [foldersCollapsed, setFoldersCollapsed] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<InboxSourceFilter>("all");
@@ -297,12 +305,6 @@ export default function BusinessCrmInbox() {
       : (activeFolder === "inbox" || activeFolder === "attention") && attentionCount > 0
         ? `${attentionCount} בקשות עדיין ממתינות להחלטה`
         : "אין הודעות חדשות בתיקייה";
-  const navigateBentoTab = (tab: BentoDockTab) => {
-    if (tab === "dashboard") openView({ kind: "overview" });
-    else if (tab === "calendar") openView({ kind: "calendar" });
-    else if (tab === "clients") openView({ kind: "clients" });
-    else openView({ kind: "inbox" });
-  };
   const toggleMessage = (id: string) => setSelectedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   const markMessageHandled = async (message: InboxMessage) => {
@@ -467,13 +469,15 @@ export default function BusinessCrmInbox() {
           <header className="crm-inbox-mobile-header">
             <div className="crm-inbox-mobile-heading-row">
               <div className="crm-inbox-mobile-title-copy">
-                <p className="crm-inbox-mobile-clinic">{VETERINARY_CLINIC_PROFILE.businessName}</p>
                 <h1>תיבת דואר</h1>
               </div>
-              <div className="crm-inbox-mobile-count" aria-label={`${currentFolderUnreadCount} הודעות לא טופלו בתיקייה`}>
-                <strong>{currentFolderUnreadCount > 99 ? "99+" : currentFolderUnreadCount}</strong>
-                <span>לא טופלו</span>
-              </div>
+              <label className="crm-inbox-mobile-folder">
+                <span className="sr-only">תיקייה</span>
+                <select value={activeFolder} onChange={(event) => setActiveFolder(event.target.value as InboxFolderKey)} aria-label="בחירת תיקייה">
+                  {MOBILE_INBOX_FOLDERS.map((folder) => <option key={folder.key} value={folder.key}>{folder.label}{folder.key === "attention" && attentionCount > 0 ? ` · ${attentionCount}` : ""}</option>)}
+                </select>
+                <ChevronDown aria-hidden="true" />
+              </label>
             </div>
             <p className="crm-inbox-mobile-summary" aria-live="polite">{mobileFolderSummary}</p>
             <div className="crm-inbox-mobile-search">
@@ -484,7 +488,6 @@ export default function BusinessCrmInbox() {
           </header>
           {!isDataLoading && !dataError && activeFolder === "inbox" && pendingAttentionMessages.length > 0 && <MobileAttentionTray messages={pendingAttentionMessages} selectedMessage={selectedAttentionMessage} isMenuOpen={attentionMenuOpen} onToggleMenu={() => setAttentionMenuOpen((current) => !current)} onCloseMenu={() => setAttentionMenuOpen(false)} onSelectMessage={selectAttentionMessage} appointmentActionState={appointmentActionState} appointmentFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} />}
           <div className="crm-inbox-mobile-controls">
-            <CrmInboxFolders activeFolder={activeFolder} onFolderChange={setActiveFolder} inboxCount={unreadCount} attentionCount={attentionCount} collapsed={false} onToggleCollapsed={() => setFoldersCollapsed(false)} />
             <MobileInboxSourceFilters selected={sourceFilter} counts={sourceFilterCounts} onChange={setSourceFilter} />
           </div>
         </div>
@@ -501,9 +504,6 @@ export default function BusinessCrmInbox() {
             <CrmInboxMessageList messages={visibleMessages} unreadCount={visibleUnreadCount} selectedIds={selectedIds} selectedMessageId={selectedMessageId} onToggleMessage={toggleMessage} onMarkHandled={markMessageHandled} onSelectMessage={toggleExpandedMessage} onSelectAll={() => setSelectedIds(new Set(visibleMessages.map((message) => message.id)))} onClearSelection={() => setSelectedIds(new Set())} onRefresh={refreshData} isRefreshing={isDataFetching} emptyStateTitle={emptyState.title} emptyStateBody={emptyState.body} inboxActionState={inboxActionState} inboxActionFeedback={inboxActionFeedback} onInboxAction={handleInboxAction} appointmentActionState={appointmentActionState} actionFeedback={appointmentFeedback} onApproveAppointment={(message) => void handleAppointmentDecision(message, "approve")} onRejectAppointment={(message) => void handleAppointmentDecision(message, "reject")} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={(message) => void handleRescheduleDecision(message, "approve")} onRejectReschedule={(message) => void handleRescheduleDecision(message, "reject")} />
           </div>
         </div>}
-      </div>
-      <div className="bn crm-inbox-mobile-dock md:hidden" dir="rtl">
-        <BentoDock active="inbox" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
       </div>
       {replyMessages && <InboxReplyComposer selectedMessages={replyMessages} senderName={VETERINARY_CLINIC_PROFILE.businessName} onClose={() => setReplyMessages(null)} onSuccess={handleReplySuccess} />}
     </>

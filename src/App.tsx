@@ -14,7 +14,14 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { shouldRedirectToCrm } from "@/lib/crmHomeScreen";
 import "@/components/business-crm/bento-theme.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    },
+  },
+});
 
 const App = () => {
   if (typeof window !== "undefined" && shouldRedirectToCrm(window.location.pathname)) {

@@ -48,6 +48,10 @@ export interface CrmDataLoadProgress {
 
 export interface CrmContextValue {
   user: CrmRecord;
+  /** Merges a saved profile change (name / photo) into the signed-in user. */
+  updateUserProfile: (updates: { full_name: string; profile_image_url?: string }) => void;
+  /** Opens the app marketplace modal (used from the phone settings page). */
+  openAppMarketplace: (trigger?: HTMLButtonElement) => void;
   userLabel: string;
   appointments: CrmRecord[];
   inquiries: CrmRecord[];

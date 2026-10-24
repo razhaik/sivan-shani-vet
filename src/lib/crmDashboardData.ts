@@ -29,6 +29,10 @@ export interface DashboardClientSummary {
 export interface DashboardMonthSummary {
   currentCount: number;
   previousCount: number;
+  /** Appointments from the 1st of this month through today. */
+  currentToDateCount: number;
+  /** Appointments in the same span of last month (1st → same day of month). */
+  previousToDateCount: number;
   lastFourteenDays: Array<{ dateKey: string; count: number }>;
 }
 
@@ -212,7 +216,13 @@ export function summarizeDashboardAppointments(records: CrmRecord[], today: stri
     const dateKey = shiftDashboardDate(today, index - 13);
     return { dateKey, count: appointmentsOn(dateKey) };
   });
-  return { currentCount, previousCount, lastFourteenDays };
+  // Same-period comparison: 1st of this month → today vs 1st of last month → same day (capped at month end).
+  const dayOfMonth = validDateParts(today)?.[2] ?? 1;
+  const previousSameDay = shiftDashboardDate(bounds.previousStart, dayOfMonth - 1);
+  const previousSamePeriodEnd = previousSameDay > bounds.previousEnd ? bounds.previousEnd : previousSameDay;
+  const currentToDateCount = validAppointments.filter((record) => text(record.date) >= bounds.start && text(record.date) <= today).length;
+  const previousToDateCount = validAppointments.filter((record) => text(record.date) >= bounds.previousStart && text(record.date) <= previousSamePeriodEnd).length;
+  return { currentCount, previousCount, currentToDateCount, previousToDateCount, lastFourteenDays };
 }
 
 function timestamp(value: unknown): number {

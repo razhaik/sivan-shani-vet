@@ -9,6 +9,9 @@ import BusinessCrmServicesSettings from "@/components/business-crm/BusinessCrmSe
 import BusinessCrmNotificationsSettings from "@/components/business-crm/BusinessCrmNotificationsSettings";
 import BusinessCrmSelfServiceSettings, { type SelfServiceSettingsPayload } from "@/components/business-crm/BusinessCrmSelfServiceSettings";
 import CalendarAppointmentSyncSection from "@/components/business-crm/CalendarAppointmentSyncSection";
+import CrmMobileSettingsHome from "@/components/business-crm/CrmMobileSettingsHome";
+import { BentoDock, type BentoDockTab } from "@/components/business-crm/bento-ui";
+import { useCrmContext } from "@/components/business-crm/CrmContext";
 import { SettingsGroup } from "@/components/business-crm/SettingsPrimitives";
 import { type WeeklyAvailability } from "@/lib/clinicAvailability";
 import type { CrmSettingsSection } from "@/components/business-crm/CrmContext";
@@ -56,6 +59,13 @@ const settingsOptions = [
 
 export default function BusinessCrmSettings({ initialSection }: BusinessCrmSettingsProps) {
   const queryClient = useQueryClient();
+  const { openView, openNewAppointment, notificationCount } = useCrmContext();
+  const navigateBentoTab = (tab: BentoDockTab) => {
+    if (tab === "dashboard") openView({ kind: "overview" });
+    else if (tab === "calendar") openView({ kind: "calendar" });
+    else if (tab === "clients") openView({ kind: "clients" });
+    else openView({ kind: "inbox" });
+  };
   const overviewListFirstButtonRef = useRef<HTMLButtonElement>(null);
   const detailBackButtonRef = useRef<HTMLButtonElement>(null);
   const previousSectionRef = useRef<SettingsSection | null>(null);
@@ -175,8 +185,19 @@ export default function BusinessCrmSettings({ initialSection }: BusinessCrmSetti
   return (
     <>
       <SEO title={`הגדרות | ${VETERINARY_CLINIC_PROFILE.shortName}`} description={`הגדרות יומן, שירותים, תזכורות ללקוחות והתראות לבעלת העסק במרפאה הווטרינרית של ${VETERINARY_CLINIC_PROFILE.shortName}.`} url={`${VETERINARY_CLINIC_PROFILE.publicOrigin}${VETERINARY_CLINIC_PROFILE.crmBasePath}/settings`} noindex siteName={VETERINARY_CLINIC_PROFILE.businessName} />
-      <div dir="rtl" className={settingsSection === null ? "space-y-5" : "space-y-6"}>
-        <div className="max-w-3xl">
+      {settingsSection === null && (
+        <div className="md:hidden">
+          <CrmMobileSettingsHome
+            setting={setting as Record<string, unknown> | undefined}
+            isLoading={settingsQuery.isLoading}
+            hasError={Boolean(settingsQuery.error)}
+            onOpenSection={selectSettingsSection}
+            onSaveReminders={handleSaveReminders}
+          />
+        </div>
+      )}
+      <div dir="rtl" className={`crm-settings-page ${settingsSection === null ? "space-y-5 hidden md:block" : "space-y-6"}`}>
+        <div className="max-w-3xl crm-settings-desktop-heading">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#E8F3F5] text-[#1D6472]" aria-hidden="true">
               <ShieldCheck className="h-5 w-5" />
@@ -348,6 +369,9 @@ export default function BusinessCrmSettings({ initialSection }: BusinessCrmSetti
             </div>
           )}
         </section>
+      </div>
+      <div className="bn crm-settings-mobile-dock md:hidden" dir="rtl">
+        <BentoDock active="dashboard" onChange={navigateBentoTab} onAdd={openNewAppointment} badgeCount={notificationCount} />
       </div>
     </>
   );

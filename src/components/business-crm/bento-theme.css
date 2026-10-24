@@ -49,13 +49,18 @@
     --lav: #2a2250;
     --lav-ink: #c0b0ff;
   }
+
+  .bn .tile .ico {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }
 
 .bn * {
   box-sizing: border-box;
 }
 
-.bn:not(.bn-client-list) button {
+/* Zero-specificity reset, so component rules like `.bn .round` and `.bn .ap` keep their surface. */
+:where(.bn:not(.bn-client-list)) button {
   border: 0;
   padding: 0;
   color: inherit;
@@ -187,15 +192,7 @@
 }
 
 .bn .next::after {
-  position: absolute;
-  inset-block-start: -58px;
-  inset-inline-end: -56px;
-  width: 160px;
-  height: 160px;
-  border: 1px solid rgba(233, 196, 106, 0.16);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
+  content: none;
 }
 
 .bn .next .lbl {
@@ -204,7 +201,7 @@
   color: var(--gold);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
 }
 
 .bn .next .who {
@@ -438,6 +435,16 @@
   color: var(--sun-ink);
 }
 
+.bn .tile.idle {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink2);
+}
+
+.bn .tile.idle b {
+  color: var(--ink3);
+}
+
 .bn .tile .trend {
   margin-inline-start: 3px;
   font-size: 11px;
@@ -621,7 +628,7 @@
   overflow: hidden;
   max-width: 100%;
   color: var(--ink3);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -724,7 +731,7 @@
 
 .bn .ap .tm small {
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   opacity: 0.82;
 }
@@ -779,10 +786,11 @@
   max-width: 84px;
   padding: 4px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1.25;
   text-align: center;
+  white-space: nowrap;
 }
 
 .bn .st.ok {
@@ -816,7 +824,7 @@
   gap: 3px;
   margin-top: 3px;
   color: var(--mint-ink);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -877,6 +885,15 @@
   box-shadow: 0 16px 40px -18px rgba(17, 22, 51, 0.36);
 }
 
+.bn.bn-dock-host {
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  overflow: visible;
+}
+
 .bn .dk {
   position: relative;
   display: flex;
@@ -908,7 +925,7 @@
 
 .bn .dk.on::before {
   position: absolute;
-  top: -6px;
+  top: 1px;
   width: 20px;
   height: 3px;
   border-radius: 2px;
@@ -1138,17 +1155,21 @@
   box-shadow: var(--calendar-shadow);
 }
 
+.bn-calendar .calendar-heading-icon {
+  display: none !important;
+}
+
 .bn-calendar .calendar-heading small {
   display: block;
   color: var(--ink2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .bn-calendar .calendar-heading h1 {
   margin: 0;
   color: var(--ink);
-  font-size: 23px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.05;
@@ -1171,7 +1192,7 @@
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -1211,7 +1232,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 1px 4px -5px;
+  margin: 4px 4px 0;
   color: var(--ink);
   font-size: 13px;
   font-weight: 800;
@@ -1219,7 +1240,7 @@
 
 .bn-calendar .calendar-strip-hint {
   color: var(--ink3);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1247,9 +1268,8 @@
 .bn-calendar .daysum-heading > span {
   display: block;
   color: var(--gold);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.02em;
 }
 
 .bn-calendar .daysum-heading h2 {
@@ -1295,7 +1315,7 @@
 
 .bn-calendar .daysum-metric span {
   color: rgba(255, 255, 255, 0.72);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1364,12 +1384,12 @@
 .bn-calendar .calendar-timeline-heading p {
   margin: 2px 0 0;
   color: var(--ink2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .bn-calendar .timeline-legend {
-  display: inline-flex;
+  display: none;
   flex: 0 0 auto;
   align-items: center;
   gap: 5px;
@@ -1398,26 +1418,42 @@
   direction: rtl;
 }
 
+/* Hour labels sit centred on their hour line, so an event's top edge reads against the right label. */
 .bn-calendar .calendar-time-rail {
-  display: flex;
+  position: relative;
   min-width: 0;
-  flex-direction: column;
-  overflow: visible;
 }
 
 .bn-calendar .hour-label {
-  display: flex;
-  flex: 0 0 auto;
-  justify-content: center;
-  overflow: visible;
+  position: absolute;
+  inset-inline: 0;
   color: var(--ink3);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  transform: translateY(-7px);
 }
 
-.bn-calendar .hour-label span {
-  transform: translateY(-50%);
+.bn-calendar .calendar-time-rail .now-label {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 0;
+  padding: 1px 0;
+  border-radius: 7px;
+  background: #c94d43;
+  color: #ffffff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  transform: translateY(-8px);
+}
+
+.bn-calendar .calendar-timeline-scroll {
+  padding-top: 10px;
 }
 
 .bn-calendar .tl {
@@ -1503,10 +1539,11 @@
 }
 
 .bn-calendar .ev-time {
-  min-width: 0;
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
   color: var(--ink);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   line-height: 1.2;
@@ -1522,9 +1559,9 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 999px;
-  font-size: 8.5px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1561,7 +1598,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1575,7 +1612,7 @@
   gap: 3px;
   overflow: hidden;
   color: var(--ink2);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1588,7 +1625,7 @@
 
 .bn-calendar .now {
   position: absolute;
-  z-index: 7;
+  z-index: 1;
   right: 0;
   left: 0;
   height: 0;
@@ -1608,7 +1645,8 @@
   content: "";
 }
 
-.bn-calendar .now-label {
+.bn-calendar .tl .now-label {
+  display: none;
   position: absolute;
   top: 0;
   inset-inline-end: 0;
@@ -1895,13 +1933,9 @@
     padding-inline: 5px;
   }
 
-  .bn-calendar .ev-time {
-    font-size: 9px;
-  }
-
   .bn-calendar .ev-status {
-    max-width: 58px;
-    font-size: 8px;
+    max-width: 64px;
+    font-size: 10px;
   }
 
   .bn-calendar .calendar-unplaced {
@@ -2635,7 +2669,7 @@
   color: var(--gold);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .bn-client-list .client-mobile-name {
@@ -3020,13 +3054,13 @@
   stroke-width: 2;
 }
 
-.bn-client-list .dock {
+.bn-dock-host .dock {
   border-color: var(--line);
   background: var(--card);
   color: var(--ink3);
 }
 
-.bn-client-list .dock .dk {
+.bn-dock-host .dock .dk {
   border: 0;
   padding: 0;
   background: transparent;
@@ -3038,8 +3072,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.bn-client-list .dock .dk svg,
-.bn-client-list .dock .fab svg {
+.bn-dock-host .dock .dk svg,
+.bn-dock-host .dock .fab svg {
   width: 1em;
   height: 1em;
   flex-shrink: 0;
@@ -3050,22 +3084,22 @@
   stroke-linejoin: round;
 }
 
-.bn-client-list .dock .dk.on {
+.bn-dock-host .dock .dk.on {
   color: var(--ink);
 }
 
-.bn-client-list .dock .dk.on::before {
+.bn-dock-host .dock .dk.on::before {
   background: var(--gold);
 }
 
-.bn-client-list .dock .dk .bd {
+.bn-dock-host .dock .dk .bd {
   border: 1px solid var(--card);
   color: #fff;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
 }
 
-.bn-client-list .dock .fab {
+.bn-dock-host .dock .fab {
   border: 4px solid var(--bg);
   background: var(--navy);
   color: var(--gold);
@@ -3073,7 +3107,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.bn-client-list .dock .fab:hover {
+.bn-dock-host .dock .fab:hover {
   transform: translateY(-2px);
 }
 
@@ -3104,6 +3138,231 @@
     gap: 4px;
     padding-inline: 7px;
   }
+}
+
+/* Client list, phone: one count, one search with its options, rows that open the client card. */
+.bn-client-list .client-list-add-button {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.bn-client-list .client-list-add-button svg {
+  width: 19px;
+  height: 19px;
+  flex-basis: 19px;
+}
+
+.bn-client-list .client-list-select-button {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 22px;
+  font-size: 13px;
+}
+
+.bn-client-list .client-list-count {
+  font-size: 13px;
+}
+
+.bn-client-list .client-list-search .client-search-options {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 11px;
+  color: var(--ink);
+}
+
+.bn-client-list .client-list-search .client-search-options.is-active {
+  background: var(--navy);
+  color: var(--gold);
+}
+
+.bn-client-list .client-list-search .client-search-options b {
+  position: absolute;
+  top: -5px;
+  inset-inline-start: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--gold);
+  color: var(--navy);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+}
+
+.bn-client-list .client-list-search input {
+  font-size: 15px;
+}
+
+.bn-client-list .client-quick-filter {
+  font-size: 13px;
+}
+
+.bn-client-list .client-list-results-heading h2 {
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.bn-client-list .client-mobile-table {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.bn-client-list .client-mobile-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: transparent;
+}
+
+.bn-client-list .client-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+}
+
+.bn-client-list .client-row:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.bn-client-list .client-row.is-selected {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 1px var(--navy);
+}
+
+.bn-client-list .client-row-check {
+  display: grid;
+  width: 40px;
+  align-self: stretch;
+  flex: 0 0 40px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.bn-client-list .client-row-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--navy);
+}
+
+.bn-client-list .client-row-button {
+  display: flex;
+  min-width: 0;
+  min-height: 66px;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.bn-client-list .client-row-pets {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.bn-client-list .client-row-pet {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+}
+
+.bn-client-list .client-row-pet + .client-row-pet {
+  margin-inline-start: -14px;
+}
+
+.bn-client-list .client-row-pet svg {
+  width: 19px;
+  height: 19px;
+  stroke-width: 2;
+}
+
+.bn-client-list .client-row-pet.is-initials {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bn-client-list .client-row-pet.tone-sun { background: var(--sun); color: var(--sun-ink); }
+.bn-client-list .client-row-pet.tone-blue { background: var(--blue); color: var(--blue-ink); }
+.bn-client-list .client-row-pet.tone-mint { background: var(--mint); color: var(--mint-ink); }
+.bn-client-list .client-row-pet.tone-lav { background: var(--lav); color: var(--lav-ink); }
+
+.bn-client-list .client-row-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bn-client-list .client-row-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn-client-list .client-row-meta {
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn-client-list .client-row-phone {
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+.bn-client-list .client-row-side {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.bn-client-list .client-row-date {
+  color: var(--ink3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.bn-client-list .client-row-flag {
+  padding: 1px 7px;
+  border-radius: 7px;
+  background: var(--sun);
+  color: var(--sun-ink);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 /* Phone-only Client details presentation. The desktop profile keeps its three-panel layout. */
@@ -3197,7 +3456,7 @@
     color: var(--ink2);
     font-size: 11px;
     font-weight: 900;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
   }
 
   .client-details-bento .client-details-phone-content {
@@ -4473,5 +4732,1343 @@
 
   #crm-root.crm-bento-inbox .crm-inbox-decision-buttons {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Client card, phone: identity + reach-out first, pets next, the rest behind "פרטים נוספים". */
+@media (max-width: 767px) {
+  .client-details-bento .client-details-view > .client-details-actions,
+  .client-details-bento .client-details-identity-card > div:first-child {
+    display: none !important;
+  }
+
+  .client-details-bento .client-phone-hero {
+    order: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    background: var(--card);
+    box-shadow: 0 14px 34px -28px rgba(17, 22, 51, 0.5);
+  }
+
+  .client-details-bento .client-phone-hero-top {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .client-details-bento .client-phone-hero-avatar {
+    display: grid;
+    width: 60px;
+    height: 60px;
+    flex: 0 0 60px;
+    place-items: center;
+    border-radius: 20px;
+    background: var(--navy);
+    color: var(--gold);
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .client-details-bento .client-phone-hero-name {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .client-details-bento .client-phone-hero-name h1 {
+    overflow: hidden;
+    margin: 0;
+    color: var(--ink);
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .client-details-bento .client-phone-hero-name p {
+    margin: 3px 0 0;
+    color: var(--ink2);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .client-details-bento .client-phone-hero-menu {
+    position: relative;
+    align-self: flex-start;
+  }
+
+  .client-details-bento .client-phone-hero-more {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--card);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .client-details-bento .client-phone-hero-more svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .client-details-bento .client-phone-hero-popover {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    inset-inline-end: 0;
+    display: flex;
+    min-width: 200px;
+    flex-direction: column;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--card);
+    box-shadow: 0 18px 40px -18px rgba(17, 22, 51, 0.45);
+  }
+
+  .client-details-bento .client-phone-hero-popover button {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .client-details-bento .client-phone-hero-popover button:hover:not(:disabled) {
+    background: var(--bg);
+  }
+
+  .client-details-bento .client-phone-hero-popover button:disabled {
+    color: var(--ink3);
+    cursor: not-allowed;
+  }
+
+  .client-details-bento .client-phone-hero-popover svg {
+    width: 17px;
+    height: 17px;
+    color: var(--ink2);
+  }
+
+  .client-details-bento .client-phone-hero-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .client-details-bento .client-phone-hero-kpis > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 6px;
+    border-radius: 14px;
+    background: var(--bg);
+  }
+
+  .client-details-bento .client-phone-hero-kpis b {
+    color: var(--ink);
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  .client-details-bento .client-phone-hero-kpis span {
+    color: var(--ink2);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .client-details-bento .client-phone-hero-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .client-details-bento .client-phone-hero-actions > a,
+  .client-details-bento .client-phone-hero-actions > button {
+    display: inline-flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .client-details-bento .client-phone-hero-actions > .is-primary {
+    background: var(--navy);
+    color: #ffffff;
+  }
+
+  .client-details-bento .client-phone-hero-actions > .is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .client-details-bento .client-phone-hero-actions svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .client-details-bento .client-details-identity-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .client-details-bento .client-details-identity-column > * + * {
+    margin-top: 0 !important;
+  }
+
+  .client-details-bento .client-details-identity-column > .client-details-pets-card {
+    order: -1;
+  }
+
+  .client-details-bento .client-details-more {
+    margin-top: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+
+  .client-details-bento .client-details-more summary {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    color: var(--ink2);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .client-details-bento .client-details-more-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+  }
+}
+
+@media (min-width: 768px) {
+  .client-phone-hero {
+    display: none !important;
+  }
+}
+
+/* Inbox, phone: title + folder picker, one row of source chips, toolbar only once something is selected. */
+@media (max-width: 767px) {
+  #crm-root.crm-bento-inbox .crm-inbox-mobile-folder {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-mobile-folder select {
+    min-height: 40px;
+    max-width: 170px;
+    padding: 0 30px 0 14px;
+    padding-inline: 14px 30px;
+    border: 1px solid #E1E4E8;
+    border-radius: 20px;
+    background: #ffffff;
+    color: #1A1A3E;
+    font: inherit;
+    font-size: 14px !important;
+    font-weight: 700;
+    appearance: none;
+    -webkit-appearance: none;
+    text-overflow: ellipsis;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-mobile-folder svg {
+    position: absolute;
+    inset-inline-end: 11px;
+    width: 15px;
+    height: 15px;
+    color: #697386;
+    pointer-events: none;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-mobile-summary {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-source-filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-source-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-source-filter {
+    min-height: 38px;
+    flex: 0 0 auto;
+    padding: 0 14px;
+    border-radius: 19px;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-source-icon {
+    display: none;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-source-label {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-message-list:not(.has-selection) .crm-inbox-list-toolbar-header {
+    display: none;
+  }
+
+  #crm-root.crm-bento-inbox .crm-inbox-empty-state {
+    min-height: 200px;
+    padding-block: 32px;
+  }
+}
+
+/* Late overrides (must come after the base rules they adjust). */
+.bn-calendar .ev > * {
+  flex-shrink: 0;
+}
+
+.bn-calendar .ev.is-compact {
+  justify-content: center;
+  gap: 0;
+  padding-block: 3px;
+}
+
+.bn-calendar .ev.is-compact .ev-details {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bn .tile .ico {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Client card, phone, dark: the legacy panels hard-code navy text; give them readable ink. */
+@media (max-width: 767px) and (prefers-color-scheme: dark) {
+  .client-details-bento [class*="text-[#152E4D]"],
+  .client-details-bento [class*="text-[#1A1A3E]"],
+  .client-details-bento [class*="text-[#315A67]"] {
+    color: #f1f2f8 !important;
+  }
+
+  .client-details-bento .client-phone-hero,
+  .client-details-bento .client-phone-hero-more,
+  .client-details-bento .client-phone-hero-popover {
+    border-color: #262a48;
+    background: #181b33;
+  }
+
+  .client-details-bento .client-phone-hero-name h1,
+  .client-details-bento .client-phone-hero-kpis b,
+  .client-details-bento .client-phone-hero-actions > a,
+  .client-details-bento .client-phone-hero-actions > button,
+  .client-details-bento .client-phone-hero-more,
+  .client-details-bento .client-phone-hero-popover button {
+    color: #f1f2f8;
+  }
+
+  .client-details-bento .client-phone-hero-kpis > div,
+  .client-details-bento .client-phone-hero-actions > a,
+  .client-details-bento .client-phone-hero-actions > button {
+    background: #0e1022;
+  }
+
+  .client-details-bento .client-phone-hero-actions > .is-primary {
+    background: #26265e;
+  }
+
+  .client-details-bento .client-details-pet-card [class*="bg-white"],
+  .client-details-bento .client-details-pet-card .border-dashed {
+    background: #0e1022 !important;
+    color: #a7aac4 !important;
+  }
+}
+
+/* ===================================================================
+   Management home 2026-10 — yellow hero band, calm white content.
+   Scoped to .bn-home so the calendar / clients pages keep their look.
+   =================================================================== */
+.bn.bn-home {
+  --home-band-1: #f7d97a;
+  --home-band-2: #efc85a;
+  --home-band-ink: #1c1f45;
+  --home-band-muted: rgba(28, 31, 69, 0.64);
+  --home-surface: #ffffff;
+  --home-line: #eeede8;
+  --home-soft: #f3f2ee;
+  --home-chip: #fbefc6;
+  --home-chip-ink: #7a5a00;
+  background: #f6f5f1;
+}
+
+.bn.bn-home .wrap {
+  gap: 0;
+  padding-top: 0;
+}
+
+/* --- band ---------------------------------------------------------- */
+.bn.bn-home .hero-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 -16px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 72px;
+  border-radius: 0 0 32px 32px;
+  background: linear-gradient(160deg, var(--home-band-1) 0%, var(--home-band-2) 100%);
+  color: var(--home-band-ink);
+}
+
+.bn.bn-home .hero-band::before,
+.bn.bn-home .hero-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.bn.bn-home .hero-band::after {
+  inset-inline-end: -90px;
+  top: -110px;
+  width: 260px;
+  height: 260px;
+}
+
+.bn.bn-home .hero-band::before {
+  inset-inline-end: 40px;
+  top: 120px;
+  width: 140px;
+  height: 140px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bn.bn-home .hero-band .hdr {
+  padding: 4px 0 0;
+}
+
+.bn.bn-home .hero-band .hdr .av {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--home-band-ink);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.bn.bn-home .hero-band .hdr .t small {
+  color: var(--home-band-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.bn.bn-home .hero-band .hdr .t b {
+  color: var(--home-band-ink);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.bn.bn-home .hero-band .round.settings {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--home-band-ink);
+  font-size: 20px;
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.bn.bn-home .hero-band .round.settings:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.bn.bn-home .hero-band button:focus-visible {
+  outline-color: var(--home-band-ink);
+}
+
+.bn.bn-home .hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 22px;
+}
+
+.bn.bn-home .hero-stats button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 0;
+  color: var(--home-band-ink);
+  text-align: start;
+}
+
+.bn.bn-home .hero-stats button + button {
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid rgba(28, 31, 69, 0.13);
+}
+
+.bn.bn-home .hero-stats b {
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+}
+
+.bn.bn-home .hero-stats span {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--home-band-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn.bn-home .hero-stats em {
+  color: #1f6b45;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.bn.bn-home .hero-stats em.down {
+  color: #a3302b;
+}
+
+/* --- next appointment: white card lifted onto the band ------------- */
+.bn.bn-home .next,
+.bn.bn-home .wrap > .empty:nth-child(2) {
+  position: relative;
+  z-index: 1;
+  margin-top: -52px;
+}
+
+.bn.bn-home .next {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 16px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--home-surface);
+  color: var(--ink);
+  box-shadow: 0 18px 36px -22px rgba(60, 45, 0, 0.45);
+}
+
+.bn.bn-home .next .lbl {
+  grid-row: 1;
+  grid-column: 1;
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bn.bn-home .next .who {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 19px;
+}
+
+.bn.bn-home .next .what {
+  grid-column: 1 / -1;
+  color: var(--ink2);
+}
+
+.bn.bn-home .next .what .what-time {
+  display: none;
+}
+
+.bn.bn-home .next .cd {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: center;
+  min-width: 0;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--home-chip);
+}
+
+.bn.bn-home .next .cd span {
+  margin: 0;
+  color: var(--home-chip-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bn.bn-home .next .bar {
+  margin-top: 12px;
+}
+
+.bn.bn-home .next .bar a,
+.bn.bn-home .next .bar button {
+  min-height: 44px;
+  border-radius: 13px;
+  background: var(--home-soft);
+  color: var(--ink);
+}
+
+.bn.bn-home .next .bar a:hover,
+.bn.bn-home .next .bar button:hover:not(:disabled) {
+  background: #ebe9e3;
+}
+
+.bn.bn-home .next .bar .gold,
+.bn.bn-home .next .bar .gold:hover:not(:disabled) {
+  background: var(--home-band-ink);
+  color: #ffffff;
+}
+
+.bn.bn-home .next .arrival-feedback {
+  grid-column: 1 / -1;
+}
+
+.bn.bn-home .wrap > .empty:nth-child(2) {
+  background: var(--home-surface);
+  border-radius: 22px;
+  box-shadow: 0 18px 36px -22px rgba(60, 45, 0, 0.45);
+}
+
+/* --- pending approvals: quiet list --------------------------------- */
+.bn.bn-home .reqs {
+  margin-top: 24px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+}
+
+.bn.bn-home .reqs h3 {
+  margin: 0 6px 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bn.bn-home .reqs h3 em {
+  border-radius: 999px;
+  background: var(--home-chip);
+  color: var(--home-chip-ink);
+}
+
+.bn.bn-home .reqs .rq {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--home-line);
+  border-radius: 0;
+  background: var(--home-surface);
+}
+
+.bn.bn-home .reqs .rq:first-of-type {
+  border-radius: 20px 20px 0 0;
+}
+
+.bn.bn-home .reqs .rq:last-of-type {
+  border-radius: 0 0 20px 20px;
+}
+
+.bn.bn-home .reqs .rq:only-of-type {
+  border-radius: 20px;
+}
+
+.bn.bn-home .reqs .rq + .rq {
+  border-top: 0;
+}
+
+.bn.bn-home .reqs .rq .n {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.bn.bn-home .reqs .no {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 10px;
+  background: var(--home-soft);
+}
+
+.bn.bn-home .reqs .yes {
+  min-height: 36px;
+  border-radius: 10px;
+  background: var(--home-band-ink);
+}
+
+.bn.bn-home .reqs .more-requests {
+  margin-top: 8px;
+}
+
+/* --- section headings & lists below -------------------------------- */
+.bn.bn-home .sec {
+  margin-top: 24px;
+  margin-bottom: 10px;
+  padding-inline: 6px;
+}
+
+.bn.bn-home .sec h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bn.bn-home .sec button {
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bn.bn-home .home-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bn.bn-home {
+    --home-band-1: #e8c766;
+    --home-band-2: #d9b14a;
+    --home-surface: var(--card);
+    --home-line: var(--line);
+    --home-soft: rgba(255, 255, 255, 0.07);
+    --home-chip: rgba(242, 203, 115, 0.16);
+    --home-chip-ink: #f2cb73;
+    background: var(--bg);
+  }
+
+  .bn.bn-home .next {
+    box-shadow: 0 18px 36px -22px rgba(0, 0, 0, 0.8);
+  }
+
+  .bn.bn-home .next .bar a:hover,
+  .bn.bn-home .next .bar button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .bn.bn-home .next .bar .gold,
+  .bn.bn-home .reqs .yes {
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+}
+
+@media (max-width: 360px) {
+  .bn.bn-home .hero-band {
+    margin-inline: -12px;
+    padding-inline: 16px;
+  }
+
+  .bn.bn-home .hero-stats b {
+    font-size: 26px;
+  }
+}
+
+/* ===================================================================
+   Inbox "needs attention" as a card deck (phone only — the section is
+   hidden on desktop by the .crm-inbox-attention-tray gate above).
+   =================================================================== */
+.crm-attention-deck-section {
+  --deck-ink: #1c1f45;
+  --deck-ink2: #3a3d46;
+  --deck-muted: #7b7f8a;
+  --deck-line: #e9e8e4;
+  --deck-soft: #f1f0ec;
+  --deck-card: #ffffff;
+  font-family: Heebo, Assistant, sans-serif;
+}
+
+.crm-attention-deck-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.crm-attention-deck-head h2 {
+  margin: 0;
+  color: var(--deck-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.crm-attention-deck-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #e5484d;
+}
+
+.crm-attention-deck-count {
+  min-width: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fbefc6;
+  color: #7a5a00;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.crm-attention-deck-position {
+  margin-inline-start: auto;
+  color: var(--deck-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-attention-deck {
+  margin-top: 12px;
+}
+
+.crm-attention-deck-stack {
+  position: relative;
+}
+
+.crm-attention-card {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--deck-line);
+  border-radius: 18px;
+  background: var(--deck-card);
+  color: var(--deck-ink);
+  text-align: right;
+  box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.35);
+}
+
+.crm-attention-card-front {
+  position: relative;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.crm-attention-card-front:active {
+  cursor: grabbing;
+}
+
+.crm-attention-card-behind {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  overflow: hidden;
+  transform-origin: 50% 0;
+  cursor: pointer;
+}
+
+.crm-attention-card-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.crm-attention-card-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--deck-soft);
+  color: var(--deck-ink2);
+}
+
+.crm-attention-card-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.crm-attention-card-kind {
+  margin: 0;
+  color: var(--deck-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crm-attention-card-name {
+  overflow: hidden;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-attention-card-time {
+  flex-shrink: 0;
+  color: var(--deck-ink2);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-attention-card-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--deck-line);
+  border-radius: 12px;
+}
+
+.crm-attention-card-details > div {
+  min-width: 0;
+  padding: 9px 12px;
+  border-top: 1px solid var(--deck-line);
+}
+
+.crm-attention-card-details > div:nth-child(-n + 2) {
+  border-top: 0;
+}
+
+.crm-attention-card-details > div:nth-child(odd) {
+  border-left: 1px solid var(--deck-line);
+}
+
+.crm-attention-card-details > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  border-left: 0;
+}
+
+.crm-attention-card-details dt {
+  color: var(--deck-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.crm-attention-card-details dd {
+  margin: 1px 0 0;
+  color: var(--deck-ink);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.crm-attention-card-details .is-proposed dd {
+  color: #1f6b45;
+}
+
+.crm-attention-card-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.crm-attention-card-actions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 140ms ease, opacity 140ms ease;
+}
+
+.crm-attention-card-actions button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.crm-attention-card-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.crm-attention-card-actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+.crm-attention-card-actions .is-reject {
+  border: 1px solid var(--deck-line);
+  background: var(--deck-card);
+  color: var(--deck-ink2);
+}
+
+.crm-attention-card-actions .is-approve {
+  border: 1px solid var(--deck-ink);
+  background: var(--deck-ink);
+  color: #ffffff;
+}
+
+.crm-attention-card-actions button:focus-visible,
+.crm-attention-deck-dots button:focus-visible,
+.crm-attention-card-behind:focus-visible {
+  outline: 2px solid #e9c46a;
+  outline-offset: 2px;
+}
+
+.crm-attention-card-feedback {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crm-attention-card-feedback.is-success { background: #eef8f2; color: #1f6b45; }
+.crm-attention-card-feedback.is-partial { background: #fff8e1; color: #7a5a00; }
+.crm-attention-card-feedback.is-error { background: #fff1f1; color: #a3302b; }
+
+.crm-attention-deck-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.crm-attention-deck-dots button {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #d6d5cf;
+  transition: width 200ms ease, background-color 200ms ease;
+}
+
+.crm-attention-deck-dots button.is-active {
+  width: 18px;
+  background: var(--deck-ink);
+}
+
+.crm-attention-deck-hint {
+  margin: 6px 0 0;
+  color: var(--deck-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .crm-attention-deck-section {
+    --deck-ink: #f1f2f8;
+    --deck-ink2: #c9cbe0;
+    --deck-muted: #9095ad;
+    --deck-line: #2a2e4c;
+    --deck-soft: rgba(255, 255, 255, 0.07);
+    --deck-card: #181b33;
+  }
+
+  .crm-attention-card-actions .is-approve {
+    border-color: #f2cb73;
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+
+  .crm-attention-deck-dots button { background: #3a3e5c; }
+  .crm-attention-card-details .is-proposed dd { color: #78ddb0; }
+}
+
+/* ===================================================================
+   Phone settings home (2026-10) — calm light page, grouped lists.
+   =================================================================== */
+.bn.bn-settings {
+  --ms-surface: #ffffff;
+  --ms-line: #eeede8;
+  --ms-soft: #f3f2ee;
+  --ms-navy: #1c1f45;
+  background: #f6f5f1;
+}
+
+.bn.bn-settings .ms-wrap {
+  max-width: 580px;
+  margin-inline: auto;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(128px + env(safe-area-inset-bottom, 0px));
+}
+
+.bn.bn-settings .ms-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bn.bn-settings .ms-top h1 {
+  margin: 0;
+  color: var(--ms-navy);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.bn.bn-settings .ms-back {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #e9e8e4;
+  border-radius: 13px;
+  background: var(--ms-surface);
+  color: var(--ms-navy);
+  font-size: 20px;
+}
+
+.bn.bn-settings .ms-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.bn.bn-settings .ms-avatar {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #ffffff, 0 6px 16px -8px rgba(0, 0, 0, 0.35);
+}
+
+.bn.bn-settings .ms-profile-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.bn.bn-settings .ms-profile-text b {
+  display: block;
+  overflow: hidden;
+  color: var(--ms-navy);
+  font-size: 20px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn.bn-settings .ms-profile-text small {
+  color: var(--ink2);
+  font-size: 13px;
+}
+
+.bn.bn-settings .ms-edit {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--ms-navy);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bn.bn-settings .ms-group {
+  margin-top: 24px;
+}
+
+.bn.bn-settings .ms-group h2 {
+  margin: 0 8px 8px;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bn.bn-settings .ms-list {
+  overflow: hidden;
+  border: 1px solid var(--ms-line);
+  border-radius: 20px;
+  background: var(--ms-surface);
+}
+
+.bn.bn-settings .ms-row {
+  display: flex;
+  width: 100%;
+  min-height: 60px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  color: var(--ink);
+  text-align: start;
+  text-decoration: none;
+}
+
+.bn.bn-settings .ms-row + .ms-row {
+  border-top: 1px solid #f0efea;
+}
+
+.bn.bn-settings button.ms-row:active,
+.bn.bn-settings a.ms-row:active {
+  background: #faf9f6;
+}
+
+.bn.bn-settings .ms-ic {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--ms-soft);
+  color: var(--ms-navy);
+  font-size: 18px;
+}
+
+.bn.bn-settings .ms-tx {
+  min-width: 0;
+  flex: 1;
+}
+
+.bn.bn-settings .ms-tx b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.bn.bn-settings .ms-tx small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn.bn-settings .ms-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink3);
+  font-size: 16px;
+}
+
+.bn.bn-settings .ms-end em {
+  color: var(--ink2);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.bn.bn-settings .ms-toggle {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
+  border-radius: 999px;
+  background: #e2e1dc;
+  transition: background-color 180ms ease;
+}
+
+.bn.bn-settings .ms-toggle i {
+  position: absolute;
+  top: 3px;
+  inset-inline-start: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: inset-inline-start 180ms ease;
+}
+
+.bn.bn-settings .ms-toggle.is-on {
+  background: var(--ms-navy);
+}
+
+.bn.bn-settings .ms-toggle.is-on i {
+  inset-inline-start: 23px;
+}
+
+.bn.bn-settings .ms-toggle:disabled {
+  opacity: 0.6;
+}
+
+.bn.bn-settings .ms-error {
+  margin: 8px 6px 0;
+  color: #a3302b;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn.bn-settings .ms-toggle,
+  .bn.bn-settings .ms-toggle i {
+    transition: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .bn.bn-settings {
+    --ms-surface: var(--card);
+    --ms-line: var(--line);
+    --ms-soft: rgba(255, 255, 255, 0.07);
+    --ms-navy: #f1f2f8;
+    background: var(--bg);
+  }
+
+  .bn.bn-settings .ms-edit,
+  .bn.bn-settings .ms-toggle.is-on {
+    background: #f2cb73;
+    color: #1c1f45;
+  }
+
+  .bn.bn-settings .ms-row + .ms-row { border-top-color: var(--line); }
+  .bn.bn-settings .ms-toggle { background: #3a3e5c; }
+  .bn.bn-settings .ms-avatar { box-shadow: 0 0 0 3px var(--card); }
+}
+
+/* Settings detail screens on the phone: keep the old forms, give them room under the bento chrome. */
+#crm-root.crm-bento-settings .bn.crm-settings-mobile-dock {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+@media (max-width: 767px) {
+  #crm-root.crm-bento-settings .crm-settings-page {
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 12px calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #crm-root.crm-bento-settings .crm-settings-desktop-heading {
+    display: none;
   }
 }
