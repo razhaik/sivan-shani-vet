@@ -136,6 +136,23 @@ const ATTENTION_PEEK_INTRO = 62;
 const ATTENTION_MAX_BEHIND = 2;
 const ATTENTION_SWIPE_DISTANCE = 90;
 
+type AttentionExitContext = { direction: 1 | -1; mode: "toBack" | "dismiss"; backY: number };
+
+const attentionCardVariants = {
+  exit: ({ direction, mode, backY }: AttentionExitContext) => mode === "toBack"
+    ? {
+      // Out to the side, then slip underneath and settle at the back of the deck.
+      x: [null, direction * 300, direction * 300, direction * 140, 0],
+      y: [null, -4, -4, backY * 0.7, backY],
+      rotate: [null, direction * 9, direction * 9, direction * 4, 0],
+      scale: [null, 0.97, 0.97, 0.93, 0.9],
+      zIndex: [30, 30, 0, 0, 0],
+      opacity: [1, 1, 1, 1, 0],
+      transition: { duration: 0.7, times: [0, 0.34, 0.35, 0.75, 1], ease: ["easeOut", "linear", "easeInOut", "easeIn"] },
+    }
+    : { x: direction * 420, rotate: direction * 12, opacity: 0, transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } },
+};
+
 function attentionDetailsFor(message: InboxMessage) {
   return [
     message.attentionPetLabel ? { label: "חיית מחמד", value: message.attentionPetLabel } : null,
@@ -159,6 +176,8 @@ export function MobileAttentionTray({ messages, selectedMessage, onCloseMenu, on
   const reducedMotion = useReducedMotion() ?? false;
   const [introPlayed, setIntroPlayed] = useState(reducedMotion);
   const [exitDirection, setExitDirection] = useState<1 | -1>(-1);
+  // "toBack": a swipe tucks the card under the deck. "dismiss": the card left the list (approved/declined).
+  const [exitMode, setExitMode] = useState<"toBack" | "dismiss">("dismiss");
   const firstRenderRef = useRef(true);
 
   useEffect(() => {
@@ -180,11 +199,10 @@ export function MobileAttentionTray({ messages, selectedMessage, onCloseMenu, on
     if (messages.length < 2) return;
     const wrapped = (index + messages.length) % messages.length;
     setExitDirection(direction);
+    setExitMode("toBack");
     onCloseMenu();
     onSelectMessage(messages[wrapped].id);
   };
-  const goNext = () => goTo(currentIndex + 1, -1);
-  const goPrevious = () => goTo(currentIndex - 1, 1);
 
   const details = attentionDetailsFor(selectedMessage);
   const isAppointment = selectedMessage.kind === "appointment" && selectedMessage.status === "requested";
@@ -226,22 +244,24 @@ export function MobileAttentionTray({ messages, selectedMessage, onCloseMenu, on
           </motion.button>;
         })}
 
-        <AnimatePresence initial={false} mode="popLayout" custom={exitDirection}>
+        <AnimatePresence initial={false} mode="popLayout" custom={{ direction: exitDirection, mode: exitMode, backY: -(Math.max(1, behind.length)) * ATTENTION_PEEK_REST }} onExitComplete={() => setExitMode("dismiss")}>
           <motion.article
             key={selectedMessage.id}
             className="crm-attention-card crm-attention-card-front"
             style={{ zIndex: 20 }}
-            custom={exitDirection}
-            initial={reducedMotion ? false : { y: -ATTENTION_PEEK_REST, scale: 0.95, opacity: 0.6 }}
+            custom={{ direction: exitDirection, mode: exitMode, backY: -(Math.max(1, behind.length)) * ATTENTION_PEEK_REST }}
+            variants={attentionCardVariants}
+            initial={reducedMotion ? false : { y: -ATTENTION_PEEK_REST, scale: 0.95, opacity: 1 }}
             animate={{ y: 0, x: 0, scale: 1, opacity: 1, rotate: 0 }}
-            exit={reducedMotion ? { opacity: 0 } : { x: exitDirection * 420, rotate: exitDirection * 12, opacity: 0, transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+            exit={reducedMotion ? { opacity: 0, transition: { duration: 0 } } : "exit"}
             transition={transition}
             drag={messages.length > 1 && !busy ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.9}
             onDragEnd={(_, info) => {
-              if (info.offset.x < -ATTENTION_SWIPE_DISTANCE || info.velocity.x < -600) goNext();
-              else if (info.offset.x > ATTENTION_SWIPE_DISTANCE || info.velocity.x > 600) goPrevious();
+              // Either direction sends this card to the back of the deck and brings up the next one.
+              if (info.offset.x < -ATTENTION_SWIPE_DISTANCE || info.velocity.x < -600) goTo(currentIndex + 1, -1);
+              else if (info.offset.x > ATTENTION_SWIPE_DISTANCE || info.velocity.x > 600) goTo(currentIndex + 1, 1);
             }}
             aria-label={`${selectedMessage.sourceLabel} של ${selectedMessage.senderName}`}
           >
