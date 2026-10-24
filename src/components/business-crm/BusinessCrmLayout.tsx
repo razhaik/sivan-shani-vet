@@ -12,7 +12,7 @@ import type { CrmProfileUpdate } from "@/components/business-crm/CrmProfileMenu"
 import BusinessCrmContent from "@/components/business-crm/BusinessCrmContent";
 import { CrmContentBoundary } from "@/components/business-crm/CrmContentBoundary";
 import { CrmProvider, crmViewIdentity, type CrmCalendarLaunchRequest, type CrmContextValue, type CrmMobileAppointmentDecisionNotice, type CrmRecord, type CrmView } from "@/components/business-crm/CrmContext";
-import { BentoToastLayer } from "@/components/business-crm/bento-ui";
+import { BentoDock, BentoToastLayer, type BentoDockTab } from "@/components/business-crm/bento-ui";
 import type { AppointmentDecisionAction, AppointmentDecisionResult } from "@/lib/crmAppointmentDecision";
 import type { MarketingView } from "@/components/business-crm/MarketingLayout";
 import { clearCrmAsHomeScreenStart, markCrmAsHomeScreenStart } from "@/lib/crmHomeScreen";
@@ -435,10 +435,36 @@ export default function BusinessCrmLayout() {
   const toggleAssistant = useCallback(() => setIsAssistantOpen((current) => !current), []);
   const closeAssistant = useCallback(() => setIsAssistantOpen(false), []);
   const activeKey = activeKeyForView(view);
+  const mobileDockActive: BentoDockTab | null = view.kind === "overview"
+    ? "dashboard"
+    : view.kind === "calendar"
+      ? "calendar"
+      : view.kind === "clients" || view.kind === "client-details"
+        ? "clients"
+        : view.kind === "inbox"
+          ? "inbox"
+          : null;
+  const handleBentoDockChange = useCallback((tab: BentoDockTab) => {
+    if (tab === mobileDockActive) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const nextView: CrmView = tab === "dashboard"
+      ? { kind: "overview" }
+      : tab === "calendar"
+        ? { kind: "calendar" }
+        : tab === "clients"
+          ? { kind: "clients" }
+          : { kind: "inbox" };
+    openView(nextView);
+    window.scrollTo(0, 0);
+  }, [mobileDockActive, openView]);
   const searchCopy = topbarCopy(view);
   const viewKey = crmViewIdentity(view);
   const crmContextValue = useMemo<CrmContextValue>(() => ({
     user: user as CrmRecord,
+    updateUserProfile: handleProfileUpdated,
+    openAppMarketplace,
     userLabel,
     appointments,
     inquiries,
@@ -467,11 +493,11 @@ export default function BusinessCrmLayout() {
     mobileAppointmentDecision,
     scheduleMobileAppointmentDecision,
     undoMobileAppointmentDecision,
-  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
+  }), [appointments, appointmentsQuery.error, appointmentsQuery.isFetching, appointmentsQuery.isLoading, archivedClientKeys, archivedClientsQuery.error, archivedClientsQuery.isFetching, archivedClientsQuery.isLoading, businessClients, businessClientsQuery.error, businessClientsQuery.isFetching, businessClientsQuery.isLoading, calendarLaunchRequest, consumeCalendarLaunchRequest, dataLoadProgress, hasDataSnapshot, inquiries, inquiriesQuery.error, inquiriesQuery.isFetching, handleProfileUpdated, openAppMarketplace, inquiriesQuery.isLoading, mobileAppointmentDecision, mobileMoreRequest, notificationCount, openAppointmentInCalendar, openMobileMoreMenu, openNewAppointment, openView, refreshData, rescheduleRequests, rescheduleRequestsQuery.error, rescheduleRequestsQuery.isFetching, rescheduleRequestsQuery.isLoading, scheduleMobileAppointmentDecision, search, user, undoMobileAppointmentDecision, userLabel, view]);
 
   if (!authReady || !user) return <AuthGate />;
   return (
-    <div id="crm-root" dir="rtl" className={`crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]${view.kind === "inbox" ? " crm-bento-inbox" : ""}${view.kind === "overview" ? " crm-bento-home" : ""}${view.kind === "calendar" ? " crm-bento-calendar" : ""}${view.kind === "clients" ? " crm-bento-clients" : ""}${view.kind === "client-details" ? " crm-bento-client-details" : ""}`} style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}>
+    <div id="crm-root" dir="rtl" className={`crm-root min-h-screen overflow-x-hidden bg-[#F7F7F7] font-sans text-[#1A1A3E]${view.kind === "inbox" ? " crm-bento-inbox" : ""}${view.kind === "overview" ? " crm-bento-home" : ""}${view.kind === "calendar" ? " crm-bento-calendar" : ""}${view.kind === "clients" ? " crm-bento-clients" : ""}${view.kind === "client-details" ? " crm-bento-client-details" : ""}${view.kind === "settings" ? " crm-bento-settings" : ""}`} style={{ fontFamily: "Assistant, Heebo, Arial, sans-serif" }}>
       <CrmSidebar isOpen={sidebarOpen} userName={userLabel} onClose={closeSidebar} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} activeKey={activeKey} inboxCount={notificationCount} />
       <div className="min-h-screen lg:mr-[248px]">
         <div className="crm-topbar-shell">
@@ -484,6 +510,11 @@ export default function BusinessCrmLayout() {
         </main>
       </div>
       <CrmMobileNavigation view={view} onNavigate={openView} onOpenAppMarketplace={openAppMarketplace} moreOpenRequest={mobileMoreRequest} moreReturnFocusTarget={mobileMoreReturnFocusTarget} />
+      {mobileDockActive !== null && (
+        <div className="bn bn-dock-host md:hidden">
+          <BentoDock active={mobileDockActive} onChange={handleBentoDockChange} onAdd={openNewAppointment} badgeCount={notificationCount} />
+        </div>
+      )}
       <BentoToastLayer notice={mobileAppointmentDecision} onUndo={undoMobileAppointmentDecision} />
       <CrmAssistantPanel isOpen={isAssistantOpen} onClose={closeAssistant} />
       {isMarketplaceOpen && <AppMarketplaceModal onClose={closeAppMarketplace} returnFocusRef={marketplaceTriggerRef} />}

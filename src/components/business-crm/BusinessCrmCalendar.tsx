@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Appointment, AppointmentBlock, AppointmentNote, AppointmentWindow, ClinicService, ClinicSettings } from "@/entities";
 import { contacts } from "@/integrations/core";
@@ -22,11 +22,10 @@ import { BusinessCrmCalendarToolbar, type CalendarServiceItem } from "@/componen
 import { BusinessCrmCalendarSidePanel } from "@/components/business-crm/BusinessCrmCalendarSidePanel";
 import { BusinessCrmCalendarBlockDialog, type CalendarBlockDraft } from "@/components/business-crm/BusinessCrmCalendarBlockDialog";
 import { BusinessCrmCalendarSlotActionDialog } from "@/components/business-crm/BusinessCrmCalendarSlotActionDialog";
-import { CalendarEventDetails, CalendarQuickBooking, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
+import { CalendarEventDetails, CalendarQuickBooking, type CalendarDetailFeedback, type CalendarDetailMode, type CalendarPrivateNote, type NoShowCorrectionChoice, type QuickBookingCustomerMode, type QuickBookingDraft } from "@/components/business-crm/BusinessCrmCalendarPanels";
 import CalendarAppointmentSyncSection from "@/components/business-crm/CalendarAppointmentSyncSection";
 import CrmMobileSkeleton from "@/components/business-crm/CrmMobileSkeleton";
 import { CalendarPage } from "@/components/business-crm/bento-pages";
-import type { BentoDockTab } from "@/components/business-crm/bento-ui";
 import type { CalendarBlockDisplay } from "@/components/business-crm/BusinessCrmCalendarGrid";
 import type { AppointmentEditorMode } from "@/components/business-crm/BusinessCrmCalendarAppointmentEditor";
 
@@ -227,7 +226,9 @@ function CalendarState({ loading, onRetry }: { loading?: boolean; onRetry?: () =
 }
 
 export default function BusinessCrmCalendar() {
-  const { user, userLabel, appointments, inquiries, businessClients, search, setSearch, notificationCount, isDataLoading, dataError, refreshData, openView, openNewAppointment, calendarLaunchRequest, consumeCalendarLaunchRequest } = useCrmContext();
+  const { user, userLabel, appointments, inquiries, businessClients, search, setSearch, isDataLoading, dataError, refreshData, openView, openNewAppointment, calendarLaunchRequest, consumeCalendarLaunchRequest } = useCrmContext();
+  const queryClient = useQueryClient();
+  const userIdentity = String(user?.id || user?.email || "");
   const isMobile = useIsMobile();
   const isMobileCalendar = isMobile || (typeof window !== "undefined" && window.innerWidth < 768);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -257,6 +258,7 @@ export default function BusinessCrmCalendar() {
   const [cancelSaving, setCancelSaving] = useState(false);
   const [noShowConfirmOpen, setNoShowConfirmOpen] = useState(false);
   const [noShowSaving, setNoShowSaving] = useState(false);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
   const [notes, setNotes] = useState<CalendarPrivateNote[]>([]);
   const [notesAppointmentId, setNotesAppointmentId] = useState<string | null>(null);
   const [notesLoading, setNotesLoading] = useState(false);
@@ -674,6 +676,30 @@ export default function BusinessCrmCalendar() {
   };
   const toggleService = (id: string) => setVisibleServiceIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const patchLocalAppointment = (record: CrmRecord) => { const id = text(record.id); setLocalAppointments((current) => id ? [...current.filter((item) => text(item.id) !== id), record] : [...current, record]); };
+  const patchAppointmentStatusCaches = (record: CrmRecord) => {
+    const id = text(record.id);
+    if (!id) return;
+    const mergeRecord = (item: CrmRecord) => text(item.id) === id ? { ...item, ...record } : item;
+    queryClient.setQueryData<CrmRecord[]>(["business-crm", "appointments", userIdentity], (current) => current?.map(mergeRecord));
+    queryClient.setQueriesData<CrmRecord[]>({ queryKey: ["crm-dashboard-widgets", "appointments", userIdentity] }, (current) => current?.map(mergeRecord));
+    queryClient.setQueryData<CrmRecord[]>(["crm-dashboard-widgets", "pending-approvals", userIdentity], (current) => {
+      if (!current) return current;
+      const remaining = current.filter((item) => text(item.id) !== id);
+      return text(record.status) === "requested" ? [record, ...remaining] : remaining;
+    });
+  };
+  const refreshAppointmentStatusViews = () => {
+    void Promise.allSettled([
+      Promise.resolve(refreshData()),
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard-widgets", "appointments", userIdentity] }),
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard-widgets", "pending-approvals", userIdentity] }),
+      queryClient.invalidateQueries({ queryKey: ["business-crm", "sales-report-snapshot", userIdentity] }),
+    ]).then((results) => {
+      if (results.some((result) => result.status === "rejected")) {
+        console.error("Appointment status saved, but one or more CRM views could not be refreshed.");
+      }
+    });
+  };
   const actionFeedback = (result: { isPartial: boolean; summary: string }): CalendarDetailFeedback => ({ tone: result.isPartial ? "info" : "success", message: result.summary });
   const refreshGoogleCalendarViews = () => {
     void calendarEventsQuery.refetch().catch((error) => console.warn("Could not refresh Google Calendar events:", error));
@@ -1047,9 +1073,72 @@ export default function BusinessCrmCalendar() {
 
   const markNoShow = async () => {
     if (!selectedAppointment || noShowSaving || appointmentStatusTone(selectedAppointment.status) === "no_show") return;
-    const id = text(selectedAppointment.id); if (!id) { setAppointmentFeedback({ tone: "error", message: "לפגישה הזו חסר מזהה שמאפשר לעדכן את הסטטוס." }); return; }
-    setNoShowSaving(true); setAppointmentFeedback(null);
-    try { const updated = await Appointment.update(id, { status: "no_show" }); const saved = { ...selectedAppointment, ...(updated && typeof updated === "object" ? updated : {}), status: "no_show" } as CrmRecord; patchLocalAppointment(saved); setSelectedAppointment(saved); setNoShowConfirmOpen(false); setAppointmentFeedback({ tone: "success", message: "הפגישה סומנה כ״לא הגיע״ ונשארה ביומן." }); void notifyBusinessNotification("appointment_no_show", id); try { await Promise.resolve(refreshData()); } catch (error) { console.error("No-show saved, but CRM refresh failed:", error); } } catch (error) { console.error("Failed to mark appointment as no-show:", error); setAppointmentFeedback({ tone: "error", message: "לא הצלחנו לעדכן את סטטוס הפגישה. נסי שוב." }); } finally { setNoShowSaving(false); }
+    const id = text(selectedAppointment.id);
+    if (!id) { setAppointmentFeedback({ tone: "error", message: "לפגישה הזו חסר מזהה שמאפשר לעדכן את הסטטוס." }); return; }
+    setNoShowSaving(true);
+    setAppointmentFeedback(null);
+    try {
+      const updated = await Appointment.update(id, { status: "no_show" });
+      const saved = { ...selectedAppointment, ...(updated && typeof updated === "object" ? updated : {}), status: "no_show" } as CrmRecord;
+      patchLocalAppointment(saved);
+      setSelectedAppointment(saved);
+      patchAppointmentStatusCaches(saved);
+      setNoShowConfirmOpen(false);
+      setAppointmentFeedback({ tone: "success", message: "הפגישה סומנה כ״לא הגיע״ ונשארה ביומן." });
+      void notifyBusinessNotification("appointment_no_show", id);
+      refreshAppointmentStatusViews();
+    } catch (error) {
+      console.error("Failed to mark appointment as no-show:", error);
+      setAppointmentFeedback({ tone: "error", message: "לא הצלחנו לעדכן את סטטוס הפגישה. נסי שוב." });
+    } finally {
+      setNoShowSaving(false);
+    }
+  };
+
+  const correctNoShow = async (choice: NoShowCorrectionChoice): Promise<boolean> => {
+    if (!selectedAppointment || correctionSaving) return false;
+    if (appointmentStatusTone(selectedAppointment.status) !== "no_show") {
+      setAppointmentFeedback({ tone: "error", message: "אפשר לתקן רק תור שסומן כלא הגיע." });
+      return false;
+    }
+    const id = text(selectedAppointment.id);
+    if (!id) {
+      setAppointmentFeedback({ tone: "error", message: "לפגישה הזו חסר מזהה שמאפשר לשמור את התיקון." });
+      return false;
+    }
+
+    const status = choice === "requested" ? "requested" : "confirmed";
+    const arrivedAt = choice === "arrived" ? text(selectedAppointment.arrived_at) || new Date().toISOString() : "";
+    const changes = {
+      status,
+      arrived_at: arrivedAt,
+      ...(choice === "requested" ? { inbox_handled_at: "" } : {}),
+    };
+
+    setCorrectionSaving(true);
+    setAppointmentFeedback(null);
+    try {
+      const updated = await Appointment.update(id, changes);
+      const saved = { ...selectedAppointment, ...(updated && typeof updated === "object" ? updated : {}), ...changes } as CrmRecord;
+      patchLocalAppointment(saved);
+      setSelectedAppointment(saved);
+      patchAppointmentStatusCaches(saved);
+      setNoShowConfirmOpen(false);
+      const message = choice === "arrived"
+        ? "הסימון תוקן: התור מאושר ונרשמה שעת הגעה."
+        : choice === "confirmed_no_show"
+          ? "הסימון תוקן: התור מאושר, ללא סימון הגעה."
+          : "הסימון תוקן: התור הוחזר לבקשה שממתינה לאישור.";
+      setAppointmentFeedback({ tone: "success", message });
+      refreshAppointmentStatusViews();
+      return true;
+    } catch (error) {
+      console.error("Failed to correct a no-show appointment:", error);
+      setAppointmentFeedback({ tone: "error", message: "לא הצלחנו לשמור את תיקון הסימון. בדקי את מצב התור ונסי שוב." });
+      return false;
+    } finally {
+      setCorrectionSaving(false);
+    }
   };
 
   const saveNote = async () => {
@@ -1080,15 +1169,8 @@ export default function BusinessCrmCalendar() {
     selectedDate,
     now,
     search,
-    notificationCount,
     visibleServiceCount: calendarFilterItems.length,
     visibleServiceIds,
-  };
-  const navigateBentoTab = (tab: BentoDockTab) => {
-    if (tab === "dashboard") openView({ kind: "overview" });
-    else if (tab === "calendar") openView({ kind: "calendar" });
-    else if (tab === "clients") openView({ kind: "clients" });
-    else openView({ kind: "inbox" });
   };
   const openMobileAgenda = () => {
     setMobileCalendarView("agenda");
@@ -1100,7 +1182,6 @@ export default function BusinessCrmCalendar() {
     setServicePickerOpen(false);
   };
   const calendarPageActions = {
-    onNavigate: navigateBentoTab,
     onNewAppointment: openNewAppointment,
     onOpenAppointment: openAppointment,
     onSelectDate: selectDate,
@@ -1148,6 +1229,6 @@ export default function BusinessCrmCalendar() {
     {slotAction && <BusinessCrmCalendarSlotActionDialog date={slotAction.date} time={slotAction.time} onChooseAppointment={chooseSlotAppointment} onChooseBlock={chooseSlotBlock} onClose={() => setSlotAction(null)} />}
     {blockDialogOpen && <BusinessCrmCalendarBlockDialog draft={blockDraft} feedback={blockFeedback} overlapWarning={blockOverlapWarning} saving={blockSaving} onChange={updateBlockDraft} onSubmit={() => void saveCalendarBlock()} onClose={() => { if (!blockSaving) setBlockDialogOpen(false); }} />}
     {quickBooking && <CalendarQuickBooking date={quickBooking.date} time={quickBooking.time} now={now} services={quickBookingServiceItems} managerWarnings={quickBookingWarnings} publicSuggestedTimes={publicSuggestedTimes} publicAvailabilityLoading={publicAvailabilityLoading} publicAvailabilityError={publicAvailabilityError} availabilityChecksLoading={quickBookingAvailabilityLoading} availabilityChecksError={quickBookingAvailabilityErrorMessage} customers={customerRows} customerMode={quickBooking.customerMode} customerSearch={quickBooking.customerSearch} selectedCustomerId={quickBooking.selectedCustomerId} selectedCustomer={selectedQuickCustomer} onCustomerModeChange={changeQuickCustomerMode} onCustomerSearchChange={updateQuickCustomerSearch} onSelectCustomer={selectQuickCustomer} draft={quickBooking.draft} feedback={quickBooking.feedback} saving={savingBooking} onChange={updateQuickDraft} onTimeChange={updateQuickBookingTime} onSubmit={() => void saveBooking()} onClose={() => { if (!savingBooking) setQuickBooking(null); }} />}
-    {selectedAppointment && <CalendarEventDetails record={selectedAppointment} service={appointmentServiceItems.find((item) => item.id === serviceIdForRecord(selectedAppointment, appointmentServiceItems))} services={appointmentServiceItems} canManageCalendar={canManageClinicCalendar} onClose={() => { setSelectedAppointment(null); setAppointmentFeedback(null); setCancelConfirmOpen(false); }} onOpenInbox={(clientName) => { setSelectedAppointment(null); setAppointmentFeedback(null); setCancelConfirmOpen(false); openView({ kind: "inbox" }); setSearch(clientName); }} editorMode={detailMode} editDraft={editDraft} editFeedback={editorFeedback} savingAppointment={savingAppointment} onBeginEditor={beginEditor} onEditDraftChange={updateEditDraft} onSubmitEditor={() => void saveAppointmentEditor()} onCancelEditor={() => { setDetailMode("view"); setEditDraft(null); setEditorFeedback(null); }} decisionSaving={decisionSaving} onApprove={() => void saveAppointmentDecision("approve")} onReject={() => void saveAppointmentDecision("reject")} cancelConfirmOpen={cancelConfirmOpen} cancelSaving={cancelSaving} onRequestCancel={requestAppointmentCancellation} onCancelCancel={() => setCancelConfirmOpen(false)} onConfirmCancel={() => void saveConfirmedCancellation()} calendarRemovalRetrying={calendarSyncFeedback?.retryAction === "remove" && calendarSyncFeedback?.busyAppointmentId === selectedAppointmentId} onRetryCalendarRemoval={() => void retrySingleCalendarAction(selectedAppointmentId, "remove")} noShowConfirmOpen={noShowConfirmOpen} noShowSaving={noShowSaving} onRequestNoShow={() => { setNoShowConfirmOpen(true); setAppointmentFeedback(null); }} onCancelNoShow={() => setNoShowConfirmOpen(false)} onConfirmNoShow={() => void markNoShow()} feedback={appointmentFeedback} notes={visiblePrivateNotes} notesLoading={visibleNotesLoading} notesAvailable={visibleNotesAvailable} notesError={visibleNotesError} notesRetryable={visibleNotesRetryable} onRetryNotes={() => { if (selectedAppointmentId) void loadNotes(selectedAppointmentId); }} noteDraft={noteDraft} savingNote={savingNote} onNoteDraftChange={(value) => { setNoteDraft(value); setNotesError(null); }} onSaveNote={() => void saveNote()} />}
+    {selectedAppointment && <CalendarEventDetails record={selectedAppointment} service={appointmentServiceItems.find((item) => item.id === serviceIdForRecord(selectedAppointment, appointmentServiceItems))} services={appointmentServiceItems} canManageCalendar={canManageClinicCalendar} isMobile={isMobileCalendar} onClose={() => { setSelectedAppointment(null); setAppointmentFeedback(null); setCancelConfirmOpen(false); }} onOpenInbox={(clientName) => { setSelectedAppointment(null); setAppointmentFeedback(null); setCancelConfirmOpen(false); openView({ kind: "inbox" }); setSearch(clientName); }} editorMode={detailMode} editDraft={editDraft} editFeedback={editorFeedback} savingAppointment={savingAppointment} onBeginEditor={beginEditor} onEditDraftChange={updateEditDraft} onSubmitEditor={() => void saveAppointmentEditor()} onCancelEditor={() => { setDetailMode("view"); setEditDraft(null); setEditorFeedback(null); }} decisionSaving={decisionSaving} onApprove={() => void saveAppointmentDecision("approve")} onReject={() => void saveAppointmentDecision("reject")} cancelConfirmOpen={cancelConfirmOpen} cancelSaving={cancelSaving} onRequestCancel={requestAppointmentCancellation} onCancelCancel={() => setCancelConfirmOpen(false)} onConfirmCancel={() => void saveConfirmedCancellation()} calendarRemovalRetrying={calendarSyncFeedback?.retryAction === "remove" && calendarSyncFeedback?.busyAppointmentId === selectedAppointmentId} onRetryCalendarRemoval={() => void retrySingleCalendarAction(selectedAppointmentId, "remove")} noShowConfirmOpen={noShowConfirmOpen} noShowSaving={noShowSaving} onRequestNoShow={() => { setNoShowConfirmOpen(true); setAppointmentFeedback(null); }} onCancelNoShow={() => setNoShowConfirmOpen(false)} onConfirmNoShow={() => void markNoShow()} correctionSaving={correctionSaving} onCorrectNoShow={correctNoShow} feedback={appointmentFeedback} notes={visiblePrivateNotes} notesLoading={visibleNotesLoading} notesAvailable={visibleNotesAvailable} notesError={visibleNotesError} notesRetryable={visibleNotesRetryable} onRetryNotes={() => { if (selectedAppointmentId) void loadNotes(selectedAppointmentId); }} noteDraft={noteDraft} savingNote={savingNote} onNoteDraftChange={(value) => { setNoteDraft(value); setNotesError(null); }} onSaveNote={() => void saveNote()} />}
   </>;
 }

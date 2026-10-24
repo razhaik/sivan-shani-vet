@@ -1,6 +1,6 @@
-import { AnimatePresence, motion } from "framer-motion";
-import type { KeyboardEvent } from "react";
-import { CalendarDays, CheckCircle2, ChevronDown, Inbox, ListFilter, Loader2, MessageCircle, RefreshCw, RefreshCw as RefreshIcon, UserRound, XCircle } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { CalendarDays, Check, CheckCircle2, ChevronDown, Inbox, ListFilter, Loader2, MessageCircle, RefreshCw, RefreshCw as RefreshIcon, UserRound, X, XCircle } from "lucide-react";
 
 export type InboxLocation = "inbox" | "archive" | "trash";
 
@@ -131,88 +131,155 @@ interface MobileAttentionTrayProps {
   onRejectReschedule: (message: InboxMessage) => void | Promise<void>;
 }
 
-export function MobileAttentionTray({ messages, selectedMessage, isMenuOpen, onToggleMenu, onCloseMenu, onSelectMessage, appointmentActionState, appointmentFeedback, onApproveAppointment, onRejectAppointment, rescheduleActionState, rescheduleFeedback, onApproveReschedule, onRejectReschedule }: MobileAttentionTrayProps) {
-  if (!selectedMessage || messages.length === 0) return null;
+const ATTENTION_PEEK_REST = 14;
+const ATTENTION_PEEK_INTRO = 62;
+const ATTENTION_MAX_BEHIND = 2;
+const ATTENTION_SWIPE_DISTANCE = 90;
 
-  const SourceIcon = sourceIcon(selectedMessage);
-  const appointmentFeedbackForMessage = appointmentFeedback?.messageId === selectedMessage.id ? appointmentFeedback : null;
-  const rescheduleFeedbackForMessage = rescheduleFeedback?.messageId === selectedMessage.id ? rescheduleFeedback : null;
-  const selectFromMenu = (id: string) => {
-    onSelectMessage(id);
-    onCloseMenu();
-    window.requestAnimationFrame(() => document.getElementById("crm-mobile-attention-menu-button")?.focus());
-  };
-  const handleMenuKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onCloseMenu();
-      window.requestAnimationFrame(() => document.getElementById("crm-mobile-attention-menu-button")?.focus());
-      return;
-    }
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? messages.length - 1 : event.key === "ArrowDown" ? Math.min(messages.length - 1, index + 1) : Math.max(0, index - 1);
-    document.getElementById(`crm-mobile-attention-option-${nextIndex}`)?.focus();
-  };
-  const attentionDetails = [
-    selectedMessage.attentionPetLabel ? { label: "חיית מחמד", value: selectedMessage.attentionPetLabel } : null,
-    selectedMessage.attentionServiceLabel ? { label: "שירות", value: selectedMessage.attentionServiceLabel } : null,
-    selectedMessage.kind === "reschedule_request" ? { label: "מועד מקורי", value: selectedMessage.attentionOriginalDateLabel || "המועד המקורי לא צוין" } : null,
-    { label: selectedMessage.kind === "reschedule_request" ? "מועד מוצע" : "מועד מבוקש", value: selectedMessage.attentionDateLabel || selectedMessage.dateLabel },
+function attentionDetailsFor(message: InboxMessage) {
+  return [
+    message.attentionPetLabel ? { label: "חיית מחמד", value: message.attentionPetLabel } : null,
+    message.attentionServiceLabel ? { label: "שירות", value: message.attentionServiceLabel } : null,
+    message.kind === "reschedule_request" ? { label: "מועד מקורי", value: message.attentionOriginalDateLabel || "המועד המקורי לא צוין" } : null,
+    { label: message.kind === "reschedule_request" ? "מועד מוצע" : "מועד מבוקש", value: message.attentionDateLabel || message.dateLabel },
   ].filter(Boolean) as Array<{ label: string; value: string }>;
-
-  return <section dir="rtl" className="crm-inbox-attention-tray mb-5 overflow-hidden rounded-2xl border border-[#E7D88D] bg-[#FFFDF1] shadow-[0_14px_32px_-24px_rgba(26,26,62,0.8)]" aria-labelledby="crm-mobile-attention-title">
-    <div className="flex items-start gap-2 border-b border-[#F0E6B5] px-3 py-3">
-      <button id="crm-mobile-attention-menu-button" type="button" onClick={onToggleMenu} aria-expanded={isMenuOpen} aria-controls="crm-mobile-attention-menu" aria-haspopup="listbox" aria-label={isMenuOpen ? "סגירת רשימת הבקשות שממתינות" : "בחירת בקשה שממתינה"} className="order-first flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1A1A3E] text-white transition hover:bg-[#29295A] focus:outline-none focus:ring-2 focus:ring-[#F2D162] focus:ring-offset-2 focus:ring-offset-[#FFFDF1]"><ChevronDown className={`h-4 w-4 transition-transform ${isMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" /></button>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#D94C4C]" aria-hidden="true" />
-          <h2 id="crm-mobile-attention-title" className="truncate text-base font-black text-[#1A1A3E]">נדרשת תשומת לב</h2>
-          <span role="status" aria-live="polite" aria-label={`${messages.length} בקשות ממתינות`} className="min-w-6 rounded-full bg-[#F2D162] px-1.5 text-center text-[11px] font-black leading-5 text-[#1A1A3E]">{messages.length > 99 ? "99+" : messages.length}</span>
-        </div>
-        <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">בקשות תור ושינוי מועד מחכות לאישור המרפאה.</p>
-      </div>
-    </div>
-
-    {isMenuOpen && <div id="crm-mobile-attention-menu" role="listbox" aria-label="בקשות שממתינות לאישור" className="max-h-48 space-y-1 overflow-y-auto border-b border-[#F0E6B5] bg-white/75 p-2">
-      {messages.map((message, index) => {
-        const active = message.id === selectedMessage.id;
-        const ItemIcon = sourceIcon(message);
-        const attentionDateLabel = message.attentionDateLabel || message.dateLabel;
-        const dateParts = splitDateAndTime(attentionDateLabel);
-        return <button id={`crm-mobile-attention-option-${index}`} key={message.id} type="button" role="option" aria-label={`${message.sourceLabel}, ${message.senderName}, ${attentionDateLabel}`} aria-selected={active} onClick={() => selectFromMenu(message.id)} onKeyDown={(event) => handleMenuKeyDown(event, index)} className={`flex min-h-14 w-full items-start gap-2 rounded-xl border px-2.5 py-2 text-right transition focus:outline-none focus:ring-2 focus:ring-[#F2D162] ${active ? "border-[#D9BF55] bg-[#FFF8D9]" : "border-transparent bg-white hover:border-[#E5E7EB]"}`}>
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F1F3FA] text-[#5267A8]"><ItemIcon className="h-3.5 w-3.5" aria-hidden="true" /></span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-black text-slate-500">{message.sourceLabel}</span><span className="mt-0.5 block truncate text-xs font-black text-[#1A1A3E]">{message.senderName}</span><span className="mt-0.5 block break-words text-[10px] font-semibold leading-4 text-slate-400" title={attentionDateLabel}>{dateParts.date}</span>{dateParts.time && <span dir={dateParts.time.includes(":") ? "ltr" : undefined} className="block text-right text-[10px] font-black leading-4 tabular-nums text-[#5267A8]">{dateParts.time}</span>}</span>
-          {active && <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#5267A8]" aria-hidden="true" />}
-        </button>;
-      })}
-    </div>}
-
-    <div className="p-3">
-      <div className="rounded-xl border border-[#E5E7EB] bg-white p-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F2D162]/[0.35] text-[#1A1A3E]"><SourceIcon className="h-4 w-4" aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="truncate text-[10px] font-black text-[#5267A8]">{selectedMessage.sourceLabel}</p><h3 className="truncate text-sm font-black text-[#1A1A3E]">{selectedMessage.senderName}</h3></div>
-        </div>
-        <dl className="mt-3 grid grid-cols-2 gap-2">
-          {attentionDetails.map((detail) => {
-            const isOriginalDate = detail.label === "מועד מקורי";
-            const isProposedDate = detail.label === "מועד מוצע";
-            const isDateDetail = isOriginalDate || isProposedDate || detail.label === "מועד מבוקש";
-            const dateParts = isDateDetail ? splitDateAndTime(detail.value) : null;
-            const cardTone = isProposedDate ? "border border-[#DCE2F4] bg-[#F2F5FF]" : isOriginalDate ? "border border-[#E5E7EB] bg-[#F7F8FA]" : "bg-[#F7F8FA]";
-            const labelTone = isProposedDate ? "text-[#5267A8]" : isOriginalDate ? "text-slate-500" : "text-slate-400";
-            const timeTone = isOriginalDate ? "text-slate-500" : "text-[#5267A8]";
-            return <div key={detail.label} className={`min-w-0 rounded-lg px-2.5 py-2 ${cardTone}`}><dt className={`text-[10px] font-extrabold ${labelTone}`}>{detail.label}</dt><dd className={`mt-0.5 ${dateParts ? "break-words" : "truncate"} text-xs font-black text-[#1A1A3E]`} title={detail.value} aria-label={dateParts ? detail.value : undefined}>{dateParts ? <><span className="block break-words">{dateParts.date}</span>{dateParts.time && <span dir={dateParts.time.includes(":") ? "ltr" : undefined} className={`mt-0.5 block text-right text-[11px] font-black leading-4 tabular-nums ${timeTone}`}>{dateParts.time}</span>}</> : detail.value}</dd></div>;
-          })}
-        </dl>
-        {selectedMessage.kind === "appointment" && selectedMessage.status === "requested" && <AppointmentDecisionActions compact message={selectedMessage} state={appointmentActionState} feedback={appointmentFeedbackForMessage} onApprove={(message) => { onCloseMenu(); return onApproveAppointment(message); }} onReject={(message) => { onCloseMenu(); return onRejectAppointment(message); }} />}
-        {selectedMessage.kind === "reschedule_request" && selectedMessage.status === "pending" && <RescheduleDecisionActions compact message={selectedMessage} state={rescheduleActionState} feedback={rescheduleFeedbackForMessage} onApprove={(message) => { onCloseMenu(); return onApproveReschedule(message); }} onReject={(message) => { onCloseMenu(); return onRejectReschedule(message); }} />}
-      </div>
-    </div>
-  </section>;
 }
 
+function AttentionCardHeader({ message }: { message: InboxMessage }) {
+  const Icon = sourceIcon(message);
+  const time = splitDateAndTime(message.attentionDateLabel || message.dateLabel).time;
+  return <div className="crm-attention-card-head">
+    <span className="crm-attention-card-icon" aria-hidden="true"><Icon /></span>
+    <div className="min-w-0 flex-1"><p className="crm-attention-card-kind">{message.sourceLabel}</p><h3 className="crm-attention-card-name" dir="auto">{message.senderName}</h3></div>
+    {time && <span className="crm-attention-card-time" dir={time.includes(":") ? "ltr" : undefined}>{time}</span>}
+  </div>;
+}
+
+export function MobileAttentionTray({ messages, selectedMessage, onCloseMenu, onSelectMessage, appointmentActionState, appointmentFeedback, onApproveAppointment, onRejectAppointment, rescheduleActionState, rescheduleFeedback, onApproveReschedule, onRejectReschedule }: MobileAttentionTrayProps) {
+  const reducedMotion = useReducedMotion() ?? false;
+  const [introPlayed, setIntroPlayed] = useState(reducedMotion);
+  const [exitDirection, setExitDirection] = useState<1 | -1>(-1);
+  const firstRenderRef = useRef(true);
+
+  useEffect(() => {
+    if (introPlayed) return;
+    const timer = window.setTimeout(() => setIntroPlayed(true), 650);
+    return () => window.clearTimeout(timer);
+  }, [introPlayed]);
+
+  useEffect(() => { firstRenderRef.current = false; }, []);
+
+  if (!selectedMessage || messages.length === 0) return null;
+
+  const currentIndex = Math.max(0, messages.findIndex((message) => message.id === selectedMessage.id));
+  const behind = Array.from({ length: Math.min(ATTENTION_MAX_BEHIND, messages.length - 1) }, (_, offset) => messages[(currentIndex + offset + 1) % messages.length]);
+  const peek = introPlayed ? ATTENTION_PEEK_REST : ATTENTION_PEEK_INTRO;
+  const transition = reducedMotion ? { duration: 0 } : { type: "spring" as const, stiffness: 260, damping: 30, mass: 0.9 };
+
+  const goTo = (index: number, direction: 1 | -1) => {
+    if (messages.length < 2) return;
+    const wrapped = (index + messages.length) % messages.length;
+    setExitDirection(direction);
+    onCloseMenu();
+    onSelectMessage(messages[wrapped].id);
+  };
+  const goNext = () => goTo(currentIndex + 1, -1);
+  const goPrevious = () => goTo(currentIndex - 1, 1);
+
+  const details = attentionDetailsFor(selectedMessage);
+  const isAppointment = selectedMessage.kind === "appointment" && selectedMessage.status === "requested";
+  const isReschedule = selectedMessage.kind === "reschedule_request" && selectedMessage.status === "pending";
+  const actionState = isAppointment ? appointmentActionState : isReschedule ? rescheduleActionState : null;
+  const activeAction = actionState?.messageId === selectedMessage.id ? actionState.action : null;
+  const busy = Boolean(actionState);
+  const feedback = isAppointment
+    ? (appointmentFeedback?.messageId === selectedMessage.id ? appointmentFeedback : null)
+    : (rescheduleFeedback?.messageId === selectedMessage.id ? rescheduleFeedback : null);
+  const approve = () => { if (isAppointment) void onApproveAppointment(selectedMessage); else if (isReschedule) void onApproveReschedule(selectedMessage); };
+  const reject = () => { if (isAppointment) void onRejectAppointment(selectedMessage); else if (isReschedule) void onRejectReschedule(selectedMessage); };
+
+  return <section dir="rtl" className="crm-inbox-attention-tray crm-attention-deck-section mb-5" aria-labelledby="crm-mobile-attention-title" aria-roledescription="חפיסת בקשות">
+    <div className="crm-attention-deck-head">
+      <span className="crm-attention-deck-dot" aria-hidden="true" />
+      <h2 id="crm-mobile-attention-title">נדרשת תשומת לב</h2>
+      <span className="crm-attention-deck-count" role="status" aria-live="polite" aria-label={`${messages.length} בקשות ממתינות`}>{messages.length > 99 ? "99+" : messages.length}</span>
+      {messages.length > 1 && <span className="crm-attention-deck-position" aria-live="polite">{currentIndex + 1} מתוך {messages.length}</span>}
+    </div>
+
+    <motion.div className="crm-attention-deck" initial={false} animate={{ paddingTop: behind.length * peek }} transition={transition}>
+      <div className="crm-attention-deck-stack">
+        {behind.map((message, offset) => {
+          const depth = offset + 1;
+          return <motion.button
+            key={`behind-${message.id}`}
+            type="button"
+            className="crm-attention-card crm-attention-card-behind"
+            style={{ zIndex: 10 - depth }}
+            initial={firstRenderRef.current && !reducedMotion ? { y: -depth * ATTENTION_PEEK_INTRO, scale: 1 } : false}
+            animate={{ y: -depth * peek, scale: introPlayed ? 1 - depth * 0.05 : 1 - depth * 0.015 }}
+            transition={transition}
+            onClick={() => goTo(currentIndex + depth, -1)}
+            aria-label={`מעבר לבקשה של ${message.senderName}`}
+            tabIndex={-1}
+          >
+            <AttentionCardHeader message={message} />
+          </motion.button>;
+        })}
+
+        <AnimatePresence initial={false} mode="popLayout" custom={exitDirection}>
+          <motion.article
+            key={selectedMessage.id}
+            className="crm-attention-card crm-attention-card-front"
+            style={{ zIndex: 20 }}
+            custom={exitDirection}
+            initial={reducedMotion ? false : { y: -ATTENTION_PEEK_REST, scale: 0.95, opacity: 0.6 }}
+            animate={{ y: 0, x: 0, scale: 1, opacity: 1, rotate: 0 }}
+            exit={reducedMotion ? { opacity: 0 } : { x: exitDirection * 420, rotate: exitDirection * 12, opacity: 0, transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+            transition={transition}
+            drag={messages.length > 1 && !busy ? "x" : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.9}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -ATTENTION_SWIPE_DISTANCE || info.velocity.x < -600) goNext();
+              else if (info.offset.x > ATTENTION_SWIPE_DISTANCE || info.velocity.x > 600) goPrevious();
+            }}
+            aria-label={`${selectedMessage.sourceLabel} של ${selectedMessage.senderName}`}
+          >
+            <AttentionCardHeader message={selectedMessage} />
+            <dl className="crm-attention-card-details">
+              {details.map((detail) => {
+                const isDate = ["מועד מקורי", "מועד מוצע", "מועד מבוקש"].includes(detail.label);
+                const parts = isDate ? splitDateAndTime(detail.value) : null;
+                return <div key={detail.label} className={detail.label === "מועד מוצע" ? "is-proposed" : undefined}>
+                  <dt>{detail.label}</dt>
+                  <dd title={detail.value}>{parts ? <>{parts.date}{parts.time && <> · <bdi dir={parts.time.includes(":") ? "ltr" : "auto"}>{parts.time}</bdi></>}</> : detail.value}</dd>
+                </div>;
+              })}
+            </dl>
+            {(isAppointment || isReschedule) && <div className="crm-attention-card-actions" role="group" aria-label={isAppointment ? "אישור או סירוב בקשת התור" : "אישור או דחיית שינוי המועד"}>
+              <button type="button" className="is-reject" disabled={busy} onClick={reject} aria-label={isAppointment ? "סירוב הבקשה ושליחת הודעת ביטול ללקוח" : "דחיית שינוי המועד והשארת התור המקורי"}>
+                {activeAction === "reject" ? <Loader2 className="animate-spin" aria-hidden="true" /> : <X aria-hidden="true" />}
+                {activeAction === "reject" ? "שומר..." : isAppointment ? "סירוב" : "השארת המועד"}
+              </button>
+              <button type="button" className="is-approve" disabled={busy} onClick={approve} aria-label={isAppointment ? "אישור הבקשה ושליחת הודעת אישור ללקוח" : "אישור שינוי המועד"}>
+                {activeAction === "approve" ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
+                {activeAction === "approve" ? "מאשר..." : isAppointment ? "אישור" : "אישור השינוי"}
+              </button>
+            </div>}
+            {feedback && <p role={feedback.tone === "success" ? "status" : "alert"} aria-live="polite" className={`crm-attention-card-feedback is-${feedback.tone}`}>{feedback.message}</p>}
+          </motion.article>
+        </AnimatePresence>
+      </div>
+    </motion.div>
+
+    {messages.length > 1 && <>
+      <div className="crm-attention-deck-dots" role="tablist" aria-label="מעבר בין הבקשות">
+        {messages.slice(0, 8).map((message, index) => <button key={message.id} type="button" role="tab" aria-selected={index === currentIndex} aria-label={`בקשה ${index + 1}: ${message.senderName}`} className={index === currentIndex ? "is-active" : undefined} onClick={() => goTo(index, index > currentIndex ? -1 : 1)} />)}
+      </div>
+      <p className="crm-attention-deck-hint">החליקו הצידה לבקשה הבאה</p>
+    </>}
+  </section>;
+}
 interface PreviewProps {
   message: InboxMessage;
   detailId: string;
@@ -271,5 +338,5 @@ export function CrmInboxMessageList({ messages, unreadCount, selectedIds, select
   const actionTitle = inboxActionState ? "הפעולה מתבצעת" : selectedIds.size === 0 ? "יש לבחור לפחות הודעה אחת" : "בחירת פעולה להודעות שנבחרו";
   const actionStatus = inboxActionState === "reply" ? "פותח את חלון המענה..." : inboxActionState === "archive" ? "מעביר את ההודעות לארכיון..." : inboxActionState === "delete" ? "מעביר את ההודעות לאשפה..." : selectedIds.size > 0 ? `${selectedIds.size} הודעות נבחרו לפעולה` : "יש לבחור לפחות הודעה אחת כדי להפעיל פעולה";
 
-  return <section id="crm-inbox-message-list" className="crm-inbox-message-list min-w-0 overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white shadow-[0_10px_30px_-24px_rgba(26,26,62,0.65)]" aria-label="רשימת הודעות"><div className="crm-inbox-list-toolbar-header border-b border-[#EEF0F3] px-3 py-3 sm:px-5"><div className="crm-inbox-toolbar flex flex-wrap items-center justify-between gap-3"><div className="crm-inbox-toolbar-help flex min-h-10 items-center gap-2 rounded-lg border border-[#E1E4E8] bg-[#F7F8FA] px-3 text-xs font-extrabold text-[#1A1A3E]"><ListFilter className="h-4 w-4 text-slate-500" aria-hidden="true" /><span>פתיחת הודעה מסמנת אותה כטופלה</span></div><div className="crm-inbox-toolbar-controls flex min-w-0 items-center gap-2"><label className="crm-inbox-select-all relative flex min-h-10 items-center rounded-lg border border-[#E1E4E8] bg-[#F7F8FA] px-3 text-xs font-extrabold text-[#1A1A3E]"><select defaultValue="" onChange={(event) => { if (event.target.value === "all") onSelectAll(); if (event.target.value === "clear") onClearSelection(); event.currentTarget.value = ""; }} className="h-8 appearance-none bg-transparent pl-5 text-xs font-extrabold text-[#1A1A3E] outline-none" aria-label="סימון הודעות"><option value="">סימון</option><option value="all">סימון כל ההודעות המוצגות</option><option value="clear">ניקוי הבחירה</option></select><ChevronDown className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-slate-400" aria-hidden="true" /></label><button type="button" onClick={onRefresh} disabled={isRefreshing} className="crm-inbox-refresh flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E1E4E8] bg-[#F7F8FA] text-slate-500 transition hover:border-[#CBD2DB] hover:bg-white hover:text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162] disabled:cursor-wait disabled:opacity-60" aria-label="רענון תיבת הדואר" title="רענון תיבת הדואר"><RefreshCw className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} aria-hidden="true" /></button><label className={`crm-inbox-action-select relative flex min-h-10 items-center rounded-lg border px-3 text-xs font-extrabold ${actionDisabled ? "cursor-not-allowed border-[#E1E4E8] bg-[#F7F8FA] text-slate-400" : "border-[#DCE2F4] bg-[#F8F9FF] text-[#5267A8]"}`}><select defaultValue="" disabled={actionDisabled} onChange={(event) => { const action = event.target.value as InboxBulkAction; if (action) void onInboxAction(action); event.currentTarget.value = ""; }} className="h-8 max-w-[132px] appearance-none bg-transparent pl-5 text-xs font-extrabold outline-none disabled:cursor-not-allowed" aria-label="בחירת פעולה" aria-describedby="inbox-action-help" title={actionTitle}><option value="">בחירת פעולה</option><option value="reply">מענה</option><option value="archive">העברה לארכיון</option><option value="delete">מחיקה</option></select><ChevronDown className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-slate-400" aria-hidden="true" /></label></div></div><p id="inbox-action-help" role="status" aria-live="polite" className="crm-inbox-action-help mt-2 text-[11px] font-semibold text-slate-400">{actionStatus}</p>{inboxActionFeedback && <BulkActionFeedback feedback={inboxActionFeedback} />}<div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-slate-400"><div className="flex flex-wrap items-center gap-2"><span>{messages.length > 0 ? `${messages.length} הודעות מוצגות` : "אין הודעות להצגה"}</span>{unreadCount > 0 && <><span aria-hidden="true">·</span><span className="font-extrabold text-[#5267A8]">{unreadCount} לא נקראו</span></>}</div>{selectedIds.size > 0 && <span className="text-[#5267A8]">{selectedIds.size} נבחרו במסך זה בלבד</span>}</div></div>{messages.length === 0 ? <EmptyState title={emptyStateTitle} body={emptyStateBody} /> : <div className="crm-inbox-message-items" role="list" aria-label="הודעות בתיבת הדואר">{messages.map((message, index) => { const domToken = `${index}-${Math.abs(hash(message.id))}`; const detailId = `crm-inbox-detail-${domToken}`; const triggerId = `crm-inbox-trigger-${domToken}`; return <MessageRow key={message.id} message={message} index={index} selected={selectedIds.has(message.id)} active={selectedMessageId === message.id} detailId={detailId} triggerId={triggerId} onToggle={onToggleMessage} onMarkHandled={onMarkHandled} onSelect={onSelectMessage} appointmentActionState={appointmentActionState} actionFeedback={actionFeedback} onApproveAppointment={onApproveAppointment} onRejectAppointment={onRejectAppointment} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={onApproveReschedule} onRejectReschedule={onRejectReschedule} />; })}</div>}</section>;
+  return <section id="crm-inbox-message-list" className={`crm-inbox-message-list${selectedIds.size > 0 || inboxActionFeedback ? " has-selection" : ""} min-w-0 overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white shadow-[0_10px_30px_-24px_rgba(26,26,62,0.65)]`} aria-label="רשימת הודעות"><div className="crm-inbox-list-toolbar-header border-b border-[#EEF0F3] px-3 py-3 sm:px-5"><div className="crm-inbox-toolbar flex flex-wrap items-center justify-between gap-3"><div className="crm-inbox-toolbar-help flex min-h-10 items-center gap-2 rounded-lg border border-[#E1E4E8] bg-[#F7F8FA] px-3 text-xs font-extrabold text-[#1A1A3E]"><ListFilter className="h-4 w-4 text-slate-500" aria-hidden="true" /><span>פתיחת הודעה מסמנת אותה כטופלה</span></div><div className="crm-inbox-toolbar-controls flex min-w-0 items-center gap-2"><label className="crm-inbox-select-all relative flex min-h-10 items-center rounded-lg border border-[#E1E4E8] bg-[#F7F8FA] px-3 text-xs font-extrabold text-[#1A1A3E]"><select defaultValue="" onChange={(event) => { if (event.target.value === "all") onSelectAll(); if (event.target.value === "clear") onClearSelection(); event.currentTarget.value = ""; }} className="h-8 appearance-none bg-transparent pl-5 text-xs font-extrabold text-[#1A1A3E] outline-none" aria-label="סימון הודעות"><option value="">סימון</option><option value="all">סימון כל ההודעות המוצגות</option><option value="clear">ניקוי הבחירה</option></select><ChevronDown className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-slate-400" aria-hidden="true" /></label><button type="button" onClick={onRefresh} disabled={isRefreshing} className="crm-inbox-refresh flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E1E4E8] bg-[#F7F8FA] text-slate-500 transition hover:border-[#CBD2DB] hover:bg-white hover:text-[#1A1A3E] focus:outline-none focus:ring-2 focus:ring-[#F2D162] disabled:cursor-wait disabled:opacity-60" aria-label="רענון תיבת הדואר" title="רענון תיבת הדואר"><RefreshCw className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} aria-hidden="true" /></button><label className={`crm-inbox-action-select relative flex min-h-10 items-center rounded-lg border px-3 text-xs font-extrabold ${actionDisabled ? "cursor-not-allowed border-[#E1E4E8] bg-[#F7F8FA] text-slate-400" : "border-[#DCE2F4] bg-[#F8F9FF] text-[#5267A8]"}`}><select defaultValue="" disabled={actionDisabled} onChange={(event) => { const action = event.target.value as InboxBulkAction; if (action) void onInboxAction(action); event.currentTarget.value = ""; }} className="h-8 max-w-[132px] appearance-none bg-transparent pl-5 text-xs font-extrabold outline-none disabled:cursor-not-allowed" aria-label="בחירת פעולה" aria-describedby="inbox-action-help" title={actionTitle}><option value="">בחירת פעולה</option><option value="reply">מענה</option><option value="archive">העברה לארכיון</option><option value="delete">מחיקה</option></select><ChevronDown className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-slate-400" aria-hidden="true" /></label></div></div><p id="inbox-action-help" role="status" aria-live="polite" className="crm-inbox-action-help mt-2 text-[11px] font-semibold text-slate-400">{actionStatus}</p>{inboxActionFeedback && <BulkActionFeedback feedback={inboxActionFeedback} />}<div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-slate-400"><div className="flex flex-wrap items-center gap-2"><span>{messages.length > 0 ? `${messages.length} הודעות מוצגות` : "אין הודעות להצגה"}</span>{unreadCount > 0 && <><span aria-hidden="true">·</span><span className="font-extrabold text-[#5267A8]">{unreadCount} לא נקראו</span></>}</div>{selectedIds.size > 0 && <span className="text-[#5267A8]">{selectedIds.size} נבחרו במסך זה בלבד</span>}</div></div>{messages.length === 0 ? <EmptyState title={emptyStateTitle} body={emptyStateBody} /> : <div className="crm-inbox-message-items" role="list" aria-label="הודעות בתיבת הדואר">{messages.map((message, index) => { const domToken = `${index}-${Math.abs(hash(message.id))}`; const detailId = `crm-inbox-detail-${domToken}`; const triggerId = `crm-inbox-trigger-${domToken}`; return <MessageRow key={message.id} message={message} index={index} selected={selectedIds.has(message.id)} active={selectedMessageId === message.id} detailId={detailId} triggerId={triggerId} onToggle={onToggleMessage} onMarkHandled={onMarkHandled} onSelect={onSelectMessage} appointmentActionState={appointmentActionState} actionFeedback={actionFeedback} onApproveAppointment={onApproveAppointment} onRejectAppointment={onRejectAppointment} rescheduleActionState={rescheduleActionState} rescheduleFeedback={rescheduleFeedback} onApproveReschedule={onApproveReschedule} onRejectReschedule={onRejectReschedule} />; })}</div>}</section>;
 }
