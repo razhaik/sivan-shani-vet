@@ -12,6 +12,8 @@ import {
   AppointmentCard,
   clinicShortDate,
   formatCount,
+  MonthPickerButton,
+  MonthPickerSheet,
   isActiveAppointment,
   plural,
   timeMinutes,
@@ -543,6 +545,8 @@ export function CalendarPage({
   const clock = clinicNowTime(data.now);
   const isSelectedDayToday = selectedDay === today;
   const isFiltered = Boolean(data.search.trim()) || data.visibleServiceIds.size < data.visibleServiceCount;
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const selectDateKey = (dateKey: string) => actions.onSelectDate(new Date(`${dateKey}T12:00:00`));
 
   const dayAppointments = useMemo(
     () => data.appointments
@@ -642,12 +646,17 @@ export function CalendarPage({
             <section className="calendar-timeline-view" hidden={agendaMode} aria-label="תצוגת לוח יום">
               <div className="calendar-day-strip-label">
                 <span>בחירת יום</span>
-                <span className="calendar-strip-hint">6 ימי עבודה</span>
+                <MonthPickerButton value={selectedDay} expanded={monthPickerOpen} onOpen={() => setMonthPickerOpen(true)} />
               </div>
-              <WeekStrip appointments={data.appointments} value={selectedDay} today={today} onChange={(dateKey) => {
-                const date = new Date(`${dateKey}T12:00:00`);
-                actions.onSelectDate(date);
-              }} />
+              <WeekStrip appointments={data.appointments} value={selectedDay} today={today} onChange={selectDateKey} />
+              <MonthPickerSheet
+                open={monthPickerOpen}
+                value={selectedDay}
+                today={today}
+                appointments={data.allAppointments}
+                onSelect={selectDateKey}
+                onClose={() => setMonthPickerOpen(false)}
+              />
 
               <section className="daysum" aria-label={`סיכום התורים ל${selectedDateLabel}`}>
                 <div className="daysum-heading">
