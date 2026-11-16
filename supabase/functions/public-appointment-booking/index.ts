@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
 
 const MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY = "marketing-clinic-template" as const;

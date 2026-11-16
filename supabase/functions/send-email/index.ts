@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 // Sends an e-mail on behalf of a signed-in clinic admin (replaces Buildy's core.sendEmail).
 import { createSuperdevClient, sendEmailViaResend } from "../_shared/superdev-compat.ts";
 

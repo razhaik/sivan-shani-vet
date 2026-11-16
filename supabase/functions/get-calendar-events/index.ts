@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
 import { JWT } from "npm:google-auth-library@9.14.1";
 

@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
 
 const APP_ID = (Deno.env.get("SUPERDEV_APP_ID") ?? "sivan-shani-vet");

@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
 
 type BackendFunctionOptions = { headers?: Record<string, string>; signal?: AbortSignal };

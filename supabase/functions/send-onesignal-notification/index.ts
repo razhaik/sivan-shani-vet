@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
 
 const ONESIGNAL_APP_ID = "f6159636-c2ad-4e16-93c8-82845591b906";

@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import { isInternalOrAdmin } from "../_shared/superdev-compat.ts";
 
 Deno.serve(async (req) => {

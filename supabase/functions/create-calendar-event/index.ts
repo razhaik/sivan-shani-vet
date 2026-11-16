@@ -1,3 +1,4 @@
+import "../_shared/cors.ts";
 import {
   calendarHttpError,
   createCalendarRuntime,
