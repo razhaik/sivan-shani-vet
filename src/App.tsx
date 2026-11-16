@@ -9,6 +9,7 @@ import AppointmentBooking from "./pages/AppointmentBooking";
 import AppointmentManagement from "./pages/AppointmentManagement";
 import AccessibilityStatement from "./pages/AccessibilityStatement";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
 import { BrandingBadge } from "./components/BrandingBadge";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { shouldRedirectToCrm } from "@/lib/crmHomeScreen";
@@ -42,6 +43,7 @@ const App = () => {
             <Route path="/appointments" element={<AppointmentBooking />} />
             <Route path="/manage-appointment" element={<AppointmentManagement />} />
             <Route path="/accessibility" element={<AccessibilityStatement />} />
+            <Route path="/login" element={<Login />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

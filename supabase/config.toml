@@ -1,0 +1,24 @@
+# Supabase project config (only the parts this app relies on).
+project_id = "pfeneycysyczdljnuhov"
+
+[auth]
+site_url = "https://sivanshanivet.com"
+additional_redirect_urls = ["https://sivanshanivet.com/login"]
+# Only clinic staff log in; accounts are created by invitation from the dashboard.
+enable_signup = false
+
+# Functions the public booking / appointment-management pages call without a login.
+[functions.public-appointment-booking]
+verify_jwt = false
+[functions.manage-appointment-by-token]
+verify_jwt = false
+[functions.cancel-appointment-by-token]
+verify_jwt = false
+[functions.get-calendar-busy]
+verify_jwt = false
+[functions.send-business-notification]
+verify_jwt = false
+[functions.send-sms]
+verify_jwt = false
+[functions.send-appointment-reminders]
+verify_jwt = false
