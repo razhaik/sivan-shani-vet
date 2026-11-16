@@ -4402,19 +4402,10 @@
     gap: 9px;
   }
 
-  #crm-root.crm-bento-inbox .crm-inbox-toolbar-help {
-    min-width: 0;
-    min-height: 38px;
-    justify-content: flex-start;
-    padding: 8px 10px;
-    border-radius: 11px;
-    font-size: 11px;
-    line-height: 1.35;
-  }
-
   #crm-root.crm-bento-inbox .crm-inbox-toolbar-controls {
     display: grid;
     min-width: 0;
+    margin-right: 0;
     grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1.2fr);
     gap: 7px;
   }
