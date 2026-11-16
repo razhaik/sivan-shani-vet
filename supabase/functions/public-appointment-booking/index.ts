@@ -772,13 +772,17 @@ function notifyOwner(req: Request, appointmentId: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MAX_NOTIFICATION_WAIT_MS);
   const notify = superdev.functions["send-business-notification"] as unknown as BackendFunction;
-  void notify({ event: "new_appointment", record_id: appointmentId }, { headers: requestHeaders(req), signal: controller.signal })
+  // Keep the worker alive until the owner notification finishes; Supabase may stop it once the response is sent.
+  const task = notify({ event: "new_appointment", record_id: appointmentId }, { headers: requestHeaders(req), signal: controller.signal })
     .then((result) => {
       const payload = unwrap(result);
       if (payload?.error) console.error("[PublicBooking] owner notification was not accepted:", safeError(payload.error));
     })
     .catch((error) => console.error("[PublicBooking] owner notification failed:", safeError(error)))
     .finally(() => clearTimeout(timeout));
+  // deno-lint-ignore no-explicit-any
+  const runtime = (globalThis as any).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(task);
 }
 
 function serviceDetails(service: ResolvedService) {
