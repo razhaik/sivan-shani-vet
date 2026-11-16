@@ -379,12 +379,16 @@ async function runReminderJob(): Promise<void> {
   console.log(`[Reminders] run complete, scanned ${scanned} confirmed appointments`);
 }
 
-Deno.cron("appointment-reminders", "*/5 * * * *", async () => {
-  try { await runReminderJob(); }
-  catch (error) { console.error("[Reminders] scheduled run failed:", safeError(error)); }
-});
+// Supabase does not run Deno.cron, so a pg_cron job POSTs here every 5 minutes.
+// The job is safe to trigger repeatedly: each reminder is marked once it is sent.
+let running: Promise<void> | null = null;
 
-Deno.serve((req) => {
-  if (req.method !== "GET" && req.method !== "HEAD") return new Response(JSON.stringify({ error: "Health endpoint only" }), { status: 405, headers: { "Content-Type": "application/json" } });
+Deno.serve(async (req) => {
+  if (req.method === "POST") {
+    if (!running) running = runReminderJob().catch((error) => console.error("[Reminders] scheduled run failed:", safeError(error))).finally(() => { running = null; });
+    await running;
+    return new Response(JSON.stringify({ status: "ok" }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  if (req.method !== "GET" && req.method !== "HEAD") return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { "Content-Type": "application/json" } });
   return new Response(JSON.stringify({ status: "ok", job: "appointment-reminders" }), { status: 200, headers: { "Content-Type": "application/json" } });
 });
