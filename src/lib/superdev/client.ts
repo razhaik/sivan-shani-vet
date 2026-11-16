@@ -37,7 +37,7 @@ function userRecord(session: Session | null) {
   const u = session?.user;
   if (!u) return null;
   const meta = (u.user_metadata || {}) as Record<string, any>;
-  return { id: u.id, email: u.email, full_name: meta.full_name || u.email, profile_image_url: meta.profile_image_url || "", role: "admin", ...meta };
+  return { id: u.id, email: u.email, full_name: meta.full_name || u.email, profile_image_url: meta.profile_image_url || "", role: "administrator", ...meta };
 }
 
 const auth = {

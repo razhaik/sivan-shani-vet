@@ -52,7 +52,7 @@ export function createSuperdevClient(_options: Record<string, unknown> = {}) {
     const email = data.user.email || "";
     const { data: admin } = await serviceClient.from("app_admin").select("email").ilike("email", email).maybeSingle();
     if (!admin) return null; // only clinic admins count as signed-in users of this app
-    return { id: data.user.id, email, full_name: data.user.user_metadata?.full_name || email, role: "admin" };
+    return { id: data.user.id, email, full_name: data.user.user_metadata?.full_name || email, role: "administrator" };
   }
 
   const auth = {
