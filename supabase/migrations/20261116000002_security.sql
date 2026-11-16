@@ -1,7 +1,7 @@
 -- Security: who may read/write what. Generated 2026-11-16.
 create table if not exists public.app_admin (email text primary key, created_at timestamptz not null default now());
 alter table public.app_admin enable row level security;
-insert into public.app_admin(email) values ('razhaik10@gmail.com'), ('sivanshanivet@gmail.com') on conflict do nothing;
+insert into public.app_admin(email) values ('razhaik10@gmail.com'), ('seeveek@gmail.com') on conflict do nothing;
 create or replace function public.is_admin() returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.app_admin a where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 $$;
