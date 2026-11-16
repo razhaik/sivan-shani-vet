@@ -12,10 +12,10 @@ import {
 } from "@/lib/optimizedImageUrl";
 
 const INDEX_LOGO_URL =
-  "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768587105801-2026-01-05-15.55.10-Nero-AI-Background-Remover.png";
+  "/media/2279f6f6-1-05-15.55.10-Nero-AI-Background-Remover.png";
 
 const INDEX_SOCIAL_IMAGE_URL =
-  "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768592510962-pasted-image-1768592469398.png";
+  "/media/82ea2564-1768592510962-pasted-image-1768592469398.png";
 
 const Index = () => {
   const logoImage = optimizedImageSource(INDEX_LOGO_URL, {

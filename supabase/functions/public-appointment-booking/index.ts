@@ -2,7 +2,7 @@ import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
 
 const MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY = "marketing-clinic-template" as const;
-const CUSTOMER_EMAIL_LOGO_URL = "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/f4527f39-6b5f-4fae-b77d-5735fe1452b8-pasted-image-1789671955012.png";
+const CUSTOMER_EMAIL_LOGO_URL = "https://sivanshanivet.com/media/f0d6a0e1--5735fe1452b8-pasted-image-1789671955012.png";
 
 type CustomerEmailTemplateKey = "current-clinic-template" | "marketing-clinic-template";
 type CustomerEmailDetail = { label: string; value: unknown };

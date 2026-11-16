@@ -29,31 +29,31 @@ export function VetGallerySection() {
     {
       title: "בדיקות מעבדה מדויקות",
       subtitle: "מבט קרוב כדי לדייק באבחנה",
-      imageUrl: "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768592510961-pasted-image-1768592456849.png",
+      imageUrl: "/media/bed4b83f-1768592510961-pasted-image-1768592456849.png",
       imageAlt: "וטרינרית בוחנת דגימה במיקרוסקופ במעבדה וטרינרית",
     },
     {
       title: "זמן איכות עם המטופלים",
       subtitle: "חיבוקים, נשיקות והרבה דשא ירוק",
-      imageUrl: "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768592510962-pasted-image-1768592463036.png",
+      imageUrl: "/media/61be4702-1768592510962-pasted-image-1768592463036.png",
       imageAlt: "אישה שוכבת על הדשא עם שני כלבים ומחבקת אותם באהבה",
     },
     {
       title: "בדיקה רגועה לכלב גדול",
       subtitle: "סבלנות ועדינות גם עם הענקים",
-      imageUrl: "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768592510962-pasted-image-1768592469398.png",
+      imageUrl: "/media/82ea2564-1768592510962-pasted-image-1768592469398.png",
       imageAlt: "וטרינרית בודקת כלב גדול שמושיט לה רגל במרפאה",
     },
     {
       title: "מפהקים מהשעה, לא מהיחס",
       subtitle: "מטופל עייף אבל רגוע אחרי טיפול",
-      imageUrl: "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768592510962-pasted-image-1768592482313.png",
+      imageUrl: "/media/f9e57317-1768592510962-pasted-image-1768592482313.png",
       imageAlt: "כלב קטן לבן מפהק על שולחן בדיקה במרפאה וטרינרית",
     },
     {
       title: "בדיקת עיניים מתקדמת",
       subtitle: "ציוד מתקדם לשמירה על הראייה של החברים על ארבע",
-      imageUrl: "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768592510963-pasted-image-1768592509609.png",
+      imageUrl: "/media/565dbf9d-1768592510963-pasted-image-1768592509609.png",
       imageAlt: "וטרינרית בודקת עיניים של כלב באמצעות מכשיר בדיקה מיוחד",
     },
   ];

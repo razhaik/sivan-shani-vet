@@ -8,9 +8,9 @@ import {
 } from "@/lib/optimizedImageUrl";
 
 const HERO_IMAGE_URL =
-  "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/e4b08990-f579-4036-ae06-d6be2cdfc27a-file.png";
+  "/media/581e4b8f-4b08990-f579-4036-ae06-d6be2cdfc27a-file.png";
 const LOGO_IMAGE_URL =
-  "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768587105801-2026-01-05-15.55.10-Nero-AI-Background-Remover.png";
+  "/media/2279f6f6-1-05-15.55.10-Nero-AI-Background-Remover.png";
 
 export function VetHeroSection() {
   const heroImage = optimizedImageSource(HERO_IMAGE_URL, {

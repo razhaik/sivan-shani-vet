@@ -47,9 +47,9 @@ export const VETERINARY_CLINIC_PROFILE: VeterinaryClinicProfile = {
   publicOrigin: "https://sivanshanivet.com",
   crmBasePath: "/business-crm",
   logoUrl:
-    "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/1768587105801-2026-01-05-15.55.10-Nero-AI-Background-Remover.png",
+    "/media/2279f6f6-1-05-15.55.10-Nero-AI-Background-Remover.png",
   emailLogoUrl:
-    "https://ellprnxjjzatijdxcogk.supabase.co/storage/v1/object/public/superdev-project-images/a301af57-5ec1-4bdd-b507-48300a4b64bb/lczgvu3wjuxaqpny3stm/f4527f39-6b5f-4fae-b77d-5735fe1452b8-pasted-image-1789671955012.png",
+    "/media/f0d6a0e1--5735fe1452b8-pasted-image-1789671955012.png",
   googleReviewsUrl:
     "https://www.google.com/search?q=%D7%A1%D7%99%D7%95%D7%9F+%D7%A9%D7%A0%D7%99&oq=%D7%A1%D7%99%D7%95%D7%9F+&gs_lcrp=EgZjaHJvbWUqCAgAEEUYJxg7MggIABBFGCcYOzIGCAEQRRg5MgYIAhAjGCcyBwgDEC4YgAQyDQgEEC4YrwEYxwEYgAQyBggFEEUYPTIGCAYQRRg9MgYIBxFGD3SAQgxMjc1ajBqNKgCALACAQ&sourceid=chrome&ie=UTF-8#lrd=0x1502b69024c904f3:0xd0cc3abadd287849,3,,,,",
   timezone: "Asia/Jerusalem",
