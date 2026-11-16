@@ -14,6 +14,11 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
 
+  // SMS is switched off until Twilio credentials are configured: report "skipped" instead of failing.
+  if (!Deno.env.get("TWILIO_ACCOUNT_SID") || !Deno.env.get("TWILIO_AUTH_TOKEN") || !Deno.env.get("TWILIO_FROM_NUMBER")) {
+    return new Response(JSON.stringify({ success: false, skipped: true, reason: "sms_not_configured" }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
   try {
     const { to, body, calendar_url } = await req.json();
 
