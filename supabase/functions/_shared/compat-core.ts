@@ -116,8 +116,8 @@ export class CompatQuery {
   in(f: string, v: unknown[]) { this.conditions[f] = { $in: v }; return this; }
   nin(f: string, v: unknown[]) { this.conditions[f] = { $nin: v }; return this; }
   exec() { return this.manager.run(this.conditions, this.opts); }
-  async count() { const r = await this.manager.run(this.conditions, { ...this.opts, limit: 1 }); return r.total; }
-  async first() { const r = await this.manager.run(this.conditions, { ...this.opts, limit: 1 }); return r.data[0] ?? null; }
+  async count() { const r = await this.manager.run(this.conditions, { ...this.opts, limit: 1 }); return (r as any).total; }
+  async first() { const r = await this.manager.run(this.conditions, { ...this.opts, limit: 1 }); return r[0] ?? null; }
 }
 
 export class CompatEntity {
@@ -151,7 +151,8 @@ export class CompatEntity {
       if (!data || data.length < size) break;
       offset += data.length;
     }
-    return { data: rows, total: total || rows.length, limit: opts.limit, skip };
+    // The Buildy API answered list/filter/query with a plain array, so the app expects one.
+    return Object.assign(rows, { total: total || rows.length });
   }
 
   query() { return new CompatQuery(this); }
