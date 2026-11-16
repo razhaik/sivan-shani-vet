@@ -10,7 +10,6 @@ import AppointmentManagement from "./pages/AppointmentManagement";
 import AccessibilityStatement from "./pages/AccessibilityStatement";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import { BrandingBadge } from "./components/BrandingBadge";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { shouldRedirectToCrm } from "@/lib/crmHomeScreen";
 import "@/components/business-crm/bento-theme.css";
@@ -48,7 +47,6 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-        <BrandingBadge />
       </TooltipProvider>
     </QueryClientProvider>
   );
