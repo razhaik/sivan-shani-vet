@@ -2,7 +2,7 @@ import { createSuperdevClient } from "npm:@superdevhq/client@0.1.56";
 
 const APP_ID = Deno.env.get("SUPERDEV_APP_ID");
 const SITE_URL = "https://sivanshanivet.com";
-const LEGACY_CLINIC_EMAIL = "sivanshanivet@gmail.com";
+const LEGACY_CLINIC_EMAIL = "seeveek@gmail.com";
 const ONESIGNAL_APP_ID = "f6159636-c2ad-4e16-93c8-82845591b906";
 const ONESIGNAL_ENDPOINT = "https://api.onesignal.com/notifications";
 const MAX_RECORD_AGE_MS = 15 * 60 * 1000;
