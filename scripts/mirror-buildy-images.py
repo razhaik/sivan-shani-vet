@@ -24,15 +24,19 @@ for path in FILES:
         stem, dot, ext = name.rpartition(".")
         name = f"{hashlib.sha1(url.encode()).hexdigest()[:8]}-{(stem or ext)[-40:]}.{ext if dot else 'png'}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=60) as res:
-            (MEDIA / name).write_bytes(res.read())
+        try:
+            with urllib.request.urlopen(req, timeout=60) as res:
+                (MEDIA / name).write_bytes(res.read())
+        except Exception as error:  # leave this reference as it is
+            print("FAILED", url, error)
+            continue
         local[url] = name
         print("copied", name)
 
 for path in FILES:
     text = path.read_text(encoding="utf-8")
     absolute = "supabase/functions" in str(path)
-    new = PATTERN.sub(lambda m: ("https://sivanshanivet.com" if absolute else "") + "/media/" + local[m.group(0)], text)
+    new = PATTERN.sub(lambda m: ("https://sivanshanivet.com" if absolute else "") + "/media/" + local[m.group(0)] if m.group(0) in local else m.group(0), text)
     if new != text:
         path.write_text(new, encoding="utf-8")
         print("updated", path.relative_to(ROOT))
