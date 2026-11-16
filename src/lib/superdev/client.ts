@@ -9,6 +9,11 @@ import { makeEntities } from "./compat-core";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
+// Invitation / password-reset links land on the site root: send them to /login to choose a password.
+if (typeof window !== "undefined" && /type=(invite|recovery)/.test(window.location.hash) && window.location.pathname !== "/login") {
+  window.location.replace(`/login${window.location.hash}`);
+}
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
