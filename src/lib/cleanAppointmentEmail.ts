@@ -27,7 +27,7 @@ export interface CleanEmailOptions {
 }
 
 export const CLINIC_ADDRESS = "צה״ל 48א, נס ציונה";
-export const CLINIC_MAPS_URL = "https://maps.app.goo.gl/RmsYfkK3dss75Nj39";
+export const CLINIC_MAPS_URL = "https://maps.app.goo.gl/TnEkTdCouEUiFGjy5";
 export const CLINIC_HOURS = "א׳, ד׳ 16:00–19:30 · ב׳, ג׳, ה׳ 9:00–14:30, 16:00–19:30 · ו׳ 8:30–14:30";
 
 const NAVY = "#1A1A3E";
@@ -72,6 +72,12 @@ function wazeUrl(): string {
   return `https://waze.com/ul?q=${encodeURIComponent(CLINIC_ADDRESS.replace(/״/g, '"'))}&navigate=yes`;
 }
 
+/** "054-4345388" → "+972544345388" so the number is tappable in every mail app. */
+function telHref(phone: string): string {
+  const digits = phone.replace(/[^0-9+]/g, "");
+  return digits.startsWith("0") ? `+972${digits.slice(1)}` : digits;
+}
+
 function mapsUrl(): string {
   return CLINIC_MAPS_URL;
 }
@@ -102,7 +108,7 @@ function homeScreenSection(): string {
 <tr><td align="center" style="padding:10px 10px 0;font-family:${FONT};font-size:15px;line-height:1.7;color:${BODY};">הוסיפו את האתר של ${esc(VETERINARY_CLINIC_PROFILE.shortName)} למסך הבית, ובפעם הבאה תקבעו תור ישר מהאייקון.</td></tr>
 <tr><td style="padding-top:18px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl" style="table-layout:fixed;"><tr>
-${col(`<img src="${assetUrl("label-iphone.png")}" width="94" height="20" alt="iPhone" style="display:inline-block;width:94px;height:20px;border:0;" />`, assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", ["לוחצים על ⋯", "שיתוף", "הוספה למסך הבית", "הוספה"])}
+${col(`<img src="${assetUrl("label-iphone.png")}" width="93" height="20" alt="iPhone" style="display:inline-block;width:93px;height:20px;border:0;" />`, assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", ["לוחצים על ⋯", "שיתוף", "הוספה למסך הבית", "הוספה"])}
 ${col(`<img src="${assetUrl("label-android.png")}" width="117" height="18" alt="Android" style="display:inline-block;width:117px;height:18px;margin-top:2px;border:0;" />`, assetUrl("home-android.gif"), "הדגמה: הוספת האתר למסך הבית באנדרואיד", ["לוחצים על ⋮", "הוספה למסך הבית", "התקנה"])}
 </tr></table>
 </td></tr>
@@ -206,7 +212,7 @@ ${showHome ? homeScreenSection() : ""}
 <tr>
 <td align="center" style="padding-top:18px;font-family:${FONT};font-size:13px;line-height:1.8;color:${MUTED};">
 ${esc(clinic)} · מרפאה וטרינרית לכלבים ולחתולים<br>
-${esc(CLINIC_ADDRESS)} · <a href="tel:${esc(VETERINARY_CLINIC_PROFILE.phone.replace(/[^0-9+]/g, ""))}" style="color:${MUTED};text-decoration:none;">${esc(VETERINARY_CLINIC_PROFILE.phone)}</a><br>
+${esc(CLINIC_ADDRESS)} · <a href="tel:${esc(telHref(VETERINARY_CLINIC_PROFILE.phone))}" style="color:${BLUE};text-decoration:underline;">${esc(VETERINARY_CLINIC_PROFILE.phone)}</a><br>
 <a href="${esc(VETERINARY_CLINIC_PROFILE.publicOrigin)}" style="color:${MUTED};">${esc(VETERINARY_CLINIC_PROFILE.publicOrigin.replace(/^https?:\/\//, ""))}</a>
 </td></tr></table>
 </td></tr>

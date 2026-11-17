@@ -14,6 +14,7 @@ import {
   type RescheduleRejectionEmailDetails,
 } from "@/lib/emailTemplates";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
+import { CLINIC_ADDRESS, CLINIC_MAPS_URL } from "@/lib/cleanAppointmentEmail";
 
 export interface AppointmentActionSnapshot {
   id: string;
@@ -79,7 +80,7 @@ function isIsraelDST(year: number, month: number, day: number) {
   const lastDay = new Date(year, 10, 0); const lastSunday = lastDay.getDate() - lastDay.getDay(); return day < lastSunday;
 }
 
-function buildGoogleCalendarLink(snapshot: AppointmentActionSnapshot) {
+export function buildGoogleCalendarLink(snapshot: AppointmentActionSnapshot) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.date) || !/^\d{1,2}:\d{2}$/.test(snapshot.start_time) || !/^\d{1,2}:\d{2}$/.test(snapshot.end_time)) return "";
   const [year, month, day] = snapshot.date.split("-").map(Number);
   const offset = isIsraelDST(year, month - 1, day) ? "+03:00" : "+02:00";
@@ -87,9 +88,21 @@ function buildGoogleCalendarLink(snapshot: AppointmentActionSnapshot) {
   const start = stamp(`${snapshot.date}T${snapshot.start_time}:00${offset}`);
   const end = stamp(`${snapshot.date}T${snapshot.end_time}:00${offset}`);
   if (!start || !end) return "";
-  const title = `תור וטרינרי - ${snapshot.pet_name || "חיה"}`;
-  const description = `לקוח: ${snapshot.client_name}\nחיה: ${snapshot.pet_name}\nסוג: ${snapshot.appointment_type}\nטלפון: ${snapshot.phone || "-"}`;
-  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(description)}`;
+  const pet = snapshot.pet_name.trim();
+  const service = snapshot.appointment_type.trim();
+  const clinic = VETERINARY_CLINIC_PROFILE.shortName;
+  const visit = service ? `${service}${pet ? ` ל${pet}` : ""}` : `תור וטרינרי${pet ? ` ל${pet}` : ""}`;
+  const title = `🐾 ${visit} · ${clinic}`;
+  const location = `${clinic} – מרפאה וטרינרית, ${CLINIC_ADDRESS}`;
+  const description = [
+    `🩺 ${visit}`,
+    `📍 ${CLINIC_ADDRESS}`,
+    `🗺️ ניווט: ${CLINIC_MAPS_URL}`,
+    `📞 ${VETERINARY_CLINIC_PROFILE.phone}`,
+    "",
+    "מומלץ להגיע כ-5 דקות לפני התור.",
+  ].join("\n");
+  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(description)}&location=${encodeURIComponent(location)}&ctz=Asia%2FJerusalem`;
 }
 
 function unwrapFunctionPayload(value: unknown): Record<string, unknown> | null {
