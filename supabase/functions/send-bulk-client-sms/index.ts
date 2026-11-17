@@ -1,5 +1,6 @@
 import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
+import { cleanMessageEmail } from "../_shared/clean-email.ts";
 
 type CrmRecord = Record<string, any>;
 type ClientGroup = { records: CrmRecord[] };
@@ -296,34 +297,7 @@ function messageHtml(value: string): string {
 }
 
 function renderEmailHtml(subject: string, template: string, client: ResolvedClient, cta: { label: string; url: string } | null): string {
-  const body = messageHtml(personalizedMessage(template, client));
-  const ctaHtml = cta
-    ? `<div style="margin:24px 0 4px;text-align:center;"><a href="${escapeHtml(cta.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 24px;border-radius:12px;background:#1a1a3e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:800;">${escapeHtml(cta.label)}</a></div>`
-    : "";
-  return `<!doctype html>
-<html lang="he" dir="rtl">
-  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head>
-  <body style="margin:0;background:#f7f7f7;font-family:Arial,'Segoe UI',sans-serif;direction:rtl;text-align:right;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 10px;background:#f7f7f7;">
-      <tr><td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:22px;overflow:hidden;">
-          <tr><td style="padding:26px 24px;background:#1a1a3e;color:#ffffff;">
-            <div style="font-size:23px;font-weight:900;line-height:1.35;">${escapeHtml(CLINIC_NAME)}</div>
-            <div style="margin-top:8px;color:#f2d162;font-size:13px;line-height:1.6;">הודעה מהמרפאה</div>
-          </td></tr>
-          <tr><td style="padding:26px 24px;color:#334155;font-size:15px;">
-            ${body}
-            ${ctaHtml}
-          </td></tr>
-          <tr><td style="padding:18px 24px;background:#fffdf3;border-top:1px solid #e8e1b8;text-align:center;color:#80630e;font-size:11px;line-height:1.8;">
-            זוהי הודעה שיווקית שנשלחה מטעם ${escapeHtml(CLINIC_NAME)}.<br />
-            לשינוי העדפות או להפסקת הודעות שיווקיות, צרו קשר עם המרפאה בטלפון ${escapeHtml(CLINIC_PHONE)} או דרך <a href="${escapeHtml(SITE_ORIGIN)}" style="color:#5267a8;text-decoration:underline;">אתר המרפאה</a>.
-          </td></tr>
-        </table>
-      </td></tr>
-    </table>
-  </body>
-</html>`;
+  return cleanMessageEmail({ subject, body: personalizedMessage(template, client), cta, marketing: true });
 }
 
 function audienceLabel(key: string): string {

@@ -4,12 +4,15 @@ import {
   cleanBookingRequestEmail,
   cleanCancelledEmail,
   cleanClientCancellationEmail,
+  cleanMessageEmail,
   cleanRejectedEmail,
   cleanReminderEmail,
   cleanRescheduleRejectedEmail,
   cleanRescheduleRequestedEmail,
   cleanUpdatedEmail,
 } from "../../supabase/functions/_shared/clean-email.ts";
+
+export { cleanMessageEmail };
 
 /** The clinic has one customer email design. Older designs were removed. */
 export const CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY = "clean-clinic-template" as const;
@@ -207,81 +210,18 @@ export function buildMarketingEmailHtml(options: MarketingEmailOptions): string 
   const subtitle = typeof options.subtitle === "string" ? options.subtitle.trim() : "";
   const body = typeof options.body === "string" && options.body.trim()
     ? options.body.trim()
-    : "שלום,\n\nרצינו לעדכן אתכם בפרטים חשובים מהמרפאה.";
-  const statusLabel = typeof options.statusLabel === "string" ? options.statusLabel.trim() : "";
-  const statusColor = safeCssColor(options.statusColor, "#2f90a1");
-  const clinicName = typeof options.clinicName === "string" && options.clinicName.trim()
-    ? options.clinicName.trim()
-    : VETERINARY_CLINIC_PROFILE.shortName;
-  const clinicTagline = typeof options.clinicTagline === "string" && options.clinicTagline.trim()
-    ? options.clinicTagline.trim()
-    : VETERINARY_CLINIC_PROFILE.tagline;
-  const detailsHtml = marketingDetailsHtml(Array.isArray(options.details) ? options.details : []);
-  const actionsHtml = marketingActionsHtml(Array.isArray(options.actions) ? options.actions : []);
-  const footerText = typeof options.footerText === "string" && options.footerText.trim()
-    ? options.footerText.trim()
-    : "כאן עבורכם ועבור חיות המחמד שלכם";
-  const legalFooter = clinicEmailFooter(VETERINARY_CLINIC_PROFILE, "marketing");
-
-  return `<!doctype html>
-<html lang="he" dir="rtl">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(title)}</title>
-  </head>
-  <body style="margin:0;padding:0;background:#ecf5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;direction:rtl;text-align:right;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ecf5f7;padding:22px 10px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #d5e2e7;border-radius:24px;overflow:hidden;box-shadow:0 14px 32px rgba(15,40,66,0.08);">
-            <tr>
-              <td background="${escapeHtml(CLINIC_EMAIL_LOGO_URL)}" bgcolor="#ffffff" style="padding:0;background-color:#ffffff;background-image:url('${escapeHtml(CLINIC_EMAIL_LOGO_URL)}');background-position:center 52%;background-repeat:no-repeat;background-size:88% auto;overflow:hidden;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="position:relative;z-index:1;background:transparent;">
-                  <tr>
-                    <td style="padding:28px 30px 22px;background:rgba(244,249,250,0.82);border-bottom:1px solid #dce9ee;">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                        <tr>
-                          <td style="vertical-align:top;">
-                            <div style="font-size:18px;line-height:1.35;font-weight:900;letter-spacing:-0.02em;color:#0f2842;">${escapeHtml(clinicName)}</div>
-                            <div style="margin-top:5px;font-size:12px;line-height:1.6;font-weight:700;color:#52717d;">${escapeHtml(clinicTagline)}</div>
-                          </td>
-                          <td align="left" style="vertical-align:top;width:44px;">
-                            <span style="display:inline-block;width:34px;height:34px;border-radius:12px;background:#dceff2;color:#1d6472;text-align:center;font-size:19px;line-height:34px;font-weight:900;">✉</span>
-                          </td>
-                        </tr>
-                      </table>
-                      <div style="margin-top:18px;width:58px;height:4px;border-radius:99px;background:#2f90a1;"></div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:30px;background:rgba(255,255,255,0.72);">
-                      <div style="font-size:10px;line-height:1.4;font-weight:900;letter-spacing:0.16em;color:#2f90a1;">נושא ההודעה</div>
-                      <div style="margin-top:11px;font-size:25px;line-height:1.35;font-weight:900;letter-spacing:-0.03em;color:#0f2842;">${escapeHtml(title)}</div>
-                      ${subtitle ? `<div style="margin-top:10px;font-size:13px;line-height:1.75;font-weight:700;color:#52717d;">${multilineHtml(subtitle)}</div>` : ""}
-                      ${statusLabel ? `<div style="margin-top:18px;display:inline-block;padding:6px 11px;border:1px solid #c9dde3;border-radius:999px;background:#eaf6f7;color:${escapeHtml(statusColor)};font-size:11px;line-height:1.2;font-weight:900;">${escapeHtml(statusLabel)}</div>` : ""}
-                      <div style="margin-top:22px;border-top:1px solid #dce9ee;padding-top:22px;color:#405a67;font-size:14px;line-height:1.9;font-weight:600;">${multilineHtml(body)}</div>
-                      ${detailsHtml ? `<div style="margin-top:22px;">${detailsHtml}</div>` : ""}
-                      ${actionsHtml}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:18px 30px 22px;background:rgba(248,251,252,0.86);border-top:1px solid #dce9ee;text-align:center;">
-                      <div style="font-size:11px;line-height:1.6;font-weight:900;color:#0f2842;">בברכה, ${escapeHtml(clinicName)}</div>
-                      <div style="margin-top:4px;font-size:10px;line-height:1.6;font-weight:600;color:#718792;">${escapeHtml(footerText)}</div>
-                      <div style="margin-top:9px;font-size:10px;line-height:1.5;color:#8aa0a8;">${escapeHtml(legalFooter)}</div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-          <div style="height:26px;"></div>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+    : "רצינו לעדכן אתכם בפרטים חשובים מהמרפאה.";
+  const action = (Array.isArray(options.actions) ? options.actions : []).find((item) => item?.url && String(item.label || "").trim());
+  const details = (Array.isArray(options.details) ? options.details : [])
+    .map((item) => `${String(item?.label || "").trim()}: ${String(item?.value || "").trim()}`)
+    .filter((line) => line.length > 2);
+  return cleanMessageEmail({
+    subject: title,
+    intro: subtitle && subtitle !== "שלום ," ? subtitle : "",
+    body: details.length ? `${body}\n\n${details.join("\n")}` : body,
+    cta: action ? { label: String(action.label).trim(), url: String(action.url) } : null,
+    label: typeof options.statusLabel === "string" && options.statusLabel.trim() ? options.statusLabel.trim() : undefined,
+  });
 }
 
 
