@@ -781,6 +781,10 @@ async function handleCustomerLookup(rawPhone: string) {
     ? lookupPets([clientFile])
     : lookupPets(matchingAppointments.filter((record) => !["cancelled", "canceled", "rejected", "declined"].includes(text(record.status).toLowerCase())));
   const payload = lookupCustomerPayload(selected, requestedPhone, pets);
+  // Once the client has agreed to SMS (on any booking or in the CRM file), don't ask again.
+  const hasSmsConsent = [...matchingAppointments, ...matchingBusinessClients]
+    .some((record) => record.sms_consent === true && Boolean(text(record.sms_consent_language)));
+  Object.assign(payload, { smsConsent: hasSmsConsent });
   const listed = pets.find((pet) => pet.name.toLocaleLowerCase("he") === payload.petName.toLocaleLowerCase("he"));
   if (pets.length === 1) Object.assign(payload, { petName: pets[0].name, petSpecies: pets[0].species || payload.petSpecies });
   else if (pets.length > 1 && !listed) Object.assign(payload, { petName: "", petSpecies: "" });

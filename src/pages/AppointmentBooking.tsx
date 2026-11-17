@@ -101,6 +101,7 @@ type PublicBookingPayload = {
     booking_note?: unknown;
   };
   sms_consent_sync_warning?: boolean;
+  smsConsent?: boolean;
 };
 
 type CustomerFlow = "choice" | "new" | "existing";
@@ -135,6 +136,7 @@ function parsePublicBookingPayload(value: unknown): PublicBookingPayload | null 
     available_start_times: record.available_start_times,
     service: record.service && typeof record.service === "object" ? record.service : undefined,
     sms_consent_sync_warning: record.sms_consent_sync_warning === true,
+    smsConsent: record.smsConsent === true,
   };
 }
 
@@ -282,6 +284,7 @@ export default function AppointmentBooking() {
   const [customerFlow, setCustomerFlow] = useState<CustomerFlow>("choice");
   const [lookupPhone, setLookupPhone] = useState("");
   const [knownPets, setKnownPets] = useState<KnownPet[]>([]);
+  const [smsConsentOnFile, setSmsConsentOnFile] = useState(false);
   const [petSuggestionsOpen, setPetSuggestionsOpen] = useState(false);
   const [lookupStatus, setLookupStatus] = useState<CustomerLookupStatus>("idle");
   const [lookupMessage, setLookupMessage] = useState("");
@@ -400,6 +403,7 @@ export default function AppointmentBooking() {
     const phoneToKeep = preserveLookupPhone ? lookupPhone.trim() : "";
     setCustomerFlow("new");
     setKnownPets([]);
+    setSmsConsentOnFile(false);
     setLookupStatus("idle");
     setLookupPhoneError(false);
     setLookupMessage("");
@@ -430,6 +434,7 @@ export default function AppointmentBooking() {
     setLookupMessage("");
     setCustomerFlow("existing");
     setKnownPets([]);
+    setSmsConsentOnFile(false);
     setClientData((prev) => ({
       ...prev,
       name: "",
@@ -457,6 +462,7 @@ export default function AppointmentBooking() {
     setLookupStatus("loading");
     setLookupMessage("");
     setKnownPets([]);
+    setSmsConsentOnFile(false);
     setClientData((prev) => ({
       ...prev,
       name: "",
@@ -493,6 +499,8 @@ export default function AppointmentBooking() {
         petName: (payload.pets?.length || 0) > 1 ? "" : payload.petName || "",
         petSpecies: (payload.pets?.length || 0) > 1 ? "" : isPetSpecies(payload.petSpecies) ? payload.petSpecies : "",
       }));
+      setSmsConsentOnFile(payload.smsConsent === true);
+      if (payload.smsConsent === true) setClientData((prev) => ({ ...prev, smsConsent: true }));
       setKnownPets(payload.pets?.length ? payload.pets : payload.petName ? [{ name: payload.petName, species: payload.petSpecies || "" }] : []);
       setLookupPhoneError(false);
       setLookupStatus("success");
@@ -1560,6 +1568,12 @@ export default function AppointmentBooking() {
                     />
                   </div>
 
+                  {smsConsentOnFile && clientData.smsConsent ? (
+                    <p className="flex items-center gap-2 rounded-2xl border border-green-100 bg-green-50/60 px-4 py-3 text-sm font-semibold text-green-800">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      אישרתם בעבר קבלת הודעות SMS מהמרפאה, נעדכן אתכם גם בתור הזה.
+                    </p>
+                  ) : (
                   <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
                     <label htmlFor="sms-consent" className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-relaxed text-slate-700">
                       <input
@@ -1576,6 +1590,7 @@ export default function AppointmentBooking() {
                     </label>
                     <p className="mt-2 pr-8 text-xs font-medium leading-relaxed text-slate-500">הסכמה זו היא לבחירתכם ואינה תנאי לקביעת התור.</p>
                   </div>
+                  )}
 
                   {/* Summary Box */}
                   <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mt-8">
