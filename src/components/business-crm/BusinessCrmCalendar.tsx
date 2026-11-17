@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ensurePetInClientFile } from "@/lib/syncPetToClientFile";
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Loader2, Plus, RefreshCw } from "lucide-react";
@@ -821,6 +822,7 @@ export default function BusinessCrmCalendar() {
       const created = await Appointment.create(payload);
       const saved = { ...payload, ...(created && typeof created === "object" ? created : {}) } as CrmRecord;
       void notifyBrowserPush("new_appointment", text(saved.id));
+      void ensurePetInClientFile(saved);
       const { record: syncedAppointment } = await syncCreatedAppointmentCalendar(saved);
       patchLocalAppointment(syncedAppointment);
       if (customerMode === "new") {
@@ -1045,6 +1047,7 @@ export default function BusinessCrmCalendar() {
       const created = await Appointment.create(payload);
       const saved = { ...payload, ...(created && typeof created === "object" ? created : {}) } as CrmRecord;
       void notifyBrowserPush("new_appointment", text(saved.id));
+      void ensurePetInClientFile(saved);
       const { record: syncedAppointment, outcome: calendarOutcome } = await syncCreatedAppointmentCalendar(saved);
       patchLocalAppointment(syncedAppointment);
       setSelectedAppointment(syncedAppointment);
