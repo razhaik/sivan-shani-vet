@@ -38,6 +38,7 @@ const MUTED = "#5A5F7A";
 const BODY = "#4A4F6A";
 const LINE = "#E1E4E8";
 const PAGE = "#F7F8FA";
+const FOOTER_BG = "#EEF0F3";
 const FONT = "'Heebo',Arial,'Segoe UI',sans-serif";
 
 function esc(value: unknown): string {
@@ -193,9 +194,10 @@ ${primaryButton}
 
 ${showHome ? homeScreenSection() : ""}
 
-<tr><td align="center" style="padding:36px 32px 28px;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid ${LINE};">
-<tr><td align="center" style="padding-top:28px;">
+<tr><td height="36" style="height:36px;line-height:36px;font-size:0;">&nbsp;</td></tr>
+<tr><td align="center" bgcolor="${FOOTER_BG}" style="padding:28px 32px 28px;background:${FOOTER_BG};border-top:1px solid ${LINE};">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td align="center">
 <a href="${esc(mapsUrl())}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
 <img src="${assetUrl("map.png")}" width="456" alt="${esc(`מפה: ${CLINIC_ADDRESS} – לחצו לפתיחה במפות`)}" style="display:block;width:100%;max-width:456px;height:auto;margin:0 auto;border:1px solid ${LINE};border-radius:10px;" />
 </a>
