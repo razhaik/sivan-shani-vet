@@ -132,8 +132,8 @@ export function buildCleanApprovedEmailHtml(appointment: CleanEmailAppointment, 
     : "";
 
   const noteText = managementUrl
-    ? "מומלץ להגיע כ-5 דקות לפני התור ולהביא פנקס חיסונים, אם יש. צריכים לשנות? אפשר דרך הקישור \"שינוי או ביטול תור\"."
-    : `מומלץ להגיע כ-5 דקות לפני התור ולהביא פנקס חיסונים, אם יש. לשינוי או ביטול אפשר להתקשר: ${VETERINARY_CLINIC_PROFILE.phone}.`;
+    ? "מומלץ להגיע כ-5 דקות לפני התור. צריכים לשנות? אפשר דרך הקישור \"שינוי או ביטול תור\"."
+    : `מומלץ להגיע כ-5 דקות לפני התור. לשינוי או ביטול אפשר להתקשר: ${VETERINARY_CLINIC_PROFILE.phone}.`;
 
   return `<!doctype html>
 <html lang="he" dir="rtl">
