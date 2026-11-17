@@ -153,15 +153,15 @@ function defaultForm(): NotificationForm {
     email_recipients: [],
     sms_recipients: [],
     new_appointment_enabled: true,
-    new_appointment_channels: ["push"],
+    new_appointment_channels: ["email", "push"],
     new_inquiry_enabled: true,
-    new_inquiry_channels: ["push"],
+    new_inquiry_channels: ["email", "push"],
     appointment_changed_enabled: false,
     appointment_changed_channels: [],
     appointment_no_show_enabled: false,
     appointment_no_show_channels: [],
     appointment_reschedule_requested_enabled: true,
-    appointment_reschedule_requested_channels: ["push"],
+    appointment_reschedule_requested_channels: ["email", "push"],
   };
 }
 

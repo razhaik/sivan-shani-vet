@@ -65,6 +65,8 @@ export interface CleanEmailParts {
   note?: string;
   homeScreen?: boolean;
   preheader?: string;
+  /** "owner" emails (to the clinic) get a short system footer instead of the map. */
+  audience?: "client" | "owner";
 }
 
 function str(value: unknown): string {
@@ -149,6 +151,13 @@ ${col(`<img src="${assetUrl("label-android.png")}" width="117" height="18" alt="
 </tr></table>
 </td></tr>
 </table>
+</td></tr>`;
+}
+
+function ownerFooter(): string {
+  return `<tr><td height="36" style="height:36px;line-height:36px;font-size:0;">&nbsp;</td></tr>
+<tr><td align="center" bgcolor="${FOOTER_BG}" style="padding:18px 32px;background:${FOOTER_BG};border-top:1px solid ${LINE};font-family:${FONT};font-size:12px;line-height:1.7;color:${MUTED};">
+התראה ממערכת הניהול של ${esc(CLINIC_NAME)} · נשלחה לפי הגדרות ההתראות
 </td></tr>`;
 }
 
@@ -238,7 +247,7 @@ ${parts.note ? `<tr><td style="padding:36px 32px 0;">
 
 ${parts.homeScreen ? homeScreenSection() : ""}
 
-${footer()}
+${parts.audience === "owner" ? ownerFooter() : footer()}
 
 </table>
 </td></tr>
@@ -437,5 +446,50 @@ export function cleanReminderEmail(appointment: CleanAppointment, copy: Reminder
     manageUrl: options.managementUrl,
     note: "מומלץ להגיע כ-5 דקות לפני התור.",
     preheader: preheader(appointment, "תזכורת · "),
+  });
+}
+
+
+/** Sent to the client right after they ask to move an appointment. Yellow. */
+export function cleanRescheduleRequestedEmail(appointment: CleanAppointment, request: RescheduleRequestDetails, managementUrl?: string): string {
+  const { client, pet, service } = who(appointment);
+  const requested = [hebrewLongDate(request.requested_date), str(request.requested_start_time)].filter(Boolean).join(" בשעה ");
+  const current = [hebrewLongDate(appointment.date), str(appointment.start_time)].filter(Boolean).join(" בשעה ");
+  return renderCleanEmail({
+    tone: "pending",
+    title: `קיבלנו את בקשת שינוי המועד – ${CLINIC_NAME}`,
+    label: "בקשת שינוי מועד התקבלה",
+    heading: greet(client, "קיבלנו את בקשת שינוי המועד"),
+    intro: "הבקשה ממתינה לאישור המרפאה. עד שתאושר, התור הנוכחי נשאר בתוקף.",
+    rows: [["המועד הנוכחי", current], ["המועד המבוקש", requested], ["סוג ביקור", service], ["מטופל", pet], ["כתובת", CLINIC_ADDRESS]],
+    manageUrl: managementUrl,
+    manageLabel: "צפייה בתור",
+    note: "נשלח לך מייל ברגע שהבקשה תטופל.",
+    preheader: `ממתין לאישור · ${requested}`,
+  });
+}
+
+export interface OwnerNotificationInput {
+  tone: CleanTone;
+  label: string;
+  heading: string;
+  intro?: string;
+  rows: Array<[string, string]>;
+  url: string;
+  buttonLabel?: string;
+}
+
+/** Notification emails to the clinic (new appointment, cancellation, ...). */
+export function cleanOwnerNotificationEmail(input: OwnerNotificationInput): string {
+  return renderCleanEmail({
+    tone: input.tone,
+    audience: "owner",
+    title: input.label,
+    label: input.label,
+    heading: input.heading,
+    intro: input.intro,
+    rows: input.rows,
+    primary: { label: input.buttonLabel || "פתיחה במערכת הניהול", url: input.url },
+    preheader: input.intro,
   });
 }

@@ -7,6 +7,7 @@ import {
   cleanRejectedEmail,
   cleanReminderEmail,
   cleanRescheduleRejectedEmail,
+  cleanRescheduleRequestedEmail,
   cleanUpdatedEmail,
 } from "../../supabase/functions/_shared/clean-email.ts";
 
@@ -57,6 +58,11 @@ export const CUSTOMER_EMAIL_TYPES = [
     key: "client_cancellation",
     label: "אישור ביטול על ידי הלקוח",
     description: "האימייל שנשלח לאחר שלקוח מבטל תור מקישור הניהול המאובטח.",
+  },
+  {
+    key: "reschedule_requested",
+    label: "בקשת שינוי מועד התקבלה",
+    description: "האימייל שנשלח ללקוח מיד אחרי שביקש לשנות את מועד התור.",
   },
   {
     key: "reschedule_rejected",
@@ -318,6 +324,8 @@ export function buildCustomerEmailHtml(
     }
     case "reschedule_rejected":
       return cleanRescheduleRejectedEmail(appointment, {}, options.managementUrl);
+    case "reschedule_requested":
+      return cleanRescheduleRequestedEmail(appointment, {}, options.managementUrl);
     default:
       return cleanApprovedEmail(appointment, links);
   }
@@ -362,6 +370,13 @@ export function buildCustomerEmailPreviewHtml(
   _templateKey?: unknown,
   variant: { rejected?: boolean } = {},
 ): string {
+  if (emailType === "reschedule_requested") {
+    return cleanRescheduleRequestedEmail(
+      CUSTOMER_EMAIL_PREVIEW_APPOINTMENT,
+      { requested_date: "2026-10-22", requested_start_time: "16:00", requested_end_time: "16:30" },
+      CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
+    );
+  }
   if (emailType === "reschedule_rejected") {
     return buildCustomerRescheduleRejectionEmailHtml(
       CUSTOMER_EMAIL_PREVIEW_APPOINTMENT,
