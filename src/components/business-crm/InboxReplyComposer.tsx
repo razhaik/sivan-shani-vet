@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Mail, Send, Users, X } from "lucide-react";
 import { sendEmail } from "@/integrations/core";
+import { cleanMessageEmail } from "@/lib/emailTemplates";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -42,33 +43,6 @@ interface ReplyRecipient {
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function plainTextToHtml(value: string): string {
-  const blocks: string[] = [];
-  let lines: string[] = [];
-  const flush = () => {
-    if (!lines.length) return;
-    blocks.push(`<p style="margin:0 0 14px;line-height:1.75;">${lines.join("<br />")}</p>`);
-    lines = [];
-  };
-
-  value.trim().split(/\r?\n/).forEach((line) => {
-    if (line.trim()) lines.push(escapeHtml(line));
-    else flush();
-  });
-  flush();
-
-  return `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;color:#1A1A3E;font-size:16px;line-height:1.75;">${blocks.join("")}</div>`;
 }
 
 function emailSendFailed(result: unknown): boolean {
@@ -170,7 +144,6 @@ export default function InboxReplyComposer({ selectedMessages, senderName, onClo
     setError("");
     setSendProgress({ sent: 0, failed: 0 });
 
-    const htmlBody = plainTextToHtml(trimmedBody);
     let sent = 0;
     let failed = 0;
     const sentMessageIds: string[] = [];
@@ -181,7 +154,7 @@ export default function InboxReplyComposer({ selectedMessages, senderName, onClo
         const result = await sendEmail({
           to: recipient.address,
           subject: trimmedSubject,
-          body_html: htmlBody,
+          body_html: cleanMessageEmail({ subject: trimmedSubject, name: recipient.name, body: trimmedBody }),
           from_name: senderName,
         }) as unknown;
         if (emailSendFailed(result)) {

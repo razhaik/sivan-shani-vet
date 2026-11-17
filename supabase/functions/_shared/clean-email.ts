@@ -65,6 +65,10 @@ export interface CleanEmailParts {
   note?: string;
   homeScreen?: boolean;
   preheader?: string;
+  /** Free-text message body (paragraphs split on blank lines). */
+  body?: string;
+  /** Small gray line under the card content, e.g. a marketing opt-out notice. */
+  finePrint?: string;
   /** "owner" emails (to the clinic) get a short system footer instead of the map. */
   audience?: "client" | "owner";
 }
@@ -229,6 +233,10 @@ ${parts.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
 ${parts.intro ? `<p style="margin:10px 0 0;font-family:${FONT};font-size:16px;line-height:1.7;color:${BODY};">${esc(parts.intro).replace(/\n/g, "<br>")}</p>` : ""}
 </td></tr>
 
+${parts.body ? `<tr><td align="right" style="padding:20px 32px 0;">
+${parts.body.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean).map((block) => `<p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.8;color:${BODY};">${esc(block).replace(/\n/g, "<br>")}</p>`).join("\n")}
+</td></tr>` : ""}
+
 ${rows.length ? `<tr><td style="padding:24px 32px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl" style="border-top:1px solid ${LINE};">
 ${rows.map(([label, value]) => detailRow(label, value)).join("\n")}
@@ -245,7 +253,9 @@ ${parts.note ? `<tr><td style="padding:36px 32px 0;">
 </tr></table>
 </td></tr>` : ""}
 
-${parts.homeScreen ? homeScreenSection() : ""}
+${(parts.homeScreen ?? parts.audience !== "owner") ? homeScreenSection() : ""}
+
+${parts.finePrint ? `<tr><td align="center" style="padding:24px 32px 0;font-family:${FONT};font-size:12px;line-height:1.7;color:${MUTED};">${esc(parts.finePrint).replace(/\n/g, "<br>")}</td></tr>` : ""}
 
 ${parts.audience === "owner" ? ownerFooter() : footer()}
 
@@ -491,5 +501,39 @@ export function cleanOwnerNotificationEmail(input: OwnerNotificationInput): stri
     rows: input.rows,
     primary: { label: input.buttonLabel || "פתיחה במערכת הניהול", url: input.url },
     preheader: input.intro,
+  });
+}
+
+
+export interface CleanMessageInput {
+  subject: string;
+  /** Recipient's name for the greeting; omitted → no greeting line. */
+  name?: string;
+  body: string;
+  cta?: CleanLink | null;
+  /** Marketing broadcasts get an opt-out line. */
+  marketing?: boolean;
+  label?: string;
+  /** Overrides the "שלום {name}," greeting line. */
+  intro?: string;
+}
+
+/** Free-text message from the clinic (single client, bulk, inbox reply, marketing). Blue. */
+export function cleanMessageEmail(input: CleanMessageInput): string {
+  const name = str(input.name);
+  return renderCleanEmail({
+    tone: "confirmed",
+    title: str(input.subject) || `הודעה מ${CLINIC_NAME}`,
+    label: input.label || (input.marketing ? "חדשות מהמרפאה" : "הודעה מהמרפאה"),
+    heading: str(input.subject) || "הודעה מהמרפאה",
+    intro: str(input.intro) || (name ? `שלום ${name},` : undefined),
+    body: input.body,
+    rows: [],
+    primary: input.cta && input.cta.url ? input.cta : { label: "קביעת תור", url: CLINIC_BOOKING_URL },
+    homeScreen: true,
+    preheader: str(input.body).replace(/\s+/g, " ").slice(0, 110),
+    finePrint: input.marketing
+      ? `זוהי הודעה שיווקית מטעם ${CLINIC_NAME}. להפסקת קבלת הודעות שיווקיות אפשר להשיב למייל זה או להתקשר ${CLINIC_PHONE}.`
+      : undefined,
   });
 }
