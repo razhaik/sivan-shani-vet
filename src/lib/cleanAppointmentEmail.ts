@@ -82,11 +82,18 @@ function detailRow(label: string, value: string, last = false): string {
 </tr>`;
 }
 
+function stepRows(steps: string[]): string {
+  return steps.map((step, index) => `<tr>
+<td valign="top" style="padding:0 0 6px 8px;"><span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:9px;background:${SKY_SOFT};color:${BLUE};font-family:${FONT};font-size:11px;font-weight:700;text-align:center;">${index + 1}</span></td>
+<td align="right" valign="top" style="padding:0 0 6px;font-family:${FONT};font-size:13px;line-height:18px;color:${BODY};white-space:nowrap;">${step}</td>
+</tr>`).join("");
+}
+
 function homeScreenSection(): string {
-  const col = (label: string, gif: string, alt: string, steps: string) => `<td width="50%" align="center" valign="top" style="padding:0 6px;">
+  const col = (label: string, gif: string, alt: string, steps: string[]) => `<td width="50%" align="center" valign="top" style="padding:0 6px;">
 <div style="padding-bottom:12px;height:22px;">${label}</div>
 <img src="${gif}" width="200" height="267" alt="${esc(alt)}" style="display:block;width:100%;max-width:200px;height:auto;margin:0 auto;border:1px solid ${LINE};border-radius:12px;" />
-<div style="font-family:${FONT};font-size:13px;line-height:1.7;color:${BODY};padding-top:10px;">${steps}</div>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" dir="rtl" align="center" style="margin:12px auto 0;">${stepRows(steps)}</table>
 </td>`;
   return `<tr><td style="padding:36px 32px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid ${LINE};">
@@ -94,8 +101,8 @@ function homeScreenSection(): string {
 <tr><td align="center" style="padding:10px 10px 0;font-family:${FONT};font-size:15px;line-height:1.7;color:${BODY};">הוסיפו את האתר של ${esc(VETERINARY_CLINIC_PROFILE.shortName)} למסך הבית, ובפעם הבאה תקבעו תור ישר מהאייקון.</td></tr>
 <tr><td style="padding-top:18px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl" style="table-layout:fixed;"><tr>
-${col(`<img src="${assetUrl("label-iphone.png")}" width="94" height="20" alt="iPhone" style="display:inline-block;width:94px;height:20px;border:0;" />`, assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", "⋯ ← שיתוף ← הוספה למסך הבית ← הוספה")}
-${col(`<img src="${assetUrl("label-android.png")}" width="117" height="18" alt="Android" style="display:inline-block;width:117px;height:18px;margin-top:2px;border:0;" />`, assetUrl("home-android.gif"), "הדגמה: הוספת האתר למסך הבית באנדרואיד", "⋮ ← הוספה למסך הבית ← התקנה")}
+${col(`<img src="${assetUrl("label-iphone.png")}" width="94" height="20" alt="iPhone" style="display:inline-block;width:94px;height:20px;border:0;" />`, assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", ["לוחצים על ⋯", "שיתוף", "הוספה למסך הבית", "הוספה"])}
+${col(`<img src="${assetUrl("label-android.png")}" width="117" height="18" alt="Android" style="display:inline-block;width:117px;height:18px;margin-top:2px;border:0;" />`, assetUrl("home-android.gif"), "הדגמה: הוספת האתר למסך הבית באנדרואיד", ["לוחצים על ⋮", "הוספה למסך הבית", "התקנה"])}
 </tr></table>
 </td></tr>
 </table>
@@ -137,8 +144,8 @@ export function buildCleanApprovedEmailHtml(appointment: CleanEmailAppointment, 
     : "";
 
   const noteText = managementUrl
-    ? "מומלץ להגיע כ-5 דקות לפני התור. צריכים לשנות? אפשר דרך הקישור \"שינוי או ביטול תור\"."
-    : `מומלץ להגיע כ-5 דקות לפני התור. לשינוי או ביטול אפשר להתקשר: ${VETERINARY_CLINIC_PROFILE.phone}.`;
+    ? "מומלץ להגיע כ-5 דקות לפני התור.\nצריכים לשנות? לחצו על \"שינוי או ביטול תור\"."
+    : `מומלץ להגיע כ-5 דקות לפני התור.\nלשינוי או ביטול אפשר להתקשר: ${VETERINARY_CLINIC_PROFILE.phone}.`;
 
   return `<!doctype html>
 <html lang="he" dir="rtl">
@@ -166,7 +173,6 @@ export function buildCleanApprovedEmailHtml(appointment: CleanEmailAppointment, 
 <tr><td align="right" style="padding:28px 32px 0;">
 <div style="font-family:${FONT};font-size:14px;font-weight:600;color:${BLUE};">אישור תור</div>
 <h1 style="margin:10px 0 0;font-family:${FONT};font-size:28px;line-height:1.3;font-weight:700;color:${NAVY};">${esc(heading)}</h1>
-<p style="margin:10px 0 0;font-family:${FONT};font-size:16px;line-height:1.7;color:${BODY};">שמחים לאשר את התור. הנה כל הפרטים:</p>
 </td></tr>
 
 <tr><td style="padding:24px 32px 0;">
@@ -181,7 +187,7 @@ ${primaryButton}
 
 <tr><td style="padding:36px 32px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-<td bgcolor="${SKY_SOFT}" style="padding:18px 20px;border-radius:8px;font-family:${FONT};font-size:14px;line-height:1.7;color:${BODY};">${esc(noteText)}</td>
+<td align="center" bgcolor="${SKY_SOFT}" style="padding:18px 20px;border-radius:8px;text-align:center;font-family:${FONT};font-size:14px;line-height:1.7;color:${BODY};">${esc(noteText).replace(/\n/g, "<br>")}</td>
 </tr></table>
 </td></tr>
 
