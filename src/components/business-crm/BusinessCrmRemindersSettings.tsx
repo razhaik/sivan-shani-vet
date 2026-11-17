@@ -21,8 +21,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   CUSTOMER_EMAIL_TEMPLATE_OPTIONS,
   CUSTOMER_EMAIL_TYPES,
-  CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY,
-  MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY,
   CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY,
   buildCustomerEmailPreviewHtml,
   resolveCustomerEmailTemplate,
@@ -131,12 +129,8 @@ function selectedEmailTemplate(value: unknown): CustomerEmailTemplateKey {
   return resolveCustomerEmailTemplate(value);
 }
 
-function emailTemplateLabel(value: unknown): string {
-  const key = resolveCustomerEmailTemplate(value);
-  if (key === CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY) return "תבנית נקייה";
-  return key === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    ? "תבנית שיווקית"
-    : "התבנית הקיימת";
+function emailTemplateLabel(_value?: unknown): string {
+  return "תבנית נקייה";
 }
 
 export default function BusinessCrmRemindersSettings({
@@ -166,7 +160,7 @@ export default function BusinessCrmRemindersSettings({
   const [smsEditor, setSmsEditor] = useState<TemplateKey | null>(null);
   const [smsDraft, setSmsDraft] = useState("");
   const [emailEditor, setEmailEditor] = useState<CustomerEmailTypeKey | null>(null);
-  const [emailDraftSelection, setEmailDraftSelection] = useState<CustomerEmailTemplateKey>(CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY);
+  const [emailDraftSelection, setEmailDraftSelection] = useState<CustomerEmailTemplateKey>(CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY);
   const [savingSheet, setSavingSheet] = useState(false);
   const dayTemplateRef = useRef<HTMLTextAreaElement>(null);
   const hourTemplateRef = useRef<HTMLTextAreaElement>(null);
@@ -856,7 +850,7 @@ export default function BusinessCrmRemindersSettings({
           <SheetHeader className="border-b border-[#E2EBEE] px-5 pb-4 pt-6 text-right sm:px-7">
             <p className="text-xs font-extrabold tracking-[0.1em] text-[#2F8794]">תצוגות מייל ללקוח</p>
             <SheetTitle className="pr-8 text-right text-xl font-black text-[#102E47]">{activeEmailType?.label || "בחירת תצוגת מייל"}</SheetTitle>
-            <SheetDescription className="max-w-2xl text-right text-sm font-semibold leading-6 text-[#6B818A]">בחרי את התבנית שתשמש את ההודעה הזו. הבחירה נשמרת בנפרד לכל סוג מייל.</SheetDescription>
+            <SheetDescription className="max-w-2xl text-right text-sm font-semibold leading-6 text-[#6B818A]">כך נראה המייל שהלקוח מקבל. כל המיילים בעיצוב אחד, והצבע משתנה לפי מצב התור: צהוב לבקשה ממתינה, כחול לתור מאושר, אדום לביטול.</SheetDescription>
           </SheetHeader>
           <div className="mx-auto w-full max-w-2xl space-y-4 px-5 py-5 sm:px-7">
             <div className="grid gap-3 md:grid-cols-2">
