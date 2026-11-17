@@ -1,4 +1,5 @@
 import { format, isValid, parse } from "date-fns";
+import { ensurePetInClientFile } from "@/lib/syncPetToClientFile";
 import { he } from "date-fns/locale";
 import { Appointment, ClinicSettings } from "@/entities";
 import { createCalendarEvent, sendSms } from "@/functions";
@@ -285,7 +286,11 @@ export function appointmentSnapshotFromRecord(record: Record<string, any>): Appo
 export async function runAppointmentSideEffects(snapshot: AppointmentActionSnapshot, action: AppointmentActionKind): Promise<AppointmentActionResult> {
   const calendar = action === "approve" || action === "update" ? await calendarSync(snapshot.id, action) : await calendarRemove(snapshot);
   const calendarUrl = action === "approve" ? buildGoogleCalendarLink(snapshot, await managementUrlFor(snapshot)) : "";
-  const [email, sms] = await Promise.all([appointmentEmail(snapshot, action, calendarUrl), appointmentSms(snapshot, action, calendarUrl)]);
+  const [email, sms] = await Promise.all([
+    appointmentEmail(snapshot, action, calendarUrl),
+    appointmentSms(snapshot, action, calendarUrl),
+    action === "approve" || action === "update" ? ensurePetInClientFile(snapshot) : Promise.resolve(),
+  ]);
   const hasNonSuccess = [calendar, email, sms].some((item) => item.status !== "success");
   const firstLine = action === "approve" ? "הבקשה אושרה." : action === "reject" ? "הבקשה סורבה." : action === "cancel" ? "התור בוטל." : "השינויים בפגישה נשמרו.";
   return { action, isPartial: hasNonSuccess, summary: [firstLine, outcomeLine("📅 יומן Google", calendar), outcomeLine("📧 אימייל ללקוח", email), outcomeLine("📱 SMS ללקוח", sms)].join(" "), calendar, email, sms, ...(calendar.eventId ? { googleEventId: calendar.eventId } : {}) };

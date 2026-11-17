@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ensurePetInClientFile } from "@/lib/syncPetToClientFile";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Appointment } from "@/entities";
@@ -110,6 +111,7 @@ export default function AdminAppointmentBooking({ appointments, appointmentWindo
       const savedRecord = await Appointment.create(appointmentPayload);
       const savedAppointment = { ...appointmentPayload, ...(savedRecord && typeof savedRecord === "object" ? savedRecord : {}) };
       void notifyBrowserPush("new_appointment", String(savedAppointment.id || ""));
+      void ensurePetInClientFile(savedAppointment);
       let contactWarning = false, notificationWarning = false;
       if (mode === "new") {
         try { await contacts({ first_name: name, phone: normalizedPhone || phone, contact_stage: "customer", source: "dashboard_manager_booking", ...(email ? { email } : {}) }); }
