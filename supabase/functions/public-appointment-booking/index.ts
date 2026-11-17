@@ -696,8 +696,34 @@ function lookupSpecies(value: unknown): "" | "dog" | "cat" | "other" {
   return "";
 }
 
-function lookupCustomerPayload(record: AnyRecord, fallbackPhone: string) {
+type LookupPet = { name: string; species: "" | "dog" | "cat" | "other" };
+
+function lookupPets(records: AnyRecord[]): LookupPet[] {
+  const pets = new Map<string, LookupPet>();
+  const add = (rawName: unknown, rawSpecies: unknown) => {
+    const name = boundedText(rawName, 120);
+    if (!name) return;
+    const key = name.toLocaleLowerCase("he").replace(/\s+/g, " ");
+    const species = lookupSpecies(rawSpecies);
+    const existing = pets.get(key);
+    if (existing) { if (!existing.species && species) existing.species = species; return; }
+    if (pets.size >= 20) return;
+    pets.set(key, { name, species });
+  };
+  for (const record of records) {
+    if (Array.isArray(record.pet_details)) {
+      for (const item of record.pet_details) {
+        if (item && typeof item === "object") add((item as AnyRecord).name, (item as AnyRecord).species);
+      }
+    }
+    text(record.pet_name).split(/\r?\n+/).forEach((name) => add(name, record.pet_species));
+  }
+  return [...pets.values()];
+}
+
+function lookupCustomerPayload(record: AnyRecord, fallbackPhone: string, pets: LookupPet[] = []) {
   return {
+    pets,
     status: "ok",
     found: true,
     name: lookupField(record, ["client_name", "name"], 160),
@@ -747,7 +773,12 @@ async function handleCustomerLookup(rawPhone: string) {
     });
   }
 
-  return json(lookupCustomerPayload(selected, requestedPhone));
+  const pets = lookupPets([
+    ...matchingAppointments.filter((record) => !["cancelled", "canceled"].includes(text(record.status).toLowerCase())),
+    ...matchingBusinessClients,
+    ...matchingAppointments,
+  ]);
+  return json(lookupCustomerPayload(selected, requestedPhone, pets));
 }
 
 async function handleAvailability(date: ParsedDate, serviceId: string, serviceName: string, requestedDuration: unknown) {
