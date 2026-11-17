@@ -1,31 +1,24 @@
-import { clinicDisplayLabel, clinicEmailFooter, safePublicLink, VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
-import { buildCleanApprovedEmailHtml } from "@/lib/cleanAppointmentEmail";
+import { clinicEmailFooter, safePublicLink, VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
+import {
+  cleanApprovedEmail,
+  cleanBookingRequestEmail,
+  cleanCancelledEmail,
+  cleanClientCancellationEmail,
+  cleanRejectedEmail,
+  cleanReminderEmail,
+  cleanRescheduleRejectedEmail,
+  cleanUpdatedEmail,
+} from "../../supabase/functions/_shared/clean-email.ts";
 
-export const CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY = "current-clinic-template" as const;
-export const MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY = "marketing-clinic-template" as const;
+/** The clinic has one customer email design. Older designs were removed. */
 export const CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY = "clean-clinic-template" as const;
-
-/** Email types that the clean template can render. Other types keep their current designs. */
-export const CLEAN_TEMPLATE_EMAIL_TYPES = ["appointment_approved"] as const;
 
 export const CUSTOMER_EMAIL_TEMPLATE_OPTIONS = [
   {
-    key: CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY,
-    label: "התבנית הקיימת",
-    title: "התבנית הקיימת של המרפאה",
-    description: "העיצוב הנוכחי של הודעות התורים, עם כל התוכן והפעולות שכבר מוכרים לכם.",
-  },
-  {
-    key: MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY,
-    label: "תבנית שיווקית",
-    title: "תבנית שיווקית",
-    description: "עיצוב נקי עם סימן המים של לוגו המרפאה, כותרת, פרטי תור ופעולות ברורות.",
-  },
-  {
     key: CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY,
     label: "תבנית נקייה",
-    title: "תבנית נקייה עם מסך הבית",
-    description: "לוגו המרפאה, פרטי התור ברשימה מסודרת, כפתור הוספה ליומן, ניווט, והדגמה איך להוסיף את האתר למסך הבית.",
+    title: "תבנית נקייה",
+    description: "לוגו המרפאה, פרטי התור ברשימה מסודרת, צבע לפי מצב התור (צהוב ממתין, כחול מאושר, אדום בוטל) ומפה בחתימה.",
   },
 ] as const;
 
@@ -76,25 +69,16 @@ export type CustomerEmailTypeKey = (typeof CUSTOMER_EMAIL_TYPES)[number]["key"];
 export type CustomerEmailTemplateKey = (typeof CUSTOMER_EMAIL_TEMPLATE_OPTIONS)[number]["key"];
 export type CustomerEmailTemplateSelections = Partial<Record<CustomerEmailTypeKey, CustomerEmailTemplateKey>>;
 
-export function resolveCustomerEmailTemplate(value: unknown): CustomerEmailTemplateKey {
-  if (value === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY) return MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY;
-  if (value === CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY) return CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY;
-  return CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY;
+export function resolveCustomerEmailTemplate(_value?: unknown): CustomerEmailTemplateKey {
+  return CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY;
 }
 
-export function templateSupportsEmailType(templateKey: unknown, emailType: CustomerEmailTypeKey): boolean {
-  if (resolveCustomerEmailTemplate(templateKey) !== CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY) return true;
-  return (CLEAN_TEMPLATE_EMAIL_TYPES as readonly string[]).includes(emailType);
+export function templateSupportsEmailType(_templateKey: unknown, _emailType: CustomerEmailTypeKey): boolean {
+  return true;
 }
 
-export function resolveCustomerEmailTemplateSelection(value: unknown, emailType: CustomerEmailTypeKey): CustomerEmailTemplateKey {
-  const source = value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-  // The approval email uses the clean design unless the clinic picked another one.
-  if (source[emailType] === undefined && emailType === "appointment_approved") return CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY;
-  const resolved = resolveCustomerEmailTemplate(source[emailType]);
-  return templateSupportsEmailType(resolved, emailType) ? resolved : CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY;
+export function resolveCustomerEmailTemplateSelection(_value: unknown, _emailType: CustomerEmailTypeKey): CustomerEmailTemplateKey {
+  return CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY;
 }
 
 export interface AppointmentLike {
@@ -294,61 +278,49 @@ export function buildMarketingEmailHtml(options: MarketingEmailOptions): string 
 </html>`;
 }
 
-/** Build the marketing layout around appointment details while preserving every app action. */
-export function buildMarketingAppointmentEmailHtml(
-  appointment: AppointmentLike,
-  options: AppointmentEmailOptions,
-): string {
-  const clientName = appointment.client_name || "לקוח יקר";
-  const rawDate = appointment.date || "";
-  const formattedDate = rawDate.includes("-") ? rawDate.split("-").reverse().join("/") : rawDate || "לא צוין";
-  const details: MarketingEmailDetail[] = [
-    { label: "שם הלקוח", value: clientName },
-    { label: "חיית המחמד", value: appointment.pet_name || "-" },
-    { label: "סוג הטיפול", value: appointment.appointment_type || "-" },
-    { label: "תאריך", value: formattedDate },
-    { label: "שעה", value: `${appointment.start_time || "-"}${appointment.end_time ? ` - ${appointment.end_time}` : ""}` },
-  ];
-  if (appointment.phone) details.push({ label: "טלפון", value: appointment.phone });
-  if (appointment.email) details.push({ label: "דוא״ל", value: appointment.email });
-  if (appointment.notes) details.push({ label: "הערות נוספות", value: appointment.notes });
 
-  const actions: MarketingEmailAction[] = [];
-  if (options.addToCalendarUrl) actions.push({ label: options.addToCalendarLabel || "הוספה ליומן Google", url: options.addToCalendarUrl, variant: "primary" });
-  if (options.managementUrl) actions.push({ label: "ניהול התור שלי", url: options.managementUrl, variant: "secondary" });
-  if (!options.managementUrl && options.cancelUrl) actions.push({ label: options.cancelLabel || "ביטול התור", url: options.cancelUrl, variant: "danger" });
-
-  return buildMarketingEmailHtml({
-    title: options.title,
-    subtitle: options.subtitle,
-    statusLabel: options.statusLabel,
-    statusColor: options.statusColor,
-    body: options.body || `שלום ${clientName},\n\n${options.subtitle || "אלה פרטי התור שלך במרפאה."}`,
-    details,
-    actions,
-    clinicName: options.clinicName,
-    clinicTagline: options.clinicTagline,
-  });
+export interface CustomerEmailRenderOptions {
+  managementUrl?: string;
+  addToCalendarUrl?: string;
+  /** For appointment_cancelled: the clinic declined a request rather than cancelling a booked appointment. */
+  rejected?: boolean;
+  /** Reminder wording from the reminder settings. */
+  reminder?: { label: string; title: string; subtitle?: string };
 }
 
-/** Choose a customer template while preserving the existing renderer as the safe fallback. */
+/** Render a customer email in the clinic's clean design. */
 export function buildCustomerEmailHtml(
   emailType: CustomerEmailTypeKey,
-  templateKey: unknown,
+  _templateKey: unknown,
   appointment: AppointmentLike,
-  options: AppointmentEmailOptions,
+  options: CustomerEmailRenderOptions = {},
 ): string {
-  const resolvedTemplate = resolveCustomerEmailTemplate(templateKey);
-  if (resolvedTemplate === CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY && templateSupportsEmailType(resolvedTemplate, emailType)) {
-    return buildCleanApprovedEmailHtml(appointment, {
-      addToCalendarUrl: options.addToCalendarUrl,
-      managementUrl: options.managementUrl,
-    });
+  const links = { calendarUrl: options.addToCalendarUrl, managementUrl: options.managementUrl };
+  switch (emailType) {
+    case "booking_request":
+      return cleanBookingRequestEmail(appointment, links);
+    case "appointment_approved":
+      return cleanApprovedEmail(appointment, links);
+    case "appointment_updated":
+      return cleanUpdatedEmail(appointment, links);
+    case "appointment_cancelled":
+      return options.rejected ? cleanRejectedEmail(appointment) : cleanCancelledEmail(appointment);
+    case "client_cancellation":
+      return cleanClientCancellationEmail(appointment);
+    case "appointment_reminder_day":
+    case "appointment_reminder_hour": {
+      const day = emailType === "appointment_reminder_day";
+      return cleanReminderEmail(appointment, options.reminder ?? {
+        label: day ? "תזכורת לתור" : "תזכורת לתור",
+        title: day ? "תזכורת לתור שלך" : "התור שלך בעוד שעה",
+        subtitle: day ? "מחכים לראות אתכם במרפאה." : "התור שלך מתקרב, נתראה בקרוב במרפאה.",
+      }, links);
+    }
+    case "reschedule_rejected":
+      return cleanRescheduleRejectedEmail(appointment, {}, options.managementUrl);
+    default:
+      return cleanApprovedEmail(appointment, links);
   }
-  if (resolvedTemplate === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY) {
-    return buildMarketingAppointmentEmailHtml(appointment, options);
-  }
-  return buildAppointmentEmailHtml(appointment, options);
 }
 
 /** Build the one public, appointment-scoped link included in new client emails. */
@@ -367,163 +339,6 @@ export function buildAppointmentManagementUrl(token: string, origin = VETERINARY
   return `${safeOrigin}/manage-appointment?token=${encodeURIComponent(value)}`;
 }
 
-export function buildAppointmentEmailHtml(
-  appointment: AppointmentLike,
-  options: AppointmentEmailOptions,
-): string {
-  const rawDate = appointment.date || "";
-  const formattedDate = rawDate.includes("-")
-    ? rawDate.split("-").reverse().join("/")
-    : rawDate;
-
-  const clientName = appointment.client_name || "-";
-  const phone = appointment.phone || "-";
-  const email = appointment.email || "לא הוזן";
-  const petName = appointment.pet_name || "-";
-  const type = appointment.appointment_type || "-";
-  const notes = appointment.notes && appointment.notes.trim().length > 0
-    ? appointment.notes
-    : "אין הערות נוספות";
-
-  const statusLabel = options.statusLabel || "ממתין לאישור";
-  const statusColor = options.statusColor || "#2563eb";
-  const statusBg = `${statusColor}1A`;
-
-  const addToCalendarSection = options.addToCalendarUrl
-    ? `
-      <!-- Add to Calendar Section -->
-      <div style="margin-top:24px;padding-top:18px;border-top:1px dashed #e2e8f0;text-align:center;">
-        <div style="font-size:11px;color:#64748b;margin-bottom:12px;font-weight:500;">
-          ניתן להוסיף את התור ליומן Google האישי שלך בלחיצה על הכפתור הבא:
-        </div>
-        <a href="${escapeHtml(options.addToCalendarUrl)}" target="_blank" rel="noopener noreferrer"
-           style="display:inline-block;padding:10px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:12px;font-size:13px;font-weight:800;">
-          ${escapeHtml(options.addToCalendarLabel || "הוספה ליומן Google שלי")}
-        </a>
-      </div>
-    `
-    : "";
-
-  const managementSection = options.managementUrl
-    ? `
-      <!-- Appointment Management Section -->
-      <div style="margin-top:24px;padding-top:18px;border-top:1px dashed #e2e8f0;text-align:center;">
-        <div style="font-size:11px;color:#64748b;margin-bottom:12px;font-weight:600;">
-          רוצים לבטל את התור? אפשר לנהל אותו מהקישור המאובטח:
-        </div>
-        <a href="${escapeHtml(options.managementUrl)}" target="_blank" rel="noopener noreferrer"
-           style="display:inline-block;padding:11px 26px;background-color:#1a1a3e;color:#ffffff;text-decoration:none;border-radius:12px;font-size:13px;font-weight:900;">
-          ניהול התור שלי
-        </a>
-      </div>
-    `
-    : "";
-
-  const cancelSection = !options.managementUrl && options.cancelUrl ? `
-    <!-- Legacy Cancel Action Section -->
-    <div style="margin-top:24px;padding-top:18px;border-top:1px dashed #e2e8f0;text-align:center;">
-      <div style="font-size:11px;color:#64748b;margin-bottom:12px;font-weight:500;">
-        אם ברצונך לבטל את התור, ניתן לעשות זאת בלחיצה על הכפתור מטה:
-      </div>
-      <a href="${escapeHtml(options.cancelUrl)}" style="display:inline-block;padding:10px 24px;background-color:#ef4444;color:#ffffff;text-decoration:none;border-radius:12px;font-size:13px;font-weight:800;">
-        ${escapeHtml(options.cancelLabel || "ביטול התור")}
-      </a>
-      <div style="margin-top:16px;font-size:11px;color:#64748b;">
-        אם הכפתור לא פועל, ניתן להעתיק את הקישור הבא:
-      </div>
-      <div style="margin-top:8px;font-size:10px;color:#2563eb;word-break:break-all;text-decoration:underline;">
-        ${escapeHtml(options.cancelUrl)}
-      </div>
-    </div>
-  ` : "";
-
-  return `<!DOCTYPE html>
-<html lang="he" dir="rtl">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(options.title)}</title>
-  </head>
-  <body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;direction:rtl;text-align:right;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;padding:12px 8px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:360px;background-color:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.08);border:1px solid #eef2f6;">
-            <tr>
-              <td style="padding:16px 16px 14px 16px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;border-radius:20px 20px 0 0;">
-                <div style="font-size:18px;font-weight:900;letter-spacing:-0.02em;margin-bottom:8px;">${escapeHtml(options.title)}</div>
-                ${options.subtitle ? `<div style="font-size:11px;opacity:0.9;font-weight:500;">${escapeHtml(options.subtitle)}</div>` : ""}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:14px 14px 18px 14px;background-color:#ffffff;">
-                <div style="margin-bottom:14px;">
-                  <span style="display:inline-block;padding:3px 10px;border-radius:999px;background-color:${escapeHtml(statusBg)};color:${escapeHtml(statusColor)};font-size:10px;font-weight:800;border:1px solid ${escapeHtml(statusColor)}33;">${escapeHtml(statusLabel)}</span>
-                </div>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px;color:#1e293b;">
-                  <tr>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">שם הלקוח</div>
-                      <div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(clientName)}</div>
-                    </td>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">טלפון</div>
-                      <div style="font-size:12px;font-weight:700;color:#2563eb;direction:ltr;text-align:right;">${escapeHtml(phone)}</div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">חיית מחמד</div>
-                      <div style="font-size:12px;font-weight:700;color:#0f172a;">${escapeHtml(petName)}</div>
-                    </td>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">דוא"ל</div>
-                      <div style="font-size:11px;font-weight:600;color:#2563eb;direction:ltr;text-align:right;">${escapeHtml(email)}</div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">סוג טיפול</div>
-                      <div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(type)}</div>
-                    </td>
-                  </tr>
-                </table>
-                <div style="margin:8px 0 14px 0;border-radius:18px;background-color:#f8fafc;border:1px solid #f1f5f9;padding:10px 14px;">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                    <tr>
-                      <td style="width:50%;vertical-align:top;">
-                        <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">תאריך</div>
-                        <div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(formattedDate)}</div>
-                      </td>
-                      <td style="width:50%;vertical-align:top;border-right:1px solid #e2e8f0;padding-right:16px;">
-                        <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">שעה</div>
-                        <div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(appointment.start_time)} - ${escapeHtml(appointment.end_time)}</div>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-                <div>
-                  <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">הערות נוספות</div>
-                  <div style="border-radius:16px;border:1px solid #f1f5f9;background-color:#f8fafc;padding:10px 12px;font-size:12px;color:#475569;line-height:1.6;white-space:pre-wrap;min-height:40px;">${escapeHtml(notes)}</div>
-                </div>
-                ${addToCalendarSection}
-                ${managementSection}
-                ${cancelSection}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:12px 14px;background-color:#f8fafc;border-top:1px solid #f1f5f9;border-radius:0 0 20px 20px;font-size:10px;color:#94a3b8;text-align:center;font-weight:600;">
-                ${escapeHtml(clinicEmailFooter(VETERINARY_CLINIC_PROFILE, "appointment"))}
-              </td>
-            </tr>
-          </table>
-          <div style="height:40px;"></div>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
-}
 
 const CUSTOMER_EMAIL_PREVIEW_APPOINTMENT: AppointmentLike = {
   client_name: "נועה כהן",
@@ -537,104 +352,28 @@ const CUSTOMER_EMAIL_PREVIEW_APPOINTMENT: AppointmentLike = {
   notes: "דוגמה בלבד. אפשר לעדכן אותנו מראש אם יש משהו שחשוב שנדע.",
 };
 
+
 const CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL = buildAppointmentManagementUrl("preview-template-token-20261015");
-const CUSTOMER_EMAIL_PREVIEW_CALENDAR_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=תור%20וטרינרי";
+const CUSTOMER_EMAIL_PREVIEW_CALENDAR_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=%D7%AA%D7%95%D7%A8%20%D7%95%D7%98%D7%A8%D7%99%D7%A0%D7%A8%D7%99";
 
-function customerEmailPreviewOptions(emailType: CustomerEmailTypeKey): AppointmentEmailOptions {
-  switch (emailType) {
-    case "booking_request":
-      return {
-        title: "קיבלנו את בקשתך לתור!",
-        subtitle: `בקשתך במרפאת ${VETERINARY_CLINIC_PROFILE.shortName} התקבלה. נאשר את התור בהקדם.`,
-        statusLabel: "ממתין לאישור",
-        statusColor: "#2F90A1",
-        managementUrl: CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-      };
-    case "appointment_approved":
-      return {
-        title: "התור שלך אושר!",
-        subtitle: `נשמח לראותכם במרפאת ${VETERINARY_CLINIC_PROFILE.shortName}.`,
-        statusLabel: "תור מאושר",
-        statusColor: "#16a34a",
-        managementUrl: CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-        addToCalendarUrl: CUSTOMER_EMAIL_PREVIEW_CALENDAR_URL,
-        addToCalendarLabel: "הוספה ליומן Google",
-      };
-    case "appointment_updated":
-      return {
-        title: "פרטי התור עודכנו",
-        subtitle: `פרטי התור שלך במרפאת ${VETERINARY_CLINIC_PROFILE.shortName} עודכנו.`,
-        statusLabel: "תור מעודכן",
-        statusColor: "#5267A8",
-        managementUrl: CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-      };
-    case "appointment_cancelled":
-      return {
-        title: "עדכון: התור בוטל",
-        subtitle: "הודעה על ביטול התור.",
-        statusLabel: "תור מבוטל",
-        statusColor: "#dc2626",
-      };
-    case "appointment_reminder_day":
-      return {
-        title: "תזכורת לתור שלך",
-        subtitle: "נזכיר לך יום לפני התור במרפאה.",
-        statusLabel: "תזכורת יום לפני",
-        statusColor: "#2F90A1",
-        managementUrl: CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-      };
-    case "appointment_reminder_hour":
-      return {
-        title: "התור שלך בעוד שעה",
-        subtitle: "התור שלך מתקרב, נתראה בקרוב במרפאה.",
-        statusLabel: "תזכורת שעה לפני",
-        statusColor: "#1D6472",
-        managementUrl: CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-      };
-    case "client_cancellation":
-      return {
-        title: "ביטול התור בוצע",
-        subtitle: clinicDisplayLabel(VETERINARY_CLINIC_PROFILE),
-        statusLabel: "תור מבוטל",
-        statusColor: "#dc2626",
-      };
-    case "reschedule_rejected":
-      return {
-        title: "בקשת שינוי המועד לא אושרה",
-        subtitle: `המועד המקורי שלך נשאר שמור במרפאת ${VETERINARY_CLINIC_PROFILE.shortName}.`,
-        statusLabel: "התור המקורי נשאר בתוקף",
-        statusColor: "#5267A8",
-        managementUrl: CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-      };
-    default:
-      return customerEmailPreviewOptions("booking_request");
-  }
-}
-
-/** Render the selected customer email design with safe sample values for the settings preview. */
+/** Render a customer email with safe sample values for the settings preview. */
 export function buildCustomerEmailPreviewHtml(
   emailType: CustomerEmailTypeKey,
-  templateKey: unknown = CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY,
+  _templateKey?: unknown,
+  variant: { rejected?: boolean } = {},
 ): string {
-  const resolvedTemplate = resolveCustomerEmailTemplate(templateKey);
   if (emailType === "reschedule_rejected") {
     return buildCustomerRescheduleRejectionEmailHtml(
       CUSTOMER_EMAIL_PREVIEW_APPOINTMENT,
-      {
-        requested_date: "2026-10-22",
-        requested_start_time: "16:00",
-        requested_end_time: "16:30",
-      },
+      { requested_date: "2026-10-22", requested_start_time: "16:00", requested_end_time: "16:30" },
       CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
-      resolvedTemplate,
     );
   }
-  return buildCustomerEmailHtml(
-    emailType,
-    resolvedTemplate,
-    CUSTOMER_EMAIL_PREVIEW_APPOINTMENT,
-    customerEmailPreviewOptions(emailType),
-  );
+  return buildCustomerEmailHtml(emailType, CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY, CUSTOMER_EMAIL_PREVIEW_APPOINTMENT, {
+    managementUrl: emailType === "client_cancellation" || emailType === "appointment_cancelled" ? undefined : CUSTOMER_EMAIL_PREVIEW_MANAGEMENT_URL,
+    addToCalendarUrl: emailType === "appointment_approved" ? CUSTOMER_EMAIL_PREVIEW_CALENDAR_URL : undefined,
+    rejected: variant.rejected,
+  });
 }
 
 export interface RescheduleRejectionEmailDetails {
@@ -643,121 +382,12 @@ export interface RescheduleRejectionEmailDetails {
   requested_end_time: string;
 }
 
-/**
- * Builds the dedicated rejection message for a reschedule request.
- * The management URL is the only link in this template, so the customer
- * receives exactly one appointment-management CTA.
- */
+/** The rejection message for a reschedule request; the original appointment stays. */
 export function buildCustomerRescheduleRejectionEmailHtml(
   appointment: AppointmentLike,
   request: RescheduleRejectionEmailDetails,
   managementUrl: string,
-  templateKey: unknown,
+  _templateKey?: unknown,
 ): string {
-  return resolveCustomerEmailTemplate(templateKey) === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    ? buildMarketingRescheduleRejectionEmailHtml(appointment, request, managementUrl)
-    : buildRescheduleRejectionEmailHtml(appointment, request, managementUrl);
-}
-
-/** Build the approved marketing layout for a rejected reschedule request. */
-export function buildMarketingRescheduleRejectionEmailHtml(
-  appointment: AppointmentLike,
-  request: RescheduleRejectionEmailDetails,
-  managementUrl: string,
-): string {
-  const clientName = appointment.client_name || "לקוח יקר";
-  const originalDate = appointment.date?.includes("-") ? appointment.date.split("-").reverse().join("/") : appointment.date || "לא צוין";
-  const requestedDate = request.requested_date?.includes("-") ? request.requested_date.split("-").reverse().join("/") : request.requested_date || "לא צוין";
-  const originalTime = `${appointment.start_time || "-"} - ${appointment.end_time || "-"}`;
-  const requestedTime = `${request.requested_start_time || "-"} - ${request.requested_end_time || "-"}`;
-  const actions: MarketingEmailAction[] = managementUrl
-    ? [{ label: "ניהול התור שלי", url: managementUrl, variant: "secondary" }]
-    : [];
-
-  return buildMarketingEmailHtml({
-    title: "בקשת שינוי המועד לא אושרה",
-    subtitle: `המועד המקורי שלך נשאר שמור במרפאת ${VETERINARY_CLINIC_PROFILE.shortName}.`,
-    statusLabel: "התור המקורי נשאר בתוקף",
-    statusColor: "#5267A8",
-    body: `שלום ${clientName},\n\nהמועד שביקשת לא אושר. התור המקורי שלך נשאר תקף, ואין צורך לבצע פעולה כדי לשמור עליו.`,
-    details: [
-      { label: "חיית המחמד", value: appointment.pet_name || "-" },
-      { label: "סוג הטיפול", value: appointment.appointment_type || "-" },
-      { label: "המועד המקורי", value: `${originalDate} · ${originalTime}` },
-      { label: "המועד שביקשת", value: `${requestedDate} · ${requestedTime}` },
-    ],
-    actions,
-  });
-}
-
-export function buildRescheduleRejectionEmailHtml(
-  appointment: AppointmentLike,
-  request: RescheduleRejectionEmailDetails,
-  managementUrl: string,
-): string {
-  const safeManagementUrl = typeof managementUrl === "string" ? managementUrl.trim() : "";
-  const rawDate = appointment.date || "";
-  const formattedDate = rawDate.includes("-") ? rawDate.split("-").reverse().join("/") : rawDate;
-  const requestedDate = request.requested_date.includes("-") ? request.requested_date.split("-").reverse().join("/") : request.requested_date;
-  const clientName = appointment.client_name || "-";
-  const petName = appointment.pet_name || "-";
-  const type = appointment.appointment_type || "-";
-  const originalTime = `${appointment.start_time || "-"} - ${appointment.end_time || "-"}`;
-  const requestedTime = `${request.requested_start_time || "-"} - ${request.requested_end_time || "-"}`;
-  const managementSection = safeManagementUrl
-    ? `<div style="margin-top:24px;padding-top:18px;border-top:1px dashed #e2e8f0;text-align:center;">
-        <div style="font-size:11px;color:#64748b;margin-bottom:12px;font-weight:600;">לצפייה בפרטי התור ולניהולו, אפשר להשתמש בקישור המאובטח:</div>
-        <a href="${escapeHtml(safeManagementUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:11px 26px;background-color:#1a1a3e;color:#ffffff;text-decoration:none;border-radius:12px;font-size:13px;font-weight:900;">ניהול התור שלי</a>
-      </div>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="he" dir="rtl">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>בקשת שינוי מועד לא אושרה</title>
-  </head>
-  <body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;direction:rtl;text-align:right;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;padding:12px 8px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:360px;background-color:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.08);border:1px solid #eef2f6;">
-            <tr>
-              <td style="padding:16px 16px 14px 16px;background:linear-gradient(135deg,#5267a8,#394b8d);color:#ffffff;border-radius:20px 20px 0 0;">
-                <div style="font-size:18px;font-weight:900;letter-spacing:-0.02em;margin-bottom:8px;">בקשת שינוי המועד לא אושרה</div>
-                <div style="font-size:11px;opacity:0.92;font-weight:500;">המועד המקורי שלך נשאר שמור במרפאת ${escapeHtml(VETERINARY_CLINIC_PROFILE.shortName)}.</div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:14px 14px 18px 14px;background-color:#ffffff;">
-                <div style="margin-bottom:14px;"><span style="display:inline-block;padding:3px 10px;border-radius:999px;background-color:#fff4e5;color:#a35c00;font-size:10px;font-weight:800;border:1px solid #f5d3a1;">התור המקורי נשאר בתוקף</span></div>
-                <p style="margin:0 0 16px;color:#334155;font-size:13px;line-height:1.8;">שלום ${escapeHtml(clientName)},<br />המועד שביקשת לא אושר. התור המקורי שלך נשאר תקף, ואין צורך לבצע פעולה כדי לשמור עליו.</p>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px;color:#1e293b;">
-                  <tr>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;"><div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">חיית מחמד</div><div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(petName)}</div></td>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;"><div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">סוג טיפול</div><div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(type)}</div></td>
-                  </tr>
-                </table>
-                <div style="margin:8px 0 14px 0;border-radius:18px;background-color:#f8fafc;border:1px solid #f1f5f9;padding:10px 14px;">
-                  <div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">המועד המקורי, נשאר בתוקף</div>
-                  <div style="font-size:13px;font-weight:800;color:#0f172a;">${escapeHtml(formattedDate)} · ${escapeHtml(originalTime)}</div>
-                </div>
-                <div style="margin:8px 0 14px 0;border-radius:18px;background-color:#fffaf0;border:1px solid #f7e1bb;padding:10px 14px;">
-                  <div style="font-size:9px;font-weight:800;color:#a35c00;letter-spacing:0.05em;margin-bottom:6px;">המועד שביקשת, לא אושר</div>
-                  <div style="font-size:13px;font-weight:800;color:#7c4a08;">${escapeHtml(requestedDate)} · ${escapeHtml(requestedTime)}</div>
-                </div>
-                ${managementSection}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:12px 14px;background-color:#f8fafc;border-top:1px solid #f1f5f9;border-radius:0 0 20px 20px;font-size:10px;color:#94a3b8;text-align:center;font-weight:600;">${escapeHtml(clinicEmailFooter(VETERINARY_CLINIC_PROFILE, "appointment"))}</td>
-            </tr>
-          </table>
-          <div style="height:40px;"></div>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+  return cleanRescheduleRejectedEmail(appointment, request, managementUrl);
 }

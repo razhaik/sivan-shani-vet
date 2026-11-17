@@ -7,10 +7,7 @@ import {
   buildAppointmentManagementUrl,
   buildCustomerEmailHtml,
   buildCustomerRescheduleRejectionEmailHtml,
-  buildRescheduleRejectionEmailHtml,
-  MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY,
   resolveCustomerEmailTemplateSelection,
-  type AppointmentEmailOptions,
   type RescheduleRejectionEmailDetails,
 } from "@/lib/emailTemplates";
 import { VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
@@ -219,16 +216,16 @@ async function appointmentEmail(snapshot: AppointmentActionSnapshot, action: App
   const updated = action === "update";
   const setting = await loadLatestClinicSettings();
   const managementUrl = approved || updated ? managementUrlFromSettings(snapshot, setting) : "";
-  const options: AppointmentEmailOptions = approved
-    ? { title: "התור שלך אושר!", subtitle: `נשמח לראותכם במרפאת ${VETERINARY_CLINIC_PROFILE.shortName}.`, statusLabel: "תור מאושר", statusColor: "#16a34a", ...(calendarUrl ? { addToCalendarUrl: calendarUrl, addToCalendarLabel: "הוספה ליומן Google" } : {}), ...(managementUrl ? { managementUrl } : {}) }
-    : updated
-      ? { title: "פרטי התור עודכנו", subtitle: `פרטי התור שלך במרפאת ${VETERINARY_CLINIC_PROFILE.shortName} עודכנו.`, statusLabel: "תור מעודכן", statusColor: "#5267A8", ...(managementUrl ? { managementUrl } : {}) }
-      : { title: "עדכון: התור בוטל", subtitle: "הודעה על ביטול התור.", statusLabel: "תור מבוטל", statusColor: "#dc2626" };
+  const rejected = action === "reject";
   const emailType = approved ? "appointment_approved" : updated ? "appointment_updated" : "appointment_cancelled";
   const templateKey = resolveCustomerEmailTemplateSelection(setting?.customer_email_template_selections, emailType);
-  const bodyHtml = buildCustomerEmailHtml(emailType, templateKey, snapshot, options);
+  const bodyHtml = buildCustomerEmailHtml(emailType, templateKey, snapshot, {
+    ...(approved && calendarUrl ? { addToCalendarUrl: calendarUrl } : {}),
+    ...(managementUrl ? { managementUrl } : {}),
+    rejected,
+  });
   try {
-    await runWithTimeout(() => sendEmail({ to: snapshot.email, subject: approved ? `אישור תור – ${VETERINARY_CLINIC_PROFILE.shortName}` : updated ? `עדכון פרטי תור – ${VETERINARY_CLINIC_PROFILE.shortName}` : `ביטול תור – ${VETERINARY_CLINIC_PROFILE.shortName}`, body_html: bodyHtml }), "שליחת אימייל ללקוח");
+    await runWithTimeout(() => sendEmail({ to: snapshot.email, subject: approved ? `אישור תור – ${VETERINARY_CLINIC_PROFILE.shortName}` : updated ? `עדכון פרטי תור – ${VETERINARY_CLINIC_PROFILE.shortName}` : rejected ? `בקשת התור לא אושרה – ${VETERINARY_CLINIC_PROFILE.shortName}` : `ביטול תור – ${VETERINARY_CLINIC_PROFILE.shortName}`, body_html: bodyHtml }), "שליחת אימייל ללקוח");
     return succeeded("נשלח");
   } catch (error) { console.error(`CRM appointment ${action} email failed:`, error); return failed("לא נשלח"); }
 }
@@ -240,11 +237,7 @@ export async function sendRescheduleRejectionEmail(
 ): Promise<SideEffectOutcome> {
   if (!isValidEmail(snapshot.email)) return skipped("אין כתובת אימייל תקינה");
   if (!managementUrl) return failed("לא נמצא קישור ניהול תור מאובטח");
-  const setting = await loadLatestClinicSettings();
-  const templateKey = resolveCustomerEmailTemplateSelection(setting?.customer_email_template_selections, "reschedule_rejected");
-  const bodyHtml = templateKey === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    ? buildCustomerRescheduleRejectionEmailHtml(snapshot, request, managementUrl, templateKey)
-    : buildRescheduleRejectionEmailHtml(snapshot, request, managementUrl);
+  const bodyHtml = buildCustomerRescheduleRejectionEmailHtml(snapshot, request, managementUrl);
   try {
     await runWithTimeout(
       () => sendEmail({

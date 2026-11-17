@@ -1,101 +1,7 @@
 import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
+import { cleanClientCancellationEmail } from "../_shared/clean-email.ts";
 
-const MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY = "marketing-clinic-template" as const;
-const CUSTOMER_EMAIL_LOGO_URL = "https://sivanshanivet.com/media/f0d6a0e1--5735fe1452b8-pasted-image-1789671955012.png";
-
-type CustomerEmailTemplateKey = "current-clinic-template" | "marketing-clinic-template";
-type CustomerEmailDetail = { label: string; value: unknown };
-type CustomerEmailAction = { label: string; url: string; variant?: "primary" | "secondary" | "danger" };
-type CustomerEmailOptions = {
-  title: string;
-  subtitle?: string;
-  statusLabel?: string;
-  statusColor?: string;
-  body?: string;
-  details?: CustomerEmailDetail[];
-  actions?: CustomerEmailAction[];
-  clinicName?: string;
-  clinicTagline?: string;
-  footerText?: string;
-};
-
-function resolveCustomerEmailTemplateSelection(value: unknown, emailType: string): CustomerEmailTemplateKey {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  return source[emailType] === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY ? MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY : "current-clinic-template";
-}
-
-function customerEmailText(value: unknown, fallback = ""): string {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
-}
-
-function customerEmailEscapeHtml(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[character] || character));
-}
-
-function customerEmailMultiline(value: unknown): string {
-  return customerEmailEscapeHtml(value).replace(/\r?\n/g, "<br />");
-}
-
-function customerEmailSafeUrl(value: unknown): string {
-  const raw = typeof value === "string" ? value.trim() : "";
-  if (!raw || raw.length > 2048) return "";
-  try {
-    const parsed = new URL(raw, SITE_URL);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
-    const hostname = parsed.hostname.toLowerCase();
-    const clinic = hostname === "sivanshanivet.com" || hostname.endsWith(".sivanshanivet.com");
-    const calendar = hostname === "calendar.google.com" || hostname === "www.google.com";
-    return clinic || calendar ? parsed.toString() : "";
-  } catch {
-    return "";
-  }
-}
-
-function customerEmailColor(value: unknown, fallback: string): string {
-  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim() : fallback;
-}
-
-function customerEmailDetailsHtml(details: CustomerEmailDetail[]): string {
-  const visible = details.filter((detail) => detail && customerEmailText(detail.label));
-  if (!visible.length) return "";
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0;background:rgba(244,249,250,0.82);border:1px solid #dce9ee;border-radius:16px;overflow:hidden;">${visible.map((detail, index) => `<tr><td style="padding:11px 14px;${index < visible.length - 1 ? "border-bottom:1px solid #dce9ee;" : ""}width:36%;vertical-align:top;color:#718792;font-size:11px;font-weight:800;">${customerEmailEscapeHtml(detail.label)}</td><td style="padding:11px 14px;${index < visible.length - 1 ? "border-bottom:1px solid #dce9ee;" : ""}vertical-align:top;color:#0f2842;font-size:13px;font-weight:800;line-height:1.65;white-space:pre-wrap;word-break:break-word;">${customerEmailMultiline(detail.value)}</td></tr>`).join("")}</table>`;
-}
-
-function customerEmailActionsHtml(actions: CustomerEmailAction[]): string {
-  const visible = actions.map((action) => ({ ...action, url: customerEmailSafeUrl(action?.url) })).filter((action) => action.url && customerEmailText(action.label)).slice(0, 2);
-  if (!visible.length) return "";
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:25px;"><tr><td align="center">${visible.map((action) => { const background = action.variant === "danger" ? "#b83b4b" : action.variant === "secondary" ? "#0f2842" : "#1d6472"; return `<a href="${customerEmailEscapeHtml(action.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin:0 4px 8px;padding:12px 22px;border-radius:12px;background:${background};color:#ffffff;text-decoration:none;font-size:13px;font-weight:900;line-height:1.2;">${customerEmailEscapeHtml(action.label)}</a>`; }).join("")}</td></tr></table>`;
-}
-
-function buildMarketingAppointmentEmailHtml(appointment: AppointmentRecord, options: CustomerEmailOptions): string {
-  const clientName = customerEmailText(appointment.client_name, "לקוח יקר");
-  const dateValue = customerEmailText(appointment.date, "לא צוין");
-  const details: CustomerEmailDetail[] = [
-    { label: "שם הלקוח", value: clientName },
-    { label: "חיית המחמד", value: customerEmailText(appointment.pet_name, "-") },
-    { label: "סוג הטיפול", value: customerEmailText(appointment.appointment_type, "-") },
-    { label: "תאריך", value: dateValue.includes("-") ? dateValue.split("-").reverse().join("/") : dateValue },
-    { label: "שעה", value: `${customerEmailText(appointment.start_time, "-")}${customerEmailText(appointment.end_time) ? ` - ${customerEmailText(appointment.end_time)}` : ""}` },
-  ];
-  if (customerEmailText(appointment.phone)) details.push({ label: "טלפון", value: customerEmailText(appointment.phone) });
-  if (customerEmailText(appointment.email)) details.push({ label: "דוא״ל", value: customerEmailText(appointment.email) });
-  if (customerEmailText(appointment.notes)) details.push({ label: "הערות נוספות", value: customerEmailText(appointment.notes) });
-  const title = customerEmailText(options.title, "עדכון מהמרפאה");
-  const subtitle = customerEmailText(options.subtitle);
-  const body = customerEmailText(options.body, `שלום ${clientName},\n\n${subtitle || "אלה פרטי התור שלך במרפאה."}`);
-  const statusLabel = customerEmailText(options.statusLabel);
-  const statusColor = customerEmailColor(options.statusColor, "#2f90a1");
-  const clinicName = customerEmailText(options.clinicName, "ד״ר סיון שני");
-  const clinicTagline = customerEmailText(options.clinicTagline, "טיפול באהבה לבעלי חיים");
-  const footerText = customerEmailText(options.footerText, "כאן עבורכם ועבור חיות המחמד שלכם");
-  const legalFooter = `sivanshanivet.com · כל הזכויות שמורות © ${new Date().getFullYear()}`;
-  const detailsHtml = customerEmailDetailsHtml(details);
-  const actionsHtml = customerEmailActionsHtml(Array.isArray(options.actions) ? options.actions : []);
-  return `<!doctype html><html lang="he" dir="rtl"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${customerEmailEscapeHtml(title)}</title></head><body style="margin:0;padding:0;background:#ecf5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;direction:rtl;text-align:right;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ecf5f7;padding:22px 10px;"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #d5e2e7;border-radius:24px;overflow:hidden;box-shadow:0 14px 32px rgba(15,40,66,0.08);"><tr><td background="${customerEmailEscapeHtml(CUSTOMER_EMAIL_LOGO_URL)}" bgcolor="#ffffff" style="padding:0;background-color:#ffffff;background-image:url('${customerEmailEscapeHtml(CUSTOMER_EMAIL_LOGO_URL)}');background-position:center 52%;background-repeat:no-repeat;background-size:88% auto;overflow:hidden;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="position:relative;z-index:1;background:transparent;"><tr><td style="padding:28px 30px 22px;background:rgba(244,249,250,0.82);border-bottom:1px solid #dce9ee;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="vertical-align:top;"><div style="font-size:18px;line-height:1.35;font-weight:900;letter-spacing:-0.02em;color:#0f2842;">${customerEmailEscapeHtml(clinicName)}</div><div style="margin-top:5px;font-size:12px;line-height:1.6;font-weight:700;color:#52717d;">${customerEmailEscapeHtml(clinicTagline)}</div></td><td align="left" style="vertical-align:top;width:44px;"><span style="display:inline-block;width:34px;height:34px;border-radius:12px;background:#dceff2;color:#1d6472;text-align:center;font-size:19px;line-height:34px;font-weight:900;">✉</span></td></tr></table><div style="margin-top:18px;width:58px;height:4px;border-radius:99px;background:#2f90a1;"></div></td></tr><tr><td style="padding:30px;background:rgba(255,255,255,0.72);"><div style="font-size:10px;line-height:1.4;font-weight:900;letter-spacing:0.16em;color:#2f90a1;">נושא ההודעה</div><div style="margin-top:11px;font-size:25px;line-height:1.35;font-weight:900;letter-spacing:-0.03em;color:#0f2842;">${customerEmailEscapeHtml(title)}</div>${subtitle ? `<div style="margin-top:10px;font-size:13px;line-height:1.75;font-weight:700;color:#52717d;">${customerEmailMultiline(subtitle)}</div>` : ""}${statusLabel ? `<div style="margin-top:18px;display:inline-block;padding:6px 11px;border:1px solid #c9dde3;border-radius:999px;background:#eaf6f7;color:${statusColor};font-size:11px;line-height:1.2;font-weight:900;">${customerEmailEscapeHtml(statusLabel)}</div>` : ""}<div style="margin-top:22px;border-top:1px solid #dce9ee;padding-top:22px;color:#405a67;font-size:14px;line-height:1.9;font-weight:600;">${customerEmailMultiline(body)}</div><div style="margin-top:22px;">${detailsHtml}</div>${actionsHtml}</td></tr><tr><td style="padding:18px 30px 22px;background:rgba(248,251,252,0.86);border-top:1px solid #dce9ee;text-align:center;"><div style="font-size:11px;line-height:1.6;font-weight:900;color:#0f2842;">בברכה, ${customerEmailEscapeHtml(clinicName)}</div><div style="margin-top:4px;font-size:10px;line-height:1.6;font-weight:600;color:#718792;">${customerEmailEscapeHtml(footerText)}</div><div style="margin-top:9px;font-size:10px;line-height:1.5;color:#8aa0a8;">${customerEmailEscapeHtml(legalFooter)}</div></td></tr></table></td></tr></table><div style="height:26px;"></div></td></tr></table></body></html>`;
-}
 
 const APP_ID = (Deno.env.get("SUPERDEV_APP_ID") ?? "sivan-shani-vet");
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -543,104 +449,13 @@ async function rescheduleSummary(appointment: AppointmentRecord, policy: Policy)
   };
 }
 
-function cancellationEmailHtml(appointment: AppointmentRecord): string {
-  const client = customerEmailText(appointment.client_name, "לקוח/ה");
-  const pet = customerEmailText(appointment.pet_name, "חיית המחמד");
-  const service = customerEmailText(appointment.appointment_type, "תור במרפאה");
-  const date = displayDate(appointment.date);
-  const startTime = customerEmailText(appointment.start_time, "-");
-  const endTime = customerEmailText(appointment.end_time);
-  const time = `${startTime}${endTime ? ` - ${endTime}` : ""}`;
-  const title = "ביטול התור בוצע";
-  const subtitle = "ד״ר סיון שני · מרפאה וטרינרית";
-  const websiteUrl = customerEmailEscapeHtml(customerEmailSafeUrl(SITE_URL));
-  return `<!DOCTYPE html>
-<html lang="he" dir="rtl">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${customerEmailEscapeHtml(title)}</title>
-  </head>
-  <body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;direction:rtl;text-align:right;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;padding:12px 8px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:360px;background-color:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.08);border:1px solid #eef2f6;">
-            <tr>
-              <td style="padding:16px 16px 14px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;border-radius:20px 20px 0 0;">
-                <div style="font-size:18px;font-weight:900;letter-spacing:-0.02em;margin-bottom:8px;">${customerEmailEscapeHtml(title)}</div>
-                <div style="font-size:11px;line-height:1.7;opacity:0.9;font-weight:500;">${customerEmailEscapeHtml(subtitle)}</div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:14px 14px 18px;background-color:#ffffff;">
-                <div style="margin-bottom:14px;">
-                  <span style="display:inline-block;padding:3px 10px;border-radius:999px;background-color:#fee2e2;color:#b91c1c;font-size:10px;font-weight:800;border:1px solid #fca5a5;">תור מבוטל</span>
-                </div>
-                <p style="margin:0 0 18px;color:#334155;font-size:14px;line-height:1.8;">שלום ${customerEmailEscapeHtml(client)},<br />לבקשתך ביטלנו את התור הבא:</p>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px;color:#1e293b;">
-                  <tr>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">חיית מחמד</div>
-                      <div style="font-size:13px;font-weight:800;color:#0f172a;word-break:break-word;">${customerEmailEscapeHtml(pet)}</div>
-                    </td>
-                    <td style="width:50%;padding-bottom:12px;vertical-align:top;">
-                      <div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">סוג טיפול</div>
-                      <div style="font-size:13px;font-weight:800;color:#0f172a;word-break:break-word;">${customerEmailEscapeHtml(service)}</div>
-                    </td>
-                  </tr>
-                </table>
-                <div style="margin:8px 0 14px;border-radius:18px;background-color:#f8fafc;border:1px solid #f1f5f9;padding:10px 14px;">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                    <tr>
-                      <td style="width:50%;vertical-align:top;">
-                        <div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">תאריך</div>
-                        <div dir="ltr" style="font-size:13px;font-weight:800;color:#0f172a;text-align:right;">${customerEmailEscapeHtml(date)}</div>
-                      </td>
-                      <td style="width:50%;vertical-align:top;border-right:1px solid #e2e8f0;padding-right:16px;">
-                        <div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:6px;">שעה</div>
-                        <div dir="ltr" style="font-size:13px;font-weight:800;color:#0f172a;text-align:right;">${customerEmailEscapeHtml(time)}</div>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-                <p style="margin:20px 0 0;color:#475569;font-size:13px;line-height:1.8;">אם תרצו לקבוע תור חדש, אפשר לעשות זאת באתר <a href="${websiteUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">המרפאה</a> או ליצור איתנו קשר בטלפון <span dir="ltr" style="white-space:nowrap;">${customerEmailEscapeHtml(CLINIC_PHONE)}</span>.</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:12px 14px;background-color:#f8fafc;border-top:1px solid #f1f5f9;border-radius:0 0 20px 20px;font-size:10px;color:#94a3b8;text-align:center;font-weight:600;">
-                <a href="${websiteUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">sivanshanivet.com</a>
-                <span style="color:#94a3b8;"> · </span>
-                <span dir="ltr" style="color:#64748b;">${customerEmailEscapeHtml(CLINIC_PHONE)}</span>
-              </td>
-            </tr>
-          </table>
-          <div style="height:40px;"></div>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
-}
 
 async function sendCancellationEmail(appointment: AppointmentRecord, settings: SettingsRecord): Promise<"sent" | "skipped" | "failed"> {
   const email = validEmail(appointment.email);
   if (!email) return "skipped";
   if (!SERVICE_ROLE_KEY) return "failed";
 
-  const templateKey = resolveCustomerEmailTemplateSelection(settings.customer_email_template_selections, "client_cancellation");
-  const bodyHtml = templateKey === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    ? buildMarketingAppointmentEmailHtml(appointment, {
-      title: "ביטול התור בוצע",
-      subtitle: "ד״ר סיון שני · מרפאה וטרינרית",
-      statusLabel: "תור מבוטל",
-      statusColor: "#dc2626",
-      body: `שלום ${text(appointment.client_name, "לקוח/ה")},\n\nלבקשתך ביטלנו את התור של ${text(appointment.pet_name, "חיית המחמד")}. אם תרצו לקבוע תור חדש, אפשר ליצור קשר עם המרפאה בטלפון ${CLINIC_PHONE} או באתר sivanshanivet.com.`,
-      clinicName: "ד״ר סיון שני",
-      clinicTagline: "טיפול באהבה לבעלי חיים",
-      footerText: "כאן עבורכם ועבור חיות המחמד שלכם",
-    })
-    : cancellationEmailHtml(appointment);
+  const bodyHtml = cleanClientCancellationEmail(appointment);
 
   try {
     integrations.auth.setToken(SERVICE_ROLE_KEY);
