@@ -27,6 +27,7 @@ export interface CleanEmailOptions {
 }
 
 export const CLINIC_ADDRESS = "צה״ל 48א, נס ציונה";
+export const CLINIC_MAPS_URL = "https://maps.app.goo.gl/RmsYfkK3dss75Nj39";
 export const CLINIC_HOURS = "א׳, ד׳ 16:00–19:30 · ב׳, ג׳, ה׳ 9:00–14:30, 16:00–19:30 · ו׳ 8:30–14:30";
 
 const NAVY = "#1A1A3E";
@@ -70,34 +71,8 @@ function wazeUrl(): string {
   return `https://waze.com/ul?q=${encodeURIComponent(CLINIC_ADDRESS.replace(/״/g, '"'))}&navigate=yes`;
 }
 
-/** Clinic pin (Tzahal 48, Ness Ziona). */
-const CLINIC_LAT = 31.9317252;
-const CLINIC_LNG = 34.8065899;
-
-/**
- * Map image for the footer. With a Google Maps Static API key (build env
- * VITE_GOOGLE_MAPS_STATIC_KEY) the email shows a live Google Maps image;
- * without it, the bundled OpenStreetMap image at /email/map.png is used.
- */
-function mapImageUrl(): string {
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-  const key = (env?.VITE_GOOGLE_MAPS_STATIC_KEY || "").trim();
-  if (!key) return assetUrl("map.png");
-  const params = new URLSearchParams({
-    center: `${CLINIC_LAT},${CLINIC_LNG}`,
-    zoom: "16",
-    size: "456x228",
-    scale: "2",
-    language: "iw",
-    region: "IL",
-    markers: `color:red|${CLINIC_LAT},${CLINIC_LNG}`,
-    key,
-  });
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
-}
-
 function mapsUrl(): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CLINIC_ADDRESS.replace(/״/g, '"'))}`;
+  return CLINIC_MAPS_URL;
 }
 
 function detailRow(label: string, value: string, last = false): string {
@@ -216,7 +191,7 @@ ${showHome ? homeScreenSection() : ""}
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid ${LINE};">
 <tr><td align="center" style="padding-top:28px;">
 <a href="${esc(mapsUrl())}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
-<img src="${esc(mapImageUrl())}" width="456" alt="${esc(`מפה: ${CLINIC_ADDRESS} – לחצו לפתיחה במפות`)}" style="display:block;width:100%;max-width:456px;height:auto;margin:0 auto;border:1px solid ${LINE};border-radius:10px;" />
+<img src="${assetUrl("map.png")}" width="456" alt="${esc(`מפה: ${CLINIC_ADDRESS} – לחצו לפתיחה במפות`)}" style="display:block;width:100%;max-width:456px;height:auto;margin:0 auto;border:1px solid ${LINE};border-radius:10px;" />
 </a>
 <a href="${esc(mapsUrl())}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding-top:8px;font-family:${FONT};font-size:13px;color:${BLUE};text-decoration:none;">פתיחה במפות ←</a>
 </td></tr>
