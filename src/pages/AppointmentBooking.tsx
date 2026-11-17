@@ -58,6 +58,23 @@ export const PET_SPECIES_OPTIONS = [
   { value: "other", label: "אחר" },
 ] as const;
 
+export type KnownPet = { name: string; species: string };
+
+const normalizePetKey = (value: string) => value.trim().toLocaleLowerCase("he").replace(/\s+/g, " ");
+
+const parseKnownPets = (value: unknown): KnownPet[] => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const name = typeof (item as any).name === "string" ? (item as any).name.trim().slice(0, 120) : "";
+    const key = normalizePetKey(name);
+    if (!name || seen.has(key)) return [];
+    seen.add(key);
+    return [{ name, species: typeof (item as any).species === "string" ? (item as any).species : "" }];
+  }).slice(0, 20);
+};
+
 export type PetSpecies = (typeof PET_SPECIES_OPTIONS)[number]["value"];
 
 export const isPetSpecies = (value: unknown): value is PetSpecies =>
@@ -77,6 +94,7 @@ type PublicBookingPayload = {
   email?: string;
   petName?: string;
   petSpecies?: string;
+  pets?: KnownPet[];
   available_start_times?: unknown;
   service?: {
     name?: unknown;
@@ -113,6 +131,7 @@ function parsePublicBookingPayload(value: unknown): PublicBookingPayload | null 
     email: typeof record.email === "string" ? record.email : undefined,
     petName: typeof record.petName === "string" ? record.petName : undefined,
     petSpecies: typeof record.petSpecies === "string" ? record.petSpecies : undefined,
+    pets: parseKnownPets(record.pets),
     available_start_times: record.available_start_times,
     service: record.service && typeof record.service === "object" ? record.service : undefined,
     sms_consent_sync_warning: record.sms_consent_sync_warning === true,
@@ -262,6 +281,8 @@ export default function AppointmentBooking() {
   const [bookingFieldErrors, setBookingFieldErrors] = useState<BookingFieldErrors>({});
   const [customerFlow, setCustomerFlow] = useState<CustomerFlow>("choice");
   const [lookupPhone, setLookupPhone] = useState("");
+  const [knownPets, setKnownPets] = useState<KnownPet[]>([]);
+  const [petSuggestionsOpen, setPetSuggestionsOpen] = useState(false);
   const [lookupStatus, setLookupStatus] = useState<CustomerLookupStatus>("idle");
   const [lookupMessage, setLookupMessage] = useState("");
   const [lookupPhoneError, setLookupPhoneError] = useState(false);
@@ -357,9 +378,28 @@ export default function AppointmentBooking() {
     setLookupPhone((current) => current || clientData.phone);
   };
 
+  const selectKnownPet = (pet: KnownPet) => {
+    clearBookingFieldError("petName");
+    if (isPetSpecies(pet.species)) clearBookingFieldError("petSpecies");
+    setClientData((previous) => ({
+      ...previous,
+      petName: pet.name,
+      petSpecies: isPetSpecies(pet.species) ? pet.species : previous.petSpecies,
+    }));
+    setPetSuggestionsOpen(false);
+  };
+
+  const petSuggestions = (() => {
+    if (!petSuggestionsOpen || knownPets.length === 0) return [] as KnownPet[];
+    const typed = normalizePetKey(clientData.petName);
+    if (knownPets.some((pet) => normalizePetKey(pet.name) === typed)) return [] as KnownPet[];
+    return knownPets.filter((pet) => !typed || normalizePetKey(pet.name).includes(typed));
+  })();
+
   const handleChooseNewCustomer = (preserveLookupPhone = false) => {
     const phoneToKeep = preserveLookupPhone ? lookupPhone.trim() : "";
     setCustomerFlow("new");
+    setKnownPets([]);
     setLookupStatus("idle");
     setLookupPhoneError(false);
     setLookupMessage("");
@@ -389,6 +429,7 @@ export default function AppointmentBooking() {
     setLookupPhoneError(false);
     setLookupMessage("");
     setCustomerFlow("existing");
+    setKnownPets([]);
     setClientData((prev) => ({
       ...prev,
       name: "",
@@ -415,6 +456,7 @@ export default function AppointmentBooking() {
     setLookupPhoneError(false);
     setLookupStatus("loading");
     setLookupMessage("");
+    setKnownPets([]);
     setClientData((prev) => ({
       ...prev,
       name: "",
@@ -447,9 +489,11 @@ export default function AppointmentBooking() {
         name: payload.name || "",
         phone: payload.phone || phoneToSearch,
         email: payload.email || "",
-        petName: payload.petName || "",
-        petSpecies: isPetSpecies(payload.petSpecies) ? payload.petSpecies : "",
+        // With several pets, let the client pick instead of silently booking for the last one.
+        petName: (payload.pets?.length || 0) > 1 ? "" : payload.petName || "",
+        petSpecies: (payload.pets?.length || 0) > 1 ? "" : isPetSpecies(payload.petSpecies) ? payload.petSpecies : "",
       }));
+      setKnownPets(payload.pets?.length ? payload.pets : payload.petName ? [{ name: payload.petName, species: payload.petSpecies || "" }] : []);
       setLookupPhoneError(false);
       setLookupStatus("success");
       setLookupMessage("");
@@ -1371,19 +1415,89 @@ export default function AppointmentBooking() {
                       <PawPrint className="h-4 w-4 text-blue-600" aria-hidden="true" />
                       שם חיית המחמד *
                     </Label>
-                    <Input
-                      id="petName"
-                      required
-                      placeholder="לוקי, בלה, טובי..."
-                      value={clientData.petName}
-                      aria-invalid={Boolean(bookingFieldErrors.petName)}
-                      aria-describedby={bookingFieldErrors.petName ? "pet-name-error" : undefined}
-                      onChange={(event) => {
-                        clearBookingFieldError("petName");
-                        setClientData((previous) => ({ ...previous, petName: event.target.value }));
-                      }}
-                      className={`h-12 ${bookingFieldErrors.petName ? "border-red-700 focus-visible:ring-red-700" : ""}`}
-                    />
+                    {knownPets.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="חיות המחמד שלך">
+                        <span className="text-xs font-semibold text-slate-500">החיות שלך:</span>
+                        {knownPets.map((pet) => {
+                          const selected = normalizePetKey(clientData.petName) === normalizePetKey(pet.name);
+                          const speciesLabel = PET_SPECIES_OPTIONS.find((option) => option.value === pet.species)?.label;
+                          return (
+                            <button
+                              key={pet.name}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => selectKnownPet(pet)}
+                              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-bold transition-colors ${
+                                selected ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100"
+                              }`}
+                            >
+                              <PawPrint className="h-3.5 w-3.5" aria-hidden="true" />
+                              {pet.name}
+                              {speciesLabel && <span className={selected ? "font-medium text-blue-100" : "font-medium text-blue-500"}>· {speciesLabel}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="relative">
+                      <Input
+                        id="petName"
+                        required
+                        autoComplete="off"
+                        placeholder={knownPets.length ? "בחרו מהרשימה או הקלידו שם חדש" : "לוקי, בלה, טובי..."}
+                        value={clientData.petName}
+                        role={petSuggestions.length ? "combobox" : undefined}
+                        aria-expanded={petSuggestions.length ? true : undefined}
+                        aria-controls={petSuggestions.length ? "pet-suggestions" : undefined}
+                        aria-autocomplete={knownPets.length ? "list" : undefined}
+                        aria-invalid={Boolean(bookingFieldErrors.petName)}
+                        aria-describedby={bookingFieldErrors.petName ? "pet-name-error" : undefined}
+                        onFocus={() => setPetSuggestionsOpen(true)}
+                        onBlur={() => window.setTimeout(() => setPetSuggestionsOpen(false), 120)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") setPetSuggestionsOpen(false);
+                          if (event.key === "Enter" && petSuggestions.length === 1) {
+                            event.preventDefault();
+                            selectKnownPet(petSuggestions[0]);
+                          }
+                        }}
+                        onChange={(event) => {
+                          const typed = event.target.value;
+                          clearBookingFieldError("petName");
+                          setPetSuggestionsOpen(true);
+                          const match = knownPets.find((pet) => normalizePetKey(pet.name) === normalizePetKey(typed));
+                          if (match && isPetSpecies(match.species)) clearBookingFieldError("petSpecies");
+                          setClientData((previous) => ({
+                            ...previous,
+                            petName: typed,
+                            petSpecies: match && isPetSpecies(match.species) ? match.species : previous.petSpecies,
+                          }));
+                        }}
+                        className={`h-12 ${bookingFieldErrors.petName ? "border-red-700 focus-visible:ring-red-700" : ""}`}
+                      />
+                      {petSuggestions.length > 0 && (
+                        <ul
+                          id="pet-suggestions"
+                          role="listbox"
+                          className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+                        >
+                          {petSuggestions.map((pet) => (
+                            <li key={pet.name} role="option" aria-selected={false}>
+                              <button
+                                type="button"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => selectKnownPet(pet)}
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-right text-sm font-bold text-slate-800 hover:bg-blue-50"
+                              >
+                                <PawPrint className="h-4 w-4 text-blue-600" aria-hidden="true" />
+                                {pet.name}
+                                <span className="font-medium text-slate-500">{PET_SPECIES_OPTIONS.find((option) => option.value === pet.species)?.label || ""}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     {bookingFieldErrors.petName && <p id="pet-name-error" className="text-sm font-semibold text-red-800">{bookingFieldErrors.petName}</p>}
                   </div>
 
