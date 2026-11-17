@@ -20,18 +20,27 @@ export async function sendEmailViaResend(params: Record<string, any>) {
   const to = Array.isArray(params.to) ? params.to : String(params.to || "").split(",").map((s) => s.trim()).filter(Boolean);
   if (!to.length) throw new Error("Missing recipient");
   const fromName = String(params.from_name || EMAIL_DEFAULT_NAME).replace(/[<>"]/g, "");
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: `${fromName} <${EMAIL_FROM_ADDRESS}>`,
-      to,
-      subject: String(params.subject || ""),
-      html: String(params.body_html || params.html || params.body || ""),
-      ...(params.reply_to ? { reply_to: params.reply_to } : {}),
-    }),
+  const payload = JSON.stringify({
+    from: `${fromName} <${EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: String(params.subject || ""),
+    html: String(params.body_html || params.html || params.body || ""),
+    ...(params.reply_to ? { reply_to: params.reply_to } : {}),
   });
-  const body = await res.json().catch(() => ({}));
+  // Resend allows only a few requests per second; the clinic alert and the
+  // client email often go out together, so retry briefly when rate limited.
+  let res: Response = new Response(null, { status: 599 });
+  let body: any = {};
+  for (let attempt = 0; attempt < 4; attempt++) {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: payload,
+    });
+    body = await res.json().catch(() => ({}));
+    if (res.status !== 429 && res.status < 500) break;
+    await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1) + Math.floor(Math.random() * 300)));
+  }
   if (!res.ok) throw new Error(`Email failed: ${body?.message || res.status}`);
   return { success: true, id: body?.id };
 }

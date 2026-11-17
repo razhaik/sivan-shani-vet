@@ -1,5 +1,6 @@
 import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
+import { cleanOwnerNotificationEmail, hebrewLongDate, type CleanTone } from "../_shared/clean-email.ts";
 
 const APP_ID = (Deno.env.get("SUPERDEV_APP_ID") ?? "sivan-shani-vet");
 const SITE_URL = "https://sivanshanivet.com";
@@ -70,8 +71,7 @@ function booleanValue(value: unknown, fallback: boolean) {
 }
 
 function displayDate(value: unknown) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text(value));
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : text(value, "לא צוין");
+  return /^\d{4}-\d{2}-\d{2}$/.test(text(value)) ? hebrewLongDate(text(value)) : text(value, "לא צוין");
 }
 
 function displayTime(value: unknown) {
@@ -136,7 +136,7 @@ function defaultEventEnabled(event: NotificationEvent) {
 }
 
 function defaultEventChannels(event: NotificationEvent): NotificationChannel[] {
-  return defaultEventEnabled(event) ? ["push"] : [];
+  return defaultEventEnabled(event) ? ["email", "push"] : [];
 }
 
 function legacyEmailRecipients(event: NotificationEvent, record: SourceRecord) {
@@ -175,6 +175,7 @@ function appointmentRows(record: SourceRecord) {
     ["סוג התור", text(record.appointment_type, "תור במרפאה")],
     ["תאריך", displayDate(record.date)],
     ["שעה", displayTime(record.start_time)],
+    ["טלפון", text(record.phone, "")],
   ];
 }
 
@@ -183,7 +184,10 @@ function buildContent(event: NotificationEvent, record: SourceRecord, context: S
     const name = text(record.name, "פונה חדש/ה");
     const message = text(record.message, "לא צורפה הודעה");
     return {
-      titleHe: "ליד/הודעה חדשה",
+      tone: "confirmed" as CleanTone,
+      titleHe: "פנייה חדשה מהאתר",
+      headingHe: `${name} השאיר/ה פנייה`,
+      buttonHe: "פתיחת תיבת הדואר",
       titleEn: "New lead message",
       bodyHe: `התקבלה פנייה חדשה מ־${name}. פתחי את תיבת הדואר כדי לקרוא אותה.`,
       bodyEn: `A new website inquiry arrived from ${name}. Open the CRM inbox to read it.`,
@@ -203,7 +207,10 @@ function buildContent(event: NotificationEvent, record: SourceRecord, context: S
     const proposedDate = displayDate(record.proposed_appointment_date);
     const proposedTime = `${displayTime(record.proposed_start_time)}${record.proposed_end_time ? ` - ${displayTime(record.proposed_end_time)}` : ""}`;
     return {
-      titleHe: "בקשת שינוי מועד חדשה",
+      tone: "pending" as CleanTone,
+      titleHe: "בקשת שינוי מועד",
+      headingHe: `${clientName} מבקש/ת להזיז את התור של ${petName}`,
+      buttonHe: "אישור או דחייה במערכת",
       titleEn: "New appointment reschedule request",
       bodyHe: `${clientName} ביקש/ה לשנות את התור עבור ${petName} מ־${oldDate} בשעה ${oldTime} ל־${proposedDate} בשעה ${proposedTime}.`,
       bodyEn: `${clientName} requested a new appointment time for ${petName}, from ${oldDate} at ${oldTime} to ${proposedDate} at ${proposedTime}.`,
@@ -228,7 +235,10 @@ function buildContent(event: NotificationEvent, record: SourceRecord, context: S
 
   if (event === "appointment_changed") {
     return {
-      titleHe: "תור בוטל או שונה",
+      tone: "cancelled" as CleanTone,
+      titleHe: "ביטול תור על ידי לקוח",
+      headingHe: `${clientName} ביטל/ה את התור של ${petName}`,
+      buttonHe: "פתיחת היומן",
       titleEn: "Client appointment update",
       bodyHe: `${clientName} ביטל/ה את התור עבור ${petName} בתאריך ${date} בשעה ${time}.`,
       bodyEn: `${clientName} cancelled the appointment for ${petName} on ${date} at ${time}.`,
@@ -241,7 +251,10 @@ function buildContent(event: NotificationEvent, record: SourceRecord, context: S
 
   if (event === "appointment_no_show") {
     return {
+      tone: "cancelled" as CleanTone,
       titleHe: "אי־הגעה לתור",
+      headingHe: `${clientName} לא הגיע/ה לתור של ${petName}`,
+      buttonHe: "פתיחת היומן",
       titleEn: "Appointment no-show",
       bodyHe: `${clientName} לא הגיע/ה לתור עבור ${petName} בתאריך ${date} בשעה ${time}.`,
       bodyEn: `${clientName} did not attend the appointment for ${petName} on ${date} at ${time}.`,
@@ -255,7 +268,10 @@ function buildContent(event: NotificationEvent, record: SourceRecord, context: S
   const status = text(record.status, "requested").toLowerCase();
   const verb = status === "requested" ? "ביקש/ה" : "קבע/ה";
   return {
-    titleHe: "תור חדש במרפאה",
+    tone: (status === "requested" ? "pending" : "confirmed") as CleanTone,
+    titleHe: status === "requested" ? "בקשת תור חדשה" : "תור חדש במרפאה",
+    headingHe: status === "requested" ? `${clientName} מבקש/ת תור ל${petName}` : `${clientName} קבע/ה תור ל${petName}`,
+    buttonHe: status === "requested" ? "אישור או דחייה במערכת" : "פתיחת היומן",
     titleEn: "New clinic appointment",
     bodyHe: `${clientName} ${verb} תור עבור ${petName} בתאריך ${date} בשעה ${time}.`,
     bodyEn: `${clientName} requested an appointment for ${petName} on ${date} at ${time}.`,
@@ -267,8 +283,15 @@ function buildContent(event: NotificationEvent, record: SourceRecord, context: S
 }
 
 function ownerEmailHtml(content: ReturnType<typeof buildContent>) {
-  const rows = content.rows.map(([label, value]) => `<tr><td style="padding:9px 0;color:#64748b;font-size:12px;font-weight:700;width:34%;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:9px 0;color:#0f172a;font-size:14px;font-weight:800;line-height:1.6;">${escapeHtml(value)}</td></tr>`).join("");
-  return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(content.titleHe)}</title></head><body style="margin:0;background:#f7f7f7;font-family:Arial,'Segoe UI',sans-serif;direction:rtl;text-align:right;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 10px;background:#f7f7f7;"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border:1px solid #e5e7eb;border-radius:22px;overflow:hidden;"><tr><td style="padding:26px 24px;background:#1a1a3e;color:#fff;"><div style="font-size:24px;font-weight:900;margin-bottom:8px;">${escapeHtml(content.titleHe)}</div><div style="font-size:14px;line-height:1.7;color:#f2d162;">ד״ר סיון שני · מרפאה וטרינרית</div></td></tr><tr><td style="padding:24px;"><p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.8;">${escapeHtml(content.bodyHe)}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;">${rows}</table><p style="margin:20px 0 0;"><a href="${escapeHtml(content.url)}" style="display:inline-block;background:#1a1a3e;color:#fff;border-radius:10px;padding:11px 16px;font-size:13px;font-weight:800;text-decoration:none;">פתיחת ה־CRM</a></p></td></tr><tr><td style="padding:15px 24px;background:#fffdf3;border-top:1px solid #e8e1b8;text-align:center;color:#80630e;font-size:11px;line-height:1.7;">ההתראה נשלחה לפי הגדרות ההתראות של המרפאה.</td></tr></table></td></tr></table></body></html>`;
+  return cleanOwnerNotificationEmail({
+    tone: content.tone,
+    label: content.titleHe,
+    heading: content.headingHe,
+    intro: content.bodyHe,
+    rows: content.rows as Array<[string, string]>,
+    url: content.url,
+    buttonLabel: content.buttonHe,
+  });
 }
 
 function readTwilioConfig(): TwilioConfig | null {

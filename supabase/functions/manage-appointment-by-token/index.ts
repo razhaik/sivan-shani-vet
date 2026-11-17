@@ -1,6 +1,6 @@
 import "../_shared/cors.ts";
 import { createSuperdevClient } from "../_shared/superdev-compat.ts";
-import { cleanClientCancellationEmail } from "../_shared/clean-email.ts";
+import { cleanClientCancellationEmail, cleanRescheduleRequestedEmail } from "../_shared/clean-email.ts";
 
 
 const APP_ID = (Deno.env.get("SUPERDEV_APP_ID") ?? "sivan-shani-vet");
@@ -449,6 +449,28 @@ async function rescheduleSummary(appointment: AppointmentRecord, policy: Policy)
   };
 }
 
+
+async function sendRescheduleRequestedEmail(appointment: AppointmentRecord, request: RequestRecord, token: string): Promise<void> {
+  const email = validEmail(appointment.email);
+  if (!email || !SERVICE_ROLE_KEY) return;
+  try {
+    integrations.auth.setToken(SERVICE_ROLE_KEY);
+    const bodyHtml = cleanRescheduleRequestedEmail(
+      appointment,
+      { requested_date: request.proposed_appointment_date, requested_start_time: request.proposed_start_time, requested_end_time: request.proposed_end_time },
+      `${SITE_URL}/manage-appointment?token=${encodeURIComponent(token)}`,
+    );
+    const result = await integrations.integrations.core.sendEmail({
+      to: email,
+      from_name: "ד״ר סיון שני",
+      subject: "קיבלנו את בקשת שינוי המועד · ד״ר סיון שני",
+      body_html: bodyHtml,
+    });
+    if (result && typeof result === "object" && (("error" in result && result.error) || ("success" in result && result.success === false))) throw new Error("Email service reported an error");
+  } catch (error) {
+    console.error("[ManageAppointment] reschedule request client email failed:", safeError(error));
+  }
+}
 
 async function sendCancellationEmail(appointment: AppointmentRecord, settings: SettingsRecord): Promise<"sent" | "skipped" | "failed"> {
   const email = validEmail(appointment.email);
@@ -962,6 +984,7 @@ async function handleRequestReschedule(req: Request, token: string, proposedDate
     }
 
     const notificationStatus = await notifyRescheduleRequest(req, requestId);
+    await sendRescheduleRequestedEmail(appointment, persisted, token);
     if (notificationStatus === "failed" || notificationStatus === "no_recipients") {
       await markRescheduleNotificationFailure(requestId, "בקשת שינוי המועד נשמרה, אך ההתראה למרפאה לא נשלחה. נדרשת בדיקה בהגדרות ההתראות.");
     }
