@@ -80,7 +80,7 @@ function isIsraelDST(year: number, month: number, day: number) {
   const lastDay = new Date(year, 10, 0); const lastSunday = lastDay.getDate() - lastDay.getDay(); return day < lastSunday;
 }
 
-export function buildGoogleCalendarLink(snapshot: AppointmentActionSnapshot) {
+export function buildGoogleCalendarLink(snapshot: AppointmentActionSnapshot, managementUrl = "") {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.date) || !/^\d{1,2}:\d{2}$/.test(snapshot.start_time) || !/^\d{1,2}:\d{2}$/.test(snapshot.end_time)) return "";
   const [year, month, day] = snapshot.date.split("-").map(Number);
   const offset = isIsraelDST(year, month - 1, day) ? "+03:00" : "+02:00";
@@ -99,6 +99,7 @@ export function buildGoogleCalendarLink(snapshot: AppointmentActionSnapshot) {
     `📍 ${CLINIC_ADDRESS}`,
     `🗺️ ניווט: ${CLINIC_MAPS_URL}`,
     `📞 ${VETERINARY_CLINIC_PROFILE.phone}`,
+    ...(managementUrl ? ["", `✏️ שינוי או ביטול תור: ${managementUrl}`] : []),
     "",
     "מומלץ להגיע כ-5 דקות לפני התור.",
   ].join("\n");
@@ -290,7 +291,7 @@ export function appointmentSnapshotFromRecord(record: Record<string, any>): Appo
 
 export async function runAppointmentSideEffects(snapshot: AppointmentActionSnapshot, action: AppointmentActionKind): Promise<AppointmentActionResult> {
   const calendar = action === "approve" || action === "update" ? await calendarSync(snapshot.id, action) : await calendarRemove(snapshot);
-  const calendarUrl = action === "approve" ? buildGoogleCalendarLink(snapshot) : "";
+  const calendarUrl = action === "approve" ? buildGoogleCalendarLink(snapshot, await managementUrlFor(snapshot)) : "";
   const [email, sms] = await Promise.all([appointmentEmail(snapshot, action, calendarUrl), appointmentSms(snapshot, action, calendarUrl)]);
   const hasNonSuccess = [calendar, email, sms].some((item) => item.status !== "success");
   const firstLine = action === "approve" ? "הבקשה אושרה." : action === "reject" ? "הבקשה סורבה." : action === "cancel" ? "התור בוטל." : "השינויים בפגישה נשמרו.";
