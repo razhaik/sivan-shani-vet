@@ -72,14 +72,6 @@ function wazeUrl(): string {
   return `https://waze.com/ul?q=${encodeURIComponent(CLINIC_ADDRESS.replace(/״/g, '"'))}&navigate=yes`;
 }
 
-/**
- * Gmail does not keep tel: links clickable, so the phone number links to a
- * small page on the site (/call/) that opens the dialer.
- */
-function callUrl(): string {
-  return `${VETERINARY_CLINIC_PROFILE.publicOrigin.replace(/\/$/, "")}/call/`;
-}
-
 function mapsUrl(): string {
   return CLINIC_MAPS_URL;
 }
@@ -214,7 +206,7 @@ ${showHome ? homeScreenSection() : ""}
 <tr>
 <td align="center" style="padding-top:18px;font-family:${FONT};font-size:13px;line-height:1.8;color:${MUTED};">
 ${esc(clinic)} · מרפאה וטרינרית לכלבים ולחתולים<br>
-${esc(CLINIC_ADDRESS)} · <a href="${esc(callUrl())}" target="_blank" rel="noopener noreferrer" style="color:${BLUE};text-decoration:underline;">${esc(VETERINARY_CLINIC_PROFILE.phone)}</a><br>
+${esc(CLINIC_ADDRESS)} · ${esc(VETERINARY_CLINIC_PROFILE.phone)}<br>
 <a href="${esc(VETERINARY_CLINIC_PROFILE.publicOrigin)}" style="color:${MUTED};">${esc(VETERINARY_CLINIC_PROFILE.publicOrigin.replace(/^https?:\/\//, ""))}</a>
 </td></tr></table>
 </td></tr>
