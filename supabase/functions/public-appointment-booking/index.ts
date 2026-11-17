@@ -699,6 +699,7 @@ function lookupSpecies(value: unknown): "" | "dog" | "cat" | "other" {
 type LookupPet = { name: string; species: "" | "dog" | "cat" | "other" };
 
 function lookupPets(records: AnyRecord[]): LookupPet[] {
+  const canonicalOnly = records.length === 1 && Array.isArray(records[0]?.pet_details);
   const pets = new Map<string, LookupPet>();
   const add = (rawName: unknown, rawSpecies: unknown) => {
     const name = boundedText(rawName, 120);
@@ -716,7 +717,7 @@ function lookupPets(records: AnyRecord[]): LookupPet[] {
         if (item && typeof item === "object") add((item as AnyRecord).name, (item as AnyRecord).species);
       }
     }
-    text(record.pet_name).split(/\r?\n+/).forEach((name) => add(name, record.pet_species));
+    if (!canonicalOnly) text(record.pet_name).split(/\r?\n+/).forEach((name) => add(name, record.pet_species));
   }
   return [...pets.values()];
 }
@@ -754,7 +755,7 @@ async function handleCustomerLookup(rawPhone: string) {
     .filter((record) => canonicalPhone(record.phone) === canonical)
     .sort((left, right) => lookupRecordRecency(right, true) - lookupRecordRecency(left, true));
   const matchingBusinessClients = businessClients
-    .filter((record) => canonicalPhone(record.phone) === canonical)
+    .filter((record) => canonicalPhone(record.phone) === canonical || canonicalPhone(record.mobile_phone) === canonical)
     .sort((left, right) => lookupRecordRecency(right, false) - lookupRecordRecency(left, false));
 
   const preferredAppointment = matchingAppointments.find((record) => !["cancelled", "canceled"].includes(text(record.status).toLowerCase()));
@@ -773,12 +774,17 @@ async function handleCustomerLookup(rawPhone: string) {
     });
   }
 
-  const pets = lookupPets([
-    ...matchingAppointments.filter((record) => !["cancelled", "canceled"].includes(text(record.status).toLowerCase())),
-    ...matchingBusinessClients,
-    ...matchingAppointments,
-  ]);
-  return json(lookupCustomerPayload(selected, requestedPhone, pets));
+  // The CRM client file is the source of truth for pets (same list the dashboard shows).
+  // Fall back to the client's live appointments only when no client file has a pet list.
+  const clientFile = matchingBusinessClients.find((record) => Array.isArray(record.pet_details));
+  const pets = clientFile
+    ? lookupPets([clientFile])
+    : lookupPets(matchingAppointments.filter((record) => !["cancelled", "canceled", "rejected", "declined"].includes(text(record.status).toLowerCase())));
+  const payload = lookupCustomerPayload(selected, requestedPhone, pets);
+  const listed = pets.find((pet) => pet.name.toLocaleLowerCase("he") === payload.petName.toLocaleLowerCase("he"));
+  if (pets.length === 1) Object.assign(payload, { petName: pets[0].name, petSpecies: pets[0].species || payload.petSpecies });
+  else if (pets.length > 1 && !listed) Object.assign(payload, { petName: "", petSpecies: "" });
+  return json(payload);
 }
 
 async function handleAvailability(date: ParsedDate, serviceId: string, serviceName: string, requestedDuration: unknown) {
