@@ -4,7 +4,6 @@ import { Appointment, ClinicSettings } from "@/entities";
 import { createCalendarEvent, sendSms } from "@/functions";
 import { sendEmail } from "@/integrations/core";
 import {
-  buildAppointmentEmailHtml,
   buildAppointmentManagementUrl,
   buildCustomerEmailHtml,
   buildCustomerRescheduleRejectionEmailHtml,
@@ -213,9 +212,7 @@ async function appointmentEmail(snapshot: AppointmentActionSnapshot, action: App
       : { title: "עדכון: התור בוטל", subtitle: "הודעה על ביטול התור.", statusLabel: "תור מבוטל", statusColor: "#dc2626" };
   const emailType = approved ? "appointment_approved" : updated ? "appointment_updated" : "appointment_cancelled";
   const templateKey = resolveCustomerEmailTemplateSelection(setting?.customer_email_template_selections, emailType);
-  const bodyHtml = templateKey === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    ? buildCustomerEmailHtml(emailType, templateKey, snapshot, options)
-    : buildAppointmentEmailHtml(snapshot, options);
+  const bodyHtml = buildCustomerEmailHtml(emailType, templateKey, snapshot, options);
   try {
     await runWithTimeout(() => sendEmail({ to: snapshot.email, subject: approved ? `אישור תור – ${VETERINARY_CLINIC_PROFILE.shortName}` : updated ? `עדכון פרטי תור – ${VETERINARY_CLINIC_PROFILE.shortName}` : `ביטול תור – ${VETERINARY_CLINIC_PROFILE.shortName}`, body_html: bodyHtml }), "שליחת אימייל ללקוח");
     return succeeded("נשלח");

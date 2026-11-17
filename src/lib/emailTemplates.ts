@@ -1,7 +1,12 @@
 import { clinicDisplayLabel, clinicEmailFooter, safePublicLink, VETERINARY_CLINIC_PROFILE } from "@/lib/clinicProfile";
+import { buildCleanApprovedEmailHtml } from "@/lib/cleanAppointmentEmail";
 
 export const CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY = "current-clinic-template" as const;
 export const MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY = "marketing-clinic-template" as const;
+export const CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY = "clean-clinic-template" as const;
+
+/** Email types that the clean template can render. Other types keep their current designs. */
+export const CLEAN_TEMPLATE_EMAIL_TYPES = ["appointment_approved"] as const;
 
 export const CUSTOMER_EMAIL_TEMPLATE_OPTIONS = [
   {
@@ -15,6 +20,12 @@ export const CUSTOMER_EMAIL_TEMPLATE_OPTIONS = [
     label: "תבנית שיווקית",
     title: "תבנית שיווקית",
     description: "עיצוב נקי עם סימן המים של לוגו המרפאה, כותרת, פרטי תור ופעולות ברורות.",
+  },
+  {
+    key: CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY,
+    label: "תבנית נקייה",
+    title: "תבנית נקייה עם מסך הבית",
+    description: "לוגו המרפאה, פרטי התור ברשימה מסודרת, כפתור הוספה ליומן, ניווט, והדגמה איך להוסיף את האתר למסך הבית.",
   },
 ] as const;
 
@@ -66,16 +77,24 @@ export type CustomerEmailTemplateKey = (typeof CUSTOMER_EMAIL_TEMPLATE_OPTIONS)[
 export type CustomerEmailTemplateSelections = Partial<Record<CustomerEmailTypeKey, CustomerEmailTemplateKey>>;
 
 export function resolveCustomerEmailTemplate(value: unknown): CustomerEmailTemplateKey {
-  return value === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    ? MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
-    : CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY;
+  if (value === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY) return MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY;
+  if (value === CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY) return CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY;
+  return CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY;
+}
+
+export function templateSupportsEmailType(templateKey: unknown, emailType: CustomerEmailTypeKey): boolean {
+  if (resolveCustomerEmailTemplate(templateKey) !== CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY) return true;
+  return (CLEAN_TEMPLATE_EMAIL_TYPES as readonly string[]).includes(emailType);
 }
 
 export function resolveCustomerEmailTemplateSelection(value: unknown, emailType: CustomerEmailTypeKey): CustomerEmailTemplateKey {
   const source = value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-  return resolveCustomerEmailTemplate(source[emailType]);
+  // The approval email uses the clean design unless the clinic picked another one.
+  if (source[emailType] === undefined && emailType === "appointment_approved") return CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY;
+  const resolved = resolveCustomerEmailTemplate(source[emailType]);
+  return templateSupportsEmailType(resolved, emailType) ? resolved : CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY;
 }
 
 export interface AppointmentLike {
@@ -320,10 +339,16 @@ export function buildCustomerEmailHtml(
   options: AppointmentEmailOptions,
 ): string {
   const resolvedTemplate = resolveCustomerEmailTemplate(templateKey);
-  if (resolvedTemplate === CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY) {
-    return buildAppointmentEmailHtml(appointment, options);
+  if (resolvedTemplate === CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY && templateSupportsEmailType(resolvedTemplate, emailType)) {
+    return buildCleanApprovedEmailHtml(appointment, {
+      addToCalendarUrl: options.addToCalendarUrl,
+      managementUrl: options.managementUrl,
+    });
   }
-  return buildMarketingAppointmentEmailHtml(appointment, options);
+  if (resolvedTemplate === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY) {
+    return buildMarketingAppointmentEmailHtml(appointment, options);
+  }
+  return buildAppointmentEmailHtml(appointment, options);
 }
 
 /** Build the one public, appointment-scoped link included in new client emails. */

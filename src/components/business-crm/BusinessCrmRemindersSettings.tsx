@@ -23,8 +23,11 @@ import {
   CUSTOMER_EMAIL_TYPES,
   CURRENT_CUSTOMER_EMAIL_TEMPLATE_KEY,
   MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY,
+  CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY,
   buildCustomerEmailPreviewHtml,
   resolveCustomerEmailTemplate,
+  resolveCustomerEmailTemplateSelection,
+  templateSupportsEmailType,
   type CustomerEmailTemplateKey,
   type CustomerEmailTemplateSelections,
   type CustomerEmailTypeKey,
@@ -119,7 +122,7 @@ function readEmailSelections(value: unknown): CustomerEmailTemplateSelections {
     ? value as Record<string, unknown>
     : {};
   return CUSTOMER_EMAIL_TYPES.reduce<CustomerEmailTemplateSelections>((selections, emailType) => {
-    selections[emailType.key] = resolveCustomerEmailTemplate(source[emailType.key]);
+    selections[emailType.key] = resolveCustomerEmailTemplateSelection(source, emailType.key);
     return selections;
   }, {});
 }
@@ -129,7 +132,9 @@ function selectedEmailTemplate(value: unknown): CustomerEmailTemplateKey {
 }
 
 function emailTemplateLabel(value: unknown): string {
-  return resolveCustomerEmailTemplate(value) === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
+  const key = resolveCustomerEmailTemplate(value);
+  if (key === CLEAN_CUSTOMER_EMAIL_TEMPLATE_KEY) return "תבנית נקייה";
+  return key === MARKETING_CUSTOMER_EMAIL_TEMPLATE_KEY
     ? "תבנית שיווקית"
     : "התבנית הקיימת";
 }
@@ -855,7 +860,7 @@ export default function BusinessCrmRemindersSettings({
           </SheetHeader>
           <div className="mx-auto w-full max-w-2xl space-y-4 px-5 py-5 sm:px-7">
             <div className="grid gap-3 md:grid-cols-2">
-              {CUSTOMER_EMAIL_TEMPLATE_OPTIONS.map((option) => {
+              {CUSTOMER_EMAIL_TEMPLATE_OPTIONS.filter((option) => templateSupportsEmailType(option.key, emailEditor ?? "booking_request")).map((option) => {
                 const selected = emailDraftSelection === option.key;
                 return (
                   <article
