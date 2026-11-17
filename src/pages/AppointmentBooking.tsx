@@ -1568,12 +1568,7 @@ export default function AppointmentBooking() {
                     />
                   </div>
 
-                  {smsConsentOnFile && clientData.smsConsent ? (
-                    <p className="flex items-center gap-2 rounded-2xl border border-green-100 bg-green-50/60 px-4 py-3 text-sm font-semibold text-green-800">
-                      <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      אישרתם בעבר קבלת הודעות SMS מהמרפאה, נעדכן אתכם גם בתור הזה.
-                    </p>
-                  ) : (
+                  {smsConsentOnFile && clientData.smsConsent ? null : (
                   <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
                     <label htmlFor="sms-consent" className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-relaxed text-slate-700">
                       <input
