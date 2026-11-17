@@ -79,7 +79,7 @@ function detailRow(label: string, value: string, last = false): string {
 
 function homeScreenSection(): string {
   const col = (label: string, gif: string, alt: string, steps: string) => `<td width="50%" align="center" valign="top" style="padding:0 6px;">
-<div style="font-family:${FONT};font-size:14px;font-weight:700;color:${BLUE};padding-bottom:10px;">${label}</div>
+<div style="padding-bottom:12px;height:22px;">${label}</div>
 <img src="${gif}" width="200" height="267" alt="${esc(alt)}" style="display:block;width:200px;max-width:100%;height:auto;border:1px solid ${LINE};border-radius:12px;" />
 <div style="font-family:${FONT};font-size:13px;line-height:1.7;color:${BODY};padding-top:10px;">${steps}</div>
 </td>`;
@@ -89,8 +89,8 @@ function homeScreenSection(): string {
 <tr><td align="center" style="padding:10px 10px 0;font-family:${FONT};font-size:15px;line-height:1.7;color:${BODY};">הוסיפו את האתר של ${esc(VETERINARY_CLINIC_PROFILE.shortName)} למסך הבית, ובפעם הבאה תקבעו תור ישר מהאייקון.</td></tr>
 <tr><td style="padding-top:18px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl"><tr>
-${col("אייפון", assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", "⋯ ← שיתוף ← הוספה למסך הבית ← הוספה")}
-${col("אנדרואיד", assetUrl("home-android.gif"), "הדגמה: הוספת האתר למסך הבית באנדרואיד", "⋮ ← הוספה למסך הבית ← התקנה")}
+${col(`<img src="${assetUrl("label-iphone.png")}" width="103" height="22" alt="iPhone" style="display:inline-block;width:103px;height:22px;border:0;" />`, assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", "⋯ ← שיתוף ← הוספה למסך הבית ← הוספה")}
+${col(`<img src="${assetUrl("label-android.png")}" width="143" height="22" alt="Android" style="display:inline-block;width:143px;height:22px;border:0;" />`, assetUrl("home-android.gif"), "הדגמה: הוספת האתר למסך הבית באנדרואיד", "⋮ ← הוספה למסך הבית ← התקנה")}
 </tr></table>
 </td></tr>
 </table>
