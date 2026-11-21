@@ -1,0 +1,18 @@
+name: Diagnose reminders (read-only)
+on:
+  push:
+    branches: [diag/reminders]
+jobs:
+  q:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          q() { jq -n --arg q "$1" '{query: $q, read_only: true}' > b.json; echo "=== $2"; curl -sS -X POST "https://api.supabase.com/v1/projects/pfeneycysyczdljnuhov/database/query" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @b.json; echo; }
+          q "select jobid, jobname, schedule, active from cron.job" "cron jobs"
+          q "select status, count(*), max(start_time) last from cron.job_run_details where start_time > now() - interval '5 days' group by status" "cron runs 5d"
+          q "select status_code, count(*), max(created) last from net._http_response where created > now() - interval '2 days' group by status_code" "http responses 2d"
+          q "select count(*) total_confirmed, count(*) filter (where date >= current_date - 1) upcoming_confirmed, min(date) oldest from public.appointment where status='confirmed'" "confirmed counts"
+          q "select date, count(*) appts, count(day_before_reminder_sent_at) day_sent, count(hour_before_reminder_sent_at) hour_sent, count(*) filter (where coalesce(email,'') ~ '@') with_email from public.appointment where status='confirmed' and date between current_date - 5 and current_date + 1 group by date order by date" "markers by day"
+          q "select enable_email_reminders, enable_sms_reminders, reminder_day_before_hours, reminder_hour_before_hours from public.clinic_settings order by created_at desc limit 1" "settings"
