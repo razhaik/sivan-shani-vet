@@ -126,8 +126,8 @@ function linkStyle(): string {
 
 function detailRow(label: string, value: string): string {
   return `<tr>
-<td align="right" style="padding:14px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:15px;color:${MUTED};">${esc(label)}</td>
-<td align="left" style="padding:14px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:15px;font-weight:600;color:${NAVY};">${esc(value)}</td>
+<td align="right" style="padding:14px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:14px;color:${MUTED};">${esc(label)}</td>
+<td align="left" style="padding:14px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:14px;font-weight:600;color:${NAVY};">${esc(value)}</td>
 </tr>`;
 }
 
@@ -146,8 +146,8 @@ function homeScreenSection(): string {
 </td>`;
   return `<tr><td class="px" style="padding:36px 32px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid ${LINE};">
-<tr><td align="center" style="padding-top:32px;font-family:${FONT};font-size:22px;font-weight:700;color:${NAVY};">קביעת תור בלחיצה אחת</td></tr>
-<tr><td align="center" style="padding:10px 10px 0;font-family:${FONT};font-size:15px;line-height:1.7;color:${BODY};">הוסיפו את האתר של ${esc(CLINIC_NAME)} למסך הבית, ובפעם הבאה תקבעו תור ישר מהאייקון.</td></tr>
+<tr><td align="center" style="padding-top:32px;font-family:${FONT};font-size:18px;font-weight:700;color:${NAVY};">קביעת תור בלחיצה אחת</td></tr>
+<tr><td align="center" style="padding:10px 10px 0;font-family:${FONT};font-size:14px;line-height:1.7;color:${BODY};">הוסיפו את האתר של ${esc(CLINIC_NAME)} למסך הבית, ובפעם הבאה תקבעו תור ישר מהאייקון.</td></tr>
 <tr><td style="padding-top:18px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl" style="table-layout:fixed;"><tr>
 ${col(`<img src="${assetUrl("label-iphone.png")}" width="93" height="20" alt="iPhone" style="display:inline-block;width:93px;height:20px;border:0;" />`, assetUrl("home-ios.gif"), "הדגמה: הוספת האתר למסך הבית באייפון", ["לוחצים על ⋯", "שיתוף", "הוספה למסך הבית", "הוספה"])}
@@ -198,7 +198,7 @@ export function renderCleanEmail(parts: CleanEmailParts): string {
   const primary = parts.primary && primaryUrl
     ? `<tr><td class="px" style="padding:32px 32px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" bgcolor="${tone.button}" style="border-radius:8px;">
-<a href="${esc(primaryUrl)}" target="_blank" rel="noopener noreferrer" style="display:block;padding:15px 0;font-family:${FONT};font-size:16px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:8px;">${esc(parts.primary.label)}</a>
+<a href="${esc(primaryUrl)}" target="_blank" rel="noopener noreferrer" style="display:block;padding:15px 0;font-family:${FONT};font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:8px;">${esc(parts.primary.label)}</a>
 </td></tr></table></td></tr>`
     : "";
 
@@ -220,31 +220,31 @@ img{max-width:100%;height:auto;}
   .px{padding-left:20px !important;padding-right:20px !important;}
   .shell{padding:16px 8px !important;}
   .hs-col{display:block !important;width:100% !important;padding:0 0 28px !important;}
-  .h1{font-size:24px !important;}
+  .h1{font-size:20px !important;}
 }
 </style>
 </head>
 <body style="margin:0;padding:0;background:${PAGE};direction:rtl;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
 ${parts.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(parts.preheader)}</div>` : ""}
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="${PAGE}" style="background:${PAGE};">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="${PAGE}" style="background:${PAGE};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">
 <tr><td class="shell" align="center" style="padding:40px 12px;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl" style="max-width:520px;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px;overflow:hidden;word-break:break-word;overflow-wrap:anywhere;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" dir="rtl" style="max-width:520px;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px;overflow:hidden;">
 <tr><td height="6" bgcolor="${tone.bar}" style="height:6px;line-height:6px;font-size:0;background:${tone.bar};">&nbsp;</td></tr>
 
 <tr><td class="px" align="center" style="padding:40px 32px 0;">
 <img src="${assetUrl("logo-navy.png")}" width="49" height="76" alt="לוגו ${esc(CLINIC_NAME)}" style="display:block;width:49px;height:76px;border:0;" />
-<div style="padding-top:10px;font-family:${FONT};font-size:20px;font-weight:700;color:${NAVY};">${esc(CLINIC_NAME)}</div>
+<div style="padding-top:10px;font-family:${FONT};font-size:17px;font-weight:700;color:${NAVY};">${esc(CLINIC_NAME)}</div>
 <div style="font-family:${FONT};font-size:13px;color:${MUTED};">מרפאה וטרינרית · נס ציונה</div>
 </td></tr>
 
 <tr><td class="px" align="right" style="padding:28px 32px 0;">
-${parts.label && parts.label !== parts.heading ? `<div style="font-family:${FONT};font-size:14px;font-weight:600;color:${tone.label};">${esc(parts.label)}</div>` : ""}
-<h1 class="h1" style="margin:10px 0 0;font-family:${FONT};font-size:28px;line-height:1.3;font-weight:700;color:${NAVY};">${esc(parts.heading)}</h1>
-${parts.intro ? `<p style="margin:10px 0 0;font-family:${FONT};font-size:16px;line-height:1.7;color:${BODY};">${esc(parts.intro).replace(/\n/g, "<br>")}</p>` : ""}
+${parts.label && parts.label !== parts.heading ? `<div style="font-family:${FONT};font-size:13px;font-weight:600;color:${tone.label};">${esc(parts.label)}</div>` : ""}
+<h1 class="h1" style="margin:10px 0 0;font-family:${FONT};font-size:22px;line-height:1.3;font-weight:700;color:${NAVY};">${esc(parts.heading)}</h1>
+${parts.intro ? `<p style="margin:10px 0 0;font-family:${FONT};font-size:15px;line-height:1.7;color:${BODY};">${esc(parts.intro).replace(/\n/g, "<br>")}</p>` : ""}
 </td></tr>
 
 ${parts.body ? `<tr><td class="px" align="right" style="padding:20px 32px 0;">
-${parts.body.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean).map((block) => `<p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.8;color:${BODY};">${esc(block).replace(/\n/g, "<br>")}</p>`).join("\n")}
+${parts.body.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean).map((block) => `<p style="margin:0 0 14px;font-family:${FONT};font-size:15px;line-height:1.8;color:${BODY};">${esc(block).replace(/\n/g, "<br>")}</p>`).join("\n")}
 </td></tr>` : ""}
 
 ${rows.length ? `<tr><td class="px" style="padding:24px 32px 0;">
@@ -255,11 +255,11 @@ ${rows.map(([label, value]) => detailRow(label, value)).join("\n")}
 
 ${primary}
 
-${links ? `<tr><td class="px" align="center" style="padding:16px 32px 0;font-family:${FONT};font-size:15px;">${links}</td></tr>` : ""}
+${links ? `<tr><td class="px" align="center" style="padding:16px 32px 0;font-family:${FONT};font-size:14px;">${links}</td></tr>` : ""}
 
 ${parts.note ? `<tr><td class="px" style="padding:36px 32px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-<td align="center" bgcolor="${tone.soft}" style="padding:18px 20px;border-radius:8px;text-align:center;font-family:${FONT};font-size:14px;line-height:1.7;color:${BODY};">${esc(parts.note).replace(/\n/g, "<br>")}</td>
+<td align="center" bgcolor="${tone.soft}" style="padding:18px 20px;border-radius:8px;text-align:center;font-family:${FONT};font-size:13px;line-height:1.7;color:${BODY};">${esc(parts.note).replace(/\n/g, "<br>")}</td>
 </tr></table>
 </td></tr>` : ""}
 
