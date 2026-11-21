@@ -250,7 +250,11 @@ async function runReminderJob(): Promise<void> {
 
   let appointments: AppointmentRecord[];
   try {
-    appointments = await Appointment.query().where("status", "confirmed").sort("date").limit(MAX_APPOINTMENTS).exec();
+    // Only upcoming appointments can need a reminder. Without this filter the oldest 250
+    // confirmed appointments (history migrated from Buildy) filled the batch and the
+    // upcoming ones were never reached.
+    const fromDate = new Date(Date.now() - 24 * HOUR_MS).toISOString().slice(0, 10);
+    appointments = await Appointment.query().where("status", "confirmed").gte("date", fromDate).sort("date").limit(MAX_APPOINTMENTS).exec();
   } catch (error) { console.error("[Reminders] Could not load confirmed appointments:", safeError(error)); return; }
 
   const now = new Date();
