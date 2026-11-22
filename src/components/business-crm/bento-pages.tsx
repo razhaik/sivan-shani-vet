@@ -8,6 +8,7 @@ import { CrmProfileMenu, type CrmProfileUpdate } from "@/components/business-crm
 import type { CrmRecord, CrmMobileAppointmentDecisionNotice } from "@/components/business-crm/CrmContext";
 import type { AppointmentDecisionAction } from "@/lib/crmAppointmentDecision";
 import type { DashboardClientSummary } from "@/lib/crmDashboardData";
+import type { GoogleCalendarEvent } from "@/lib/adminAppointmentAvailability";
 import {
   AppointmentCard,
   clinicShortDate,
@@ -509,6 +510,8 @@ export interface CalendarPageData {
   search: string;
   visibleServiceCount: number;
   visibleServiceIds: Set<string>;
+  /** Google Calendar events for the visible range; drawn as busy blocks so no one books over them. */
+  googleEvents?: GoogleCalendarEvent[];
 }
 
 export interface CalendarPageActions {
@@ -554,9 +557,20 @@ export function CalendarPage({
     () => data.allAppointments.filter((record) => String(record.date ?? "") === selectedDay && isActiveAppointment(record)),
     [data.allAppointments, selectedDay],
   );
+  const dayGoogleEvents = useMemo(
+    () => (data.googleEvents ?? []).filter((event) => String(event.date ?? "") === selectedDay),
+    [data.googleEvents, selectedDay],
+  );
+  const allDayGoogleEvents = useMemo(() => dayGoogleEvents.filter((event) => event.allDay), [dayGoogleEvents]);
+  // Google events share the timeline with appointments (same lanes), as records marked __google.
   const timedAppointments = useMemo(
-    () => arrangeCalendarTimeline(dayAppointments),
-    [dayAppointments],
+    () => arrangeCalendarTimeline([
+      ...dayAppointments,
+      ...dayGoogleEvents
+        .filter((event) => !event.allDay && timeMinutes(event.start) !== null)
+        .map((event) => ({ id: `google-${event.id}`, start_time: event.start, end_time: event.end, client_name: event.title, __google: true }) as CrmRecord),
+    ]),
+    [dayAppointments, dayGoogleEvents],
   );
   const appointmentsWithoutTime = useMemo(
     () => dayAppointments.filter((record) => timeMinutes(record.start_time) === null),
@@ -590,7 +604,7 @@ export function CalendarPage({
   const hours = Array.from({ length: hourCount + 1 }, (_, index) => timelineBounds.startHour + index);
   const nowOffset = (clock.minutes - timelineBounds.startHour * 60) * (CALENDAR_HOUR_HEIGHT / 60);
   const showNowLine = isSelectedDayToday && nowOffset >= 0 && nowOffset <= timelineHeight;
-  const noVisibleAppointments = dayAppointments.length === 0;
+  const noVisibleAppointments = dayAppointments.length === 0 && dayGoogleEvents.length === 0;
   const hasUnfilteredAppointments = allDayAppointments.length > 0;
 
   const statusToneClass = (record: CrmRecord) => {
@@ -686,6 +700,12 @@ export function CalendarPage({
                   <span className="timeline-legend"><i aria-hidden="true" />טווח שעות</span>
                 </div>
 
+                {allDayGoogleEvents.length > 0 && (
+                  <div className="calendar-google-allday" aria-label="אירועי Google לכל היום">
+                    {allDayGoogleEvents.map((event) => <span className="calendar-google-chip" key={event.id}><CalendarDays aria-hidden="true" /><b dir="auto">{event.title || "תפוס"}</b><small>כל היום · Google</small></span>)}
+                  </div>
+                )}
+
                 {noVisibleAppointments && !hasUnfilteredAppointments ? (
                   <div className="calendar-empty-state">
                     <span className="calendar-empty-icon"><CalendarDays aria-hidden="true" /></span>
@@ -711,6 +731,27 @@ export function CalendarPage({
                         <div className="tl" style={{ height: `${timelineHeight}px` }} role="list" aria-label="תורים לפי שעה">
                           {hours.map((hour, index) => <div className="hr" key={hour} style={{ top: `${index * CALENDAR_HOUR_HEIGHT}px` }} aria-hidden="true" />)}
                           {timedAppointments.map((event) => {
+                            if (event.record.__google) {
+                              const gTop = Math.max(0, (event.startMinutes - timelineBounds.startHour * 60) * (CALENDAR_HOUR_HEIGHT / 60));
+                              const gHeight = Math.max(CALENDAR_EVENT_MIN_HEIGHT, (event.endMinutes - event.startMinutes) * (CALENDAR_HOUR_HEIGHT / 60));
+                              const gWidth = 100 / event.lanes;
+                              const gTitle = String(event.record.client_name ?? "").trim() || "תפוס";
+                              return (
+                                <div
+                                  role="listitem"
+                                  key={String(event.record.id)}
+                                  className={`ev google${gHeight < 64 ? " is-compact" : ""}`}
+                                  style={{ top: `${gTop}px`, height: `${gHeight}px`, width: `calc(${gWidth}% - 4px)`, insetInlineStart: `calc(${event.lane * gWidth}% + 2px)` }}
+                                  aria-label={`תפוס ביומן Google: ${gTitle}, ${calendarClockLabel(event.startMinutes)} עד ${calendarClockLabel(event.endMinutes)}`}
+                                >
+                                  <span className="ev-top">
+                                    <span className="ev-time"><TimeRange start={event.record.start_time} end={calendarClockLabel(event.endMinutes)} /></span>
+                                    <span className="ev-status google">Google</span>
+                                  </span>
+                                  <b className="ev-client" dir="auto">{gTitle}</b>
+                                </div>
+                              );
+                            }
                             const { status, kindClass } = statusToneClass(event.record);
                             const clientName = String(event.record.client_name ?? "").trim() || "שם הלקוח לא צוין";
                             const details = [String(event.record.pet_name ?? "").trim(), String(event.record.appointment_type ?? "").trim()].filter(Boolean).join(" · ") || "פרטים לא צוינו";

@@ -1523,6 +1523,52 @@
   background: var(--rose);
 }
 
+.bn-calendar .ev.google {
+  z-index: 1;
+  border-color: color-mix(in srgb, var(--ink3) 30%, transparent);
+  border-style: dashed;
+  border-inline-start-style: solid;
+  border-inline-start-color: var(--ink3);
+  background: repeating-linear-gradient(135deg, var(--bg) 0 8px, color-mix(in srgb, var(--ink3) 9%, var(--bg)) 8px 16px);
+  box-shadow: none;
+  cursor: default;
+}
+
+.bn-calendar .ev.google:hover {
+  filter: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.bn-calendar .ev-status.google {
+  color: var(--ink2, #4b5563);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.bn-calendar .calendar-google-allday {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.bn-calendar .calendar-google-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px dashed color-mix(in srgb, var(--ink3) 35%, transparent);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.bn-calendar .calendar-google-chip svg { width: 14px; height: 14px; flex: none; }
+.bn-calendar .calendar-google-chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bn-calendar .calendar-google-chip small { color: var(--ink3); white-space: nowrap; }
+
 .bn-calendar .ev.unknown,
 .bn-calendar .ev.cancelled {
   border-color: var(--line);

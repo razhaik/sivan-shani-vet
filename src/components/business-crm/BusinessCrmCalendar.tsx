@@ -1174,6 +1174,7 @@ export default function BusinessCrmCalendar() {
     search,
     visibleServiceCount: calendarFilterItems.length,
     visibleServiceIds,
+    googleEvents: visibleGoogleEvents,
   };
   const openMobileAgenda = () => {
     setMobileCalendarView("agenda");
