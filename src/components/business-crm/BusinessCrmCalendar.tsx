@@ -1180,6 +1180,11 @@ export default function BusinessCrmCalendar() {
     setMobileCalendarView("agenda");
     setMode("agenda");
   };
+  const openMobileMonth = () => {
+    setMobileCalendarView("agenda");
+    setMode("month");
+    setServicePickerOpen(false);
+  };
   const openMobileDay = () => {
     setMobileCalendarView("timeline");
     setMode("day");
@@ -1191,6 +1196,7 @@ export default function BusinessCrmCalendar() {
     onSelectDate: selectDate,
     onOpenAgenda: openMobileAgenda,
     onOpenDay: openMobileDay,
+    onOpenMonth: openMobileMonth,
     onOpenBlock: () => openBlockDialog(selectedDate),
     onSearchChange: setSearch,
   };
@@ -1198,7 +1204,7 @@ export default function BusinessCrmCalendar() {
     <div className="calendar-agenda-stack">
       <BusinessCrmCalendarToolbar mode={mode} selectedDate={selectedDate} isTodayView={isTodayView} canCreateBooking={canCreateBooking} unsyncedCount={unsyncedConfirmedCount} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} servicePickerOpen={servicePickerOpen} sidePanelOpen={sidePanelOpen} onModeChange={setMode} onPrevious={() => moveDate(-1)} onNext={() => moveDate(1)} onToday={() => selectDate(new Date())} onSelectDate={selectDate} onRefresh={() => { void refreshData(); void calendarBlocksQuery.refetch(); }} onToggleServicePicker={() => setServicePickerOpen((open) => !open)} onToggleService={toggleService} onToggleSidePanel={() => setSidePanelOpen((open) => !open)} onNewBooking={() => openQuickBooking(selectedDate, suggestedBookingTime)} onOpenBlock={openBlockDialog} onOpenSettings={() => openView({ kind: "settings", section: "calendar" })} />
       <CalendarAppointmentSyncSection className="crm-calendar-sync-in-calendar" syncFeedback={calendarSyncFeedback} onRetrySingle={(appointmentId) => void retrySingleCalendarAction(appointmentId)} onSyncSettled={refreshCrmAndGoogleCalendar} />
-      <div className={`grid min-w-0 gap-5 ${sidePanelOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "grid-cols-1"}`} dir="ltr"><div className="min-w-0" dir="rtl"><BusinessCrmCalendarGrid mode={mode} selectedDate={selectedDate} monthDate={monthDate} isMobile={isMobileCalendar} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} services={appointmentServiceItems} now={now} onSelectDate={selectDate} onSelectSlot={openSlotAction} onSelectAppointment={openAppointment} calendarBlocks={normalizedCalendarBlocks} /></div>{sidePanelOpen && <BusinessCrmCalendarSidePanel selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} calendarBlocks={normalizedCalendarBlocks} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} onSelectDate={selectDate} onChangeMonth={setMonthDate} onToggleService={toggleService} onDeleteBlock={(block) => { void deleteCalendarBlock(block); }} />}</div>
+      <div className={`grid min-w-0 gap-5 ${sidePanelOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "grid-cols-1"}`} dir="ltr"><div className="min-w-0" dir="rtl"><BusinessCrmCalendarGrid mode={mode} selectedDate={selectedDate} monthDate={monthDate} isMobile={isMobileCalendar} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} services={appointmentServiceItems} now={now} onSelectDate={(date) => { selectDate(date); if (mode === "month") openMobileDay(); }} onSelectSlot={openSlotAction} onSelectAppointment={openAppointment} calendarBlocks={normalizedCalendarBlocks} /></div>{sidePanelOpen && <BusinessCrmCalendarSidePanel selectedDate={selectedDate} monthDate={monthDate} appointments={visibleAppointments} calendarBusy={displayCalendarBusy} googleEvents={visibleGoogleEvents} calendarBlocks={normalizedCalendarBlocks} serviceItems={calendarFilterItems} visibleServiceIds={visibleServiceIds} onSelectDate={selectDate} onChangeMonth={setMonthDate} onToggleService={toggleService} onDeleteBlock={(block) => { void deleteCalendarBlock(block); }} />}</div>
     </div>
   );
 

@@ -522,6 +522,7 @@ export interface CalendarPageActions {
   onSelectDate: (date: Date) => void;
   onOpenAgenda: () => void;
   onOpenDay: () => void;
+  onOpenMonth?: () => void;
   onOpenBlock: () => void;
   onSearchChange: (value: string) => void;
 }
@@ -650,6 +651,11 @@ export function CalendarPage({
             </div>
           </div>
           <div className="calendar-header-actions">
+            {!agendaMode && actions.onOpenMonth && (
+              <button type="button" className="calendar-action secondary" onClick={actions.onOpenMonth} aria-label="פתיחת תצוגת חודש">
+                <CalendarDays aria-hidden="true" /><span>חודש</span>
+              </button>
+            )}
             <button type="button" className="calendar-action secondary" onClick={actions.onOpenBlock} aria-label="סגירת חלון זמן ביומן">
               <CalendarDays aria-hidden="true" /><span>סגירת זמן</span>
             </button>
