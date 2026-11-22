@@ -65,7 +65,7 @@ function dayNumber(dateKey: string): number {
   return new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
 }
 
-function workDaysFrom(start: string, count = 6): string[] {
+export function workDaysFrom(start: string, count = 6): string[] {
   const days: string[] = [];
   let cursor = start;
   while (days.length < count) {
@@ -81,14 +81,17 @@ export function WeekStrip({
   appointments,
   value,
   today,
+  start,
   onChange,
 }: {
   appointments: CrmRecord[];
   value: string;
   today: string;
+  /** First day shown; defaults to today. */
+  start?: string;
   onChange: (dateKey: string) => void;
 }) {
-  const days = workDaysFrom(today, 6);
+  const days = workDaysFrom(start || today, 6);
   return (
     <div className="week" role="group" aria-label="בחירת יום לתצוגת התורים">
       {days.map((dateKey) => {

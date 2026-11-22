@@ -1244,6 +1244,45 @@
   font-weight: 700;
 }
 
+.bn-calendar .calendar-strip-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bn-calendar .strip-nav-btn,
+.bn-calendar .strip-nav-today,
+.bn-calendar .strip-nav-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bn-calendar .strip-nav-btn { padding: 0; }
+.bn-calendar .strip-nav-btn svg,
+.bn-calendar .strip-nav-picker svg { width: 15px; height: 15px; }
+
+/* The native date input covers the whole chip, so a tap anywhere opens the phone's date picker. */
+.bn-calendar .strip-nav-picker input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .bn-calendar .week {
   gap: 3px;
   padding: 6px;

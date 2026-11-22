@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, CalendarDays, Check, Clock3, List, PawPrint, Plus, Search, Settings, X, Phone, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, List, PawPrint, Plus, Search, Settings, X, Phone, XCircle } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ProfileAvatar } from "@/components/business-crm/CrmProfileAvatar";
 import { CrmProfileMenu, type CrmProfileUpdate } from "@/components/business-crm/CrmProfileMenu";
@@ -18,12 +18,14 @@ import {
   timeMinutes,
   TimeRange,
   WeekStrip,
+  workDaysFrom,
   appointmentStatus,
   type BentoDockTab,
 } from "@/components/business-crm/bento-ui";
 import {
   formatDashboardDate,
   getClinicDateKey,
+  shiftDashboardDate,
   summarizeDashboardAppointments,
 } from "@/lib/crmDashboardData";
 
@@ -547,6 +549,23 @@ export function CalendarPage({
   const isSelectedDayToday = selectedDay === today;
   const isFiltered = Boolean(data.search.trim()) || data.visibleServiceIds.size < data.visibleServiceCount;
 
+  // The day strip shows six work days from stripStart. Picking a date outside it (from the
+  // date picker) moves the strip so the chosen day is always visible.
+  const [stripStart, setStripStart] = useState(today);
+  useEffect(() => {
+    if (!workDaysFrom(stripStart, 6).includes(selectedDay)) setStripStart(selectedDay);
+  }, [selectedDay, stripStart]);
+  const pickDate = (dateKey: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+    actions.onSelectDate(new Date(`${dateKey}T12:00:00`));
+  };
+  const moveStrip = (days: number) => {
+    const nextStart = shiftDashboardDate(stripStart, days);
+    setStripStart(nextStart);
+    pickDate(workDaysFrom(nextStart, 1)[0]);
+  };
+  const stripIsCurrent = stripStart === today;
+
   const dayAppointments = useMemo(
     () => data.appointments
       .filter((record) => String(record.date ?? "") === selectedDay && isActiveAppointment(record))
@@ -656,12 +675,18 @@ export function CalendarPage({
             <section className="calendar-timeline-view" hidden={agendaMode} aria-label="תצוגת לוח יום">
               <div className="calendar-day-strip-label">
                 <span>בחירת יום</span>
-                <span className="calendar-strip-hint">6 ימי עבודה</span>
+                <span className="calendar-strip-nav">
+                  <button type="button" className="strip-nav-btn" onClick={() => moveStrip(-7)} aria-label="שבוע קודם"><ArrowRight aria-hidden="true" /></button>
+                  {!stripIsCurrent && <button type="button" className="strip-nav-today" onClick={() => { setStripStart(today); pickDate(today); }}>היום</button>}
+                  <label className="strip-nav-picker">
+                    <CalendarDays aria-hidden="true" />
+                    <span>תאריך</span>
+                    <input type="date" value={selectedDay} onChange={(event) => pickDate(event.target.value)} aria-label="בחירת תאריך ביומן" />
+                  </label>
+                  <button type="button" className="strip-nav-btn" onClick={() => moveStrip(7)} aria-label="שבוע הבא"><ArrowLeft aria-hidden="true" /></button>
+                </span>
               </div>
-              <WeekStrip appointments={data.appointments} value={selectedDay} today={today} onChange={(dateKey) => {
-                const date = new Date(`${dateKey}T12:00:00`);
-                actions.onSelectDate(date);
-              }} />
+              <WeekStrip appointments={data.appointments} value={selectedDay} today={today} start={stripStart} onChange={pickDate} />
 
               <section className="daysum" aria-label={`סיכום התורים ל${selectedDateLabel}`}>
                 <div className="daysum-heading">
